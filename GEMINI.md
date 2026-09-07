@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # GEMINI.md — sgrai-pwa
 
 Este archivo da contexto arquitectónico a cualquier asistente de IA que trabaje sobre este repositorio, que es la **aplicación de terreno (PWA)** del Sistema de Gestión de Recursos para Atención de Incidentes (SGRAI), de la Dirección de Gestión de Riesgos de Desastres de la Municipalidad de Valdivia.
