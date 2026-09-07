@@ -1,34 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SGRAI — App Terreno (PWA)
 
-## Getting Started
+Aplicacion de terreno (Progressive Web App) del **Sistema de Gestion de Recursos para Atencion de Incidentes (SGRAI)**, desarrollado para la Direccion de Gestion de Riesgos de Desastres de la Municipalidad de Valdivia.
 
-First, run the development server:
+## Descripcion
+
+Este repositorio contiene el cliente de presentacion para **personal operativo desplegado en terreno**. A diferencia del portal web (`sgrai-web`), esta aplicacion esta disenada para funcionar en condiciones de conectividad intermitente, con acceso a capacidades nativas del dispositivo (GPS, camara) y una interfaz optimizada para uso en movimiento.
+
+### Roles cubiertos
+
+- **Patrulla Verificadora**: recibe notificacion de incidente, confirma asistencia, categoriza el incidente en terreno, ajusta prioridad y envia reportes de situacion.
+- **Delegado de Cuadrilla**: acepta o rechaza misiones (con justificacion obligatoria), reporta llegada y estado inicial, adjunta evidencia fotografica/video e indica faltantes de recursos.
+
+> Nota: el rol de Informante no esta incluido en este repositorio. El Portal Informante se encuentra en `sgrai-web`.
+
+## Stack tecnologico
+
+| Tecnologia | Proposito |
+|---|---|
+| Next.js (React) | Framework principal, configurado como PWA |
+| TypeScript | Tipado estatico |
+| Vanilla CSS | Estilos, sin frameworks CSS externos |
+| Socket.io (cliente) | Notificaciones push en tiempo real |
+| Service Workers | Soporte offline y sincronizacion |
+| Docker | Contenedorizacion para despliegue On-Premise |
+
+## Estructura del proyecto
+
+```
+src/
+  app/            # Rutas y layouts (App Router de Next.js)
+  components/     # Componentes React reutilizables
+  hooks/          # Custom hooks (conectividad, geolocalizacion, etc.)
+  lib/            # Cliente API tipado y utilidades compartidas
+  services/       # Sincronizacion offline, cola local, Socket.io
+  types/          # Tipos generados desde OpenAPI (no editar manualmente)
+docs/
+  manuales-usuario/   # Manuales por historia de usuario (H<n>-<slug>.md)
+    assets/            # Capturas de pantalla para manuales
+```
+
+## Desarrollo local
+
+### Requisitos previos
+
+- Node.js >= 24
+- npm >= 12
+
+### Instalacion
+
+```bash
+npm install
+```
+
+### Variables de entorno
+
+Copiar el archivo de ejemplo y completar los valores:
+
+```bash
+cp .env.example .env.local
+```
+
+| Variable | Descripcion |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | URL base de la API REST (`sgrai-api`) |
+| `NEXT_PUBLIC_SOCKET_URL` | URL del servidor Socket.io |
+
+### Ejecucion
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Generacion de tipos de API
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Los tipos de request/response se generan automaticamente desde el spec OpenAPI de `sgrai-api`. No se deben escribir manualmente.
 
-## Learn More
+```bash
+npm run api:generate
+```
 
-To learn more about Next.js, take a look at the following resources:
+### Lint
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run lint
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Build
 
-## Deploy on Vercel
+```bash
+npm run build
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Comunicacion con el backend
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Este repositorio no contiene logica de negocio propia. Toda regla de negocio reside en `sgrai-api` y se consume via HTTPS/REST y Socket.io.
+
+Los tipos de la API se generan desde el spec OpenAPI y las llamadas se realizan mediante un cliente tipado (`openapi-fetch`). Nunca se deben escribir tipos de request/response a mano.
+
+## Convenciones de desarrollo
+
+| Aspecto | Convencion |
+|---|---|
+| Ramas | Gitflow (`main`, `develop`, `feature/*`, `release/*`, `hotfix/*`) |
+| Versionado | SemVer |
+| Commits | Conventional Commits |
+| Integracion | PR con Pair Review + PO Review obligatorias |
+
+## Licencia
+
+Uso interno — Municipalidad de Valdivia.

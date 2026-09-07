@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "api:generate": "npx openapi-typescript ${API_SPEC_URL:-https://api.sgrai.cl/openapi.json} -o src/types/api-generated.d.ts"
   },
   "dependencies": {
     "next": "16.3.4",
