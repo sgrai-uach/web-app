@@ -2,6 +2,10 @@
 
 # GEMINI.md — sgrai-pwa
 
+> [!NOTE]
+> **Estado del Repositorio:** Este repositorio (`sgrai-pwa` / `web-app`) se encuentra actualmente en fase inicial de andamiaje (scaffolding). El desarrollo activo y las pantallas operativas de terreno se implementan en base a las historias de usuario de terreno (H35 a H44, H68 a H70).
+
+
 Este archivo da contexto arquitectónico a cualquier asistente de IA que trabaje sobre este repositorio, que es la **aplicación de terreno (PWA)** del Sistema de Gestión de Recursos para Atención de Incidentes (SGRAI), de la Dirección de Gestión de Riesgos de Desastres de la Municipalidad de Valdivia.
 
 ## 1. Rol de este repositorio en el sistema
@@ -95,6 +99,9 @@ Usa la misma paleta e identidad visual que `sgrai-web`, derivada del sitio insti
 - Cuando se despacha una cuadrilla u otro recurso tras la verificación, la patrulla verificadora queda **liberada** — el cliente debe reflejar ese cambio de estado (vuelve a estar disponible para nueva asignación).
 - El Delegado de Cuadrilla puede **rechazar** una misión, pero el formulario debe **exigir una justificación** — no permitir rechazo sin motivo.
 - El reporte de terreno debe permitir indicar **faltantes de recursos materiales o humanos**, para que la central gestione apoyo adicional — no es solo un campo de texto libre, considerar un mecanismo estructurado (checklist o selección de tipo de recurso faltante) que facilite la gestión desde `sgrai-web`.
+- **Alerta Temprana Preventiva (ATP)**: Instrumento preventivo oficial que agrupa incidentes, operativos de prevención y mitigación en puntos críticos, eventos de recuperación post-desastre y casos de asistencia social bajo una misma contingencia climática o de emergencia comunal.
+- **Exclusión de DIDECO**: DIDECO está completamente fuera de alcance del proyecto. La gestión social corresponde exclusivamente al levantamiento de la Ficha Básica de Emergencia (FIBE) y seguimiento de vulnerabilidad por la Asistente Social de la Dirección de Gestión del Riesgo de Desastres (DGRD).
+- **Dictamen de No Abordabilidad en Terreno (H39)**: La patrulla verificadora puede dictaminar que el siniestro es `NO_ABORDABLE` (predio privado inaccesible, faja fiscal externa o falsa alarma) ingresando una justificación técnica obligatoria (>= 15 caracteres), transicionando el incidente directamente a `NO_ABORDABLE` y liberando a la patrulla a `DISPONIBLE`.
 
 ## 7. Roles y flujos de este repositorio
 
@@ -107,10 +114,10 @@ Usa la misma paleta e identidad visual que `sgrai-web`, derivada del sitio insti
 
 Cada funcionalidad de cara a Patrulla Verificadora o Delegado de Cuadrilla debe entregarse junto con su manual de usuario, no como una tarea aparte para después.
 
-- **Ubicación estándar:** `/docs/manuales-usuario/` en la raíz de este repositorio (misma convención que `sgrai-web`, pero cada repositorio mantiene los suyos porque documentan pantallas distintas).
+- **Ubicación estándar:** `/docs/manuals/` en la raíz de este repositorio (misma convención que `sgrai-web`, pero cada repositorio mantiene los suyos porque documentan pantallas distintas).
 - **Convención de nombre:** `H<numero>-<slug-corto>.md`, siguiendo el ID de la historia de usuario correspondiente (ej. `H36-confirmar-asistencia.md`, `H41-rechazar-mision.md`).
 - **Cuándo se crea:** como parte del mismo PR que implementa la funcionalidad — no se documenta después, en un PR aparte.
-- **Contenido mínimo de cada manual**, además de lo que aplica en `sgrai-web` (rol, objetivo, pasos con capturas en `/docs/manuales-usuario/assets/<mismo-slug>/`, casos especiales):
+- **Contenido mínimo de cada manual**, además de lo que aplica en `sgrai-web` (rol, objetivo, pasos con capturas en `/docs/manuals/assets/<mismo-slug>/`, casos especiales):
   - **Comportamiento sin conexión:** qué le aparece al usuario si realiza la acción sin señal, cómo sabe que quedó en cola local, y qué pasa si la sincronización falla al recuperar conexión (esto es específico de este repositorio y no debe omitirse).
   - Requisitos de permisos del dispositivo (GPS, cámara) que el manual debe explicar cómo conceder la primera vez.
 
