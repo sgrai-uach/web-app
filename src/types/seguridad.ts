@@ -30,6 +30,9 @@ export interface UsuarioPerfilSesion {
   delegacionId: string | null;
   delegacionNombre: string | null;
   permisos: string[];
+  unidadId?: string | null;
+  unidadNombre?: string | null;
+  unidadActiva?: boolean; // H82 (cuadrilla) / H85 (patrulla): false si fue desactivada mediante baja lógica
 }
 
 export interface LoginResponseData {

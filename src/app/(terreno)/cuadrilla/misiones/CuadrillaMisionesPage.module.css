@@ -1,0 +1,91 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.titleArea {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.missionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.missionCard {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-left: 6px solid var(--color-accent-mint);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+
+.missionCard:active {
+  background-color: var(--color-bg-light);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.code {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--color-primary-teal);
+}
+
+.badgeStatus {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  background-color: var(--color-bg-light);
+  color: var(--color-text-dark);
+  text-transform: uppercase;
+}
+
+.badgeStatusFinalizada {
+  background-color: var(--color-sage);
+  color: var(--color-text-dark);
+}
+
+.badgeStatusInactiva {
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.typology {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--color-text-dark);
+}
+
+.addressRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.emptyState {
+  background-color: var(--color-white);
+  border: 1px dashed var(--color-border);
+  padding: var(--space-6);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+}
