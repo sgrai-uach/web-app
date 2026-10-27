@@ -1,0 +1,112 @@
+import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+import { AuthProvider, useAuth } from '../AuthContext';
+import * as seguridadService from '@/services/seguridadService';
+import * as cookieUtils from '@/lib/utils/cookieUtils';
+
+vi.mock('@/services/seguridadService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/seguridadService')>();
+  return {
+    ...actual,
+    loginUsuario: vi.fn(),
+    obtenerUsuarioActivo: vi.fn(),
+  };
+});
+vi.mock('@/lib/utils/cookieUtils');
+
+describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(cookieUtils.getAuthCookie).mockReturnValue(null);
+  });
+
+  it('inicia en estado no autenticado cuando no hay cookie', async () => {
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    expect(result.current.cargando).toBe(false);
+    expect(result.current.autenticado).toBe(false);
+    expect(result.current.usuario).toBeNull();
+  });
+
+  it('permite login exitoso con rol PATRULLA_VERIFICADORA', async () => {
+    vi.mocked(seguridadService.loginUsuario).mockResolvedValue({
+      token: 'token-patrulla',
+      expiraEn: '2026-10-28T00:00:00Z',
+      usuario: {
+        id: 'user-patrulla-1',
+        rut: '11.111.111-1',
+        nombre: 'Juan Patrullero',
+        email: 'juan@valdivia.cl',
+        rolId: 'rol-1',
+        rolNombre: 'Patrulla Verificadora',
+        rolCodigo: 'PATRULLA_VERIFICADORA',
+        delegacionId: 'del-1',
+        delegacionNombre: 'Valdivia Centro',
+        permisos: ['misiones:terreno:verificar'],
+      },
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await act(async () => {
+      await result.current.login({
+        identificador: '11.111.111-1',
+        password: 'Password123!',
+      });
+    });
+
+    expect(result.current.autenticado).toBe(true);
+    expect(result.current.esPatrulla).toBe(true);
+    expect(result.current.esCuadrilla).toBe(false);
+    expect(result.current.usuario?.nombre).toBe('Juan Patrullero');
+    expect(cookieUtils.setAuthCookie).toHaveBeenCalledWith(
+      'token-patrulla',
+      '2026-10-28T00:00:00Z'
+    );
+  });
+
+  it('rechaza login con 403 si el rol no es de terreno (ej: CALL_CENTER o ADMIN)', async () => {
+    vi.mocked(seguridadService.loginUsuario).mockResolvedValue({
+      token: 'token-admin',
+      expiraEn: '2026-10-28T00:00:00Z',
+      usuario: {
+        id: 'user-admin-1',
+        rut: '22.222.222-2',
+        nombre: 'Carlos Admin',
+        email: 'admin@valdivia.cl',
+        rolId: 'rol-admin',
+        rolNombre: 'Administrador General',
+        rolCodigo: 'ADMIN',
+        delegacionId: null,
+        delegacionNombre: null,
+        permisos: ['todo'],
+      },
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    let errorCapturado: Error | null = null;
+    await act(async () => {
+      try {
+        await result.current.login({
+          identificador: '22.222.222-2',
+          password: 'Password123!',
+        });
+      } catch (err: unknown) {
+        errorCapturado = err as Error;
+      }
+    });
+
+    expect(errorCapturado).not.toBeNull();
+    expect(errorCapturado?.message).toContain('Acceso restringido');
+    expect(result.current.autenticado).toBe(false);
+    expect(cookieUtils.setAuthCookie).not.toHaveBeenCalled();
+  });
+});
