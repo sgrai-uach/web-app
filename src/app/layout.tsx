@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Noto_Sans } from 'next/font/google';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
+import { AuthProvider } from '@/context/AuthContext';
 
 const notoSans = Noto_Sans({
   subsets: ['latin'],
@@ -51,7 +52,9 @@ export default function RootLayout({
   return (
     <html lang="es-CL" className={notoSans.variable}>
       <body className={notoSans.className}>
-        <ToastProvider>{children}</ToastProvider>
+        <AuthProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );
