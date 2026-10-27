@@ -25,6 +25,7 @@ export interface AuthContextValue {
   autenticado: boolean;
   esPatrulla: boolean;
   esCuadrilla: boolean;
+  unidadActiva: boolean;
   login: (credenciales: LoginRequest) => Promise<UsuarioPerfilSesion>;
   logout: () => void;
   recargarSesion: () => Promise<void>;
@@ -138,6 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const rolCodigoActual = usuario?.rolCodigo?.toUpperCase() || '';
   const esPatrulla = rolCodigoActual === 'PATRULLA_VERIFICADORA';
   const esCuadrilla = rolCodigoActual === 'DELEGADO_CUADRILLA';
+  const unidadActiva = usuario?.unidadActiva !== false;
   const autenticado = Boolean(token && usuario);
 
   return (
@@ -149,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         autenticado,
         esPatrulla,
         esCuadrilla,
+        unidadActiva,
         login,
         logout,
         recargarSesion,
