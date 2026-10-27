@@ -1,111 +1,129 @@
 # SGRAI — App Terreno (PWA)
 
-Aplicacion de terreno (Progressive Web App) del **Sistema de Gestion de Recursos para Atencion de Incidentes (SGRAI)**, desarrollado para la Direccion de Gestion de Riesgos de Desastres de la Municipalidad de Valdivia.
+Cliente de presentación para **personal operativo en terreno** del **Sistema de Gestión de Recursos para Atención de Incidentes (SGRAI)** de la Dirección de Gestión de Riesgos de Desastres de la Municipalidad de Valdivia.
 
-## Descripcion
+Este cliente atiende exclusivamente a los roles de **Patrulla Verificadora** y **Delegado de Cuadrilla**, proporcionando capacidades nativas de geolocalización (GPS), captura de evidencia fotográfica (Cámara), alertas en tiempo real y soporte **offline-first** para operar en zonas de catástrofe sin cobertura de red.
 
-Este repositorio contiene el cliente de presentacion para **personal operativo desplegado en terreno**. A diferencia del portal web (`sgrai-web`), esta aplicacion esta disenada para funcionar en condiciones de conectividad intermitente, con acceso a capacidades nativas del dispositivo (GPS, camara) y una interfaz optimizada para uso en movimiento.
+---
 
-### Roles cubiertos
+## Stack Tecnológico
 
-- **Patrulla Verificadora**: recibe notificacion de incidente, confirma asistencia, categoriza el incidente en terreno, ajusta prioridad y envia reportes de situacion.
-- **Delegado de Cuadrilla**: acepta o rechaza misiones (con justificacion obligatoria), reporta llegada y estado inicial, adjunta evidencia fotografica/video e indica faltantes de recursos.
-
-> Nota: el rol de Informante no esta incluido en este repositorio. El Portal Informante se encuentra en `sgrai-web`.
-
-## Stack tecnologico
-
-| Tecnologia | Proposito |
+| Componente | Tecnología |
 |---|---|
-| Next.js (React) | Framework principal, configurado como PWA |
-| TypeScript | Tipado estatico |
-| Vanilla CSS | Estilos, sin frameworks CSS externos |
-| Socket.io (cliente) | Notificaciones push en tiempo real |
-| Service Workers | Soporte offline y sincronizacion |
-| Docker | Contenedorizacion para despliegue On-Premise |
+| Framework | Next.js 16 (React 19) con TypeScript y App Router |
+| Arquitectura | Progressive Web App (PWA) con Service Worker y Web App Manifest |
+| Persistencia Offline | IndexedDB (`idb`) para colas locales de mutación |
+| Estilos | Vanilla CSS con CSS Modules y tokens de diseño municipales planos |
+| Iconografía | Lucide Icons (`lucide-react`) — Prohibido el uso de emojis |
+| Tiempo Real | Socket.io Client (`socket.io-client`) |
+| Cliente API | `openapi-fetch` con tipos autogenerados |
+| Pruebas Unitarias | Vitest con React Testing Library y JSDOM |
+| Contenedores | Docker (multi-stage) servido tras Caddy On-Premise |
 
-## Estructura del proyecto
+---
+
+## Estructura del Proyecto
 
 ```
-src/
-  app/            # Rutas y layouts (App Router de Next.js)
-  components/     # Componentes React reutilizables
-  hooks/          # Custom hooks (conectividad, geolocalizacion, etc.)
-  lib/            # Cliente API tipado y utilidades compartidas
-  services/       # Sincronizacion offline, cola local, Socket.io
-  types/          # Tipos generados desde OpenAPI (no editar manualmente)
-docs/
-  manuales-usuario/   # Manuales por historia de usuario (H<n>-<slug>.md)
-    assets/            # Capturas de pantalla para manuales
+web-app/
+├── src/
+│   ├── app/                 # Rutas y layouts (App Router de Next.js)
+│   │   ├── manifest.ts      # Manifiesto oficial PWA
+│   │   ├── layout.tsx       # Envoltorio con Noto Sans y ToastProvider
+│   │   └── globals.css      # Reset y estilos globales
+│   ├── components/          # Componentes React reutilizables
+│   │   ├── ui/              # Componentes base planos (Button, Heading, Input, etc.)
+│   │   └── terreno/         # Componentes específicos de patrulla y cuadrilla
+│   ├── context/             # Proveedores globales de sesión (AuthContext)
+│   ├── hooks/               # Custom hooks (conectividad, telemetría, GPS)
+│   ├── lib/                 # Cliente API tipado y utilidades seguras
+│   ├── services/            # Cola local IndexedDB (Outbox) y sincronización
+│   ├── styles/              # Tokens de diseño institucionales (tokens.css)
+│   ├── test/                # Configuración y mocks para Vitest (setup.ts)
+│   └── types/               # Tipos generados desde OpenAPI (api-generated.d.ts)
+├── public/
+│   ├── sw.js                # Service Worker para caché y sincronización diferida
+│   └── favicon.*, *.png     # Iconos institucionales PWA
+├── docs/
+│   ├── architecture/        # Guía técnica de arquitectura offline-first
+│   ├── design/              # Tokens de diseño y catálogo de componentes
+│   ├── api/                 # Contratos de endpoints y eventos WebSocket
+│   ├── qa/                  # Matrices de pruebas IEEE 829
+│   └── manuals/             # Manuales de usuario por historia (H<n>-<slug>.md)
+├── AGENTS.md                # Directrices estrictas para agentes de IA
+├── CLAUDE.md                # Referencias de contexto para asistentes
+├── GEMINI.md                # Guía maestra arquitectónica de la PWA
+└── package.json             # Dependencias y scripts del proyecto
 ```
 
-## Desarrollo local
+---
 
-### Requisitos previos
+## Desarrollo Local
+
+### Requisitos Previos
 
 - Node.js >= 24
 - npm >= 12
+- Instancia activa de `sgrai-api` (por defecto en puerto 3001)
 
-### Instalacion
+### Instalación
 
 ```bash
 npm install
 ```
 
-### Variables de entorno
+### Variables de Entorno
 
-Copiar el archivo de ejemplo y completar los valores:
+Copiar el archivo de ejemplo y configurar las URLs correspondientes:
 
 ```bash
 cp .env.example .env.local
 ```
 
-| Variable | Descripcion |
-|---|---|
-| `NEXT_PUBLIC_API_URL` | URL base de la API REST (`sgrai-api`) |
-| `NEXT_PUBLIC_SOCKET_URL` | URL del servidor Socket.io |
+| Variable | Descripción | Valor por Defecto Local |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | URL base de la API REST (`sgrai-api`) | `http://localhost:3001` |
+| `NEXT_PUBLIC_SOCKET_URL` | URL del servidor Socket.io | `http://localhost:3001` |
 
-### Ejecucion
+> [!IMPORTANT]
+> **Requisito de HTTPS para Geolocation y Cámara:**
+> Los navegadores modernos exigen un contexto seguro (`HTTPS` o `localhost`) para permitir el acceso al GPS y la cámara del dispositivo móvil. En entorno de desarrollo para pruebas móviles en red local, se recomienda acceder a través del reverse proxy Caddy configurado con certificados locales.
+
+### Scripts Disponibles
 
 ```bash
+# Iniciar servidor de desarrollo en http://localhost:3000
 npm run dev
-```
 
-### Generacion de tipos de API
+# Ejecutar la suite de pruebas unitarias y de componentes con Vitest
+npm test
 
-Los tipos de request/response se generan automaticamente desde el spec OpenAPI de `sgrai-api`. No se deben escribir manualmente.
+# Ejecutar pruebas en modo observador (watch)
+npm run test:watch
 
-```bash
-npm run api:generate
-```
-
-### Lint
-
-```bash
+# Validar reglas de linter
 npm run lint
-```
 
-### Build
+# Regenerar tipos TypeScript desde el spec OpenAPI de sgrai-api
+npm run api:generate
 
-```bash
+# Compilar para producción
 npm run build
+
+# Iniciar servidor de producción
+npm start
 ```
 
-## Comunicacion con el backend
+---
 
-Este repositorio no contiene logica de negocio propia. Toda regla de negocio reside en `sgrai-api` y se consume via HTTPS/REST y Socket.io.
+## Documentación del Proyecto
 
-Los tipos de la API se generan desde el spec OpenAPI y las llamadas se realizan mediante un cliente tipado (`openapi-fetch`). Nunca se deben escribir tipos de request/response a mano.
+- **Directrices para Agentes de IA:** [`AGENTS.md`](./AGENTS.md)
+- **Guía Arquitectónica Maestra:** [`GEMINI.md`](./GEMINI.md)
+- **Manuales de Usuario de Terreno:** [`docs/manuals/`](./docs/manuals/)
 
-## Convenciones de desarrollo
-
-| Aspecto | Convencion |
-|---|---|
-| Ramas | Gitflow (`main`, `develop`, `feature/*`, `release/*`, `hotfix/*`) |
-| Versionado | SemVer |
-| Commits | Conventional Commits |
-| Integracion | PR con Pair Review + PO Review obligatorias |
+---
 
 ## Licencia
 
-Uso interno — Municipalidad de Valdivia.
+Uso interno — Dirección de Gestión de Riesgos de Desastres (DGRD), Ilustre Municipalidad de Valdivia.

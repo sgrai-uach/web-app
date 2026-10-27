@@ -1,5 +1,5 @@
 {
-  "name": "pwa",
+  "name": "sgrai-pwa",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,19 +7,39 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "api:generate": "npx openapi-typescript ${API_SPEC_URL:-https://api.sgrai.cl/openapi.json} -o src/types/api-generated.d.ts"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "api:generate": "openapi-typescript ${API_SPEC_URL:-http://localhost:3001/openapi.json} -o src/types/api-generated.d.ts"
   },
   "dependencies": {
+    "idb": "^8.0.2",
+    "lucide-react": "^1.48.0",
     "next": "16.3.4",
+    "openapi-fetch": "^0.17.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "socket.io-client": "^4.8.3",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
-    "typescript": "^5"
+    "fake-indexeddb": "^6.2.6",
+    "jsdom": "^30.0.1",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5",
+    "vite": "^8.2.2",
+    "vitest": "^3.2.7"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "unrs-resolver@1.12.2": true
   }
 }

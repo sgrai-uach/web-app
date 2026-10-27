@@ -1,0 +1,169 @@
+/* ==========================================================================
+   Button Component Styles — SGRAI Flat Municipal Style (Terreno Ergonomics)
+   ========================================================================== */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  text-decoration: none;
+  border-radius: var(--radius-none, 0px);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
+  white-space: nowrap;
+  user-select: none;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.iconWrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.text {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* --- Tamaños táctiles (Mínimo 48px para md y lg en terreno) --- */
+.sm {
+  padding: 8px 14px;
+  font-size: var(--font-size-sm);
+  min-height: 38px;
+}
+
+.md {
+  padding: 12px 20px;
+  font-size: var(--font-size-md);
+  min-height: var(--touch-target-min, 48px);
+}
+
+.lg {
+  padding: 16px 28px;
+  font-size: var(--font-size-lg);
+  min-height: 54px;
+}
+
+/* --- Variantes (Colores planos institucionales) --- */
+.primary {
+  background-color: var(--color-accent-mint);
+  color: var(--color-white);
+}
+.primary:hover:not(:disabled):not(.disabled) {
+  background-color: #429584;
+  text-decoration: none;
+}
+.primary:active:not(:disabled):not(.disabled) {
+  background-color: #387e6f;
+}
+
+.teal {
+  background-color: var(--color-primary-teal);
+  color: var(--color-white);
+}
+.teal:hover:not(:disabled):not(.disabled) {
+  background-color: var(--color-primary-teal-dark);
+  text-decoration: none;
+}
+.teal:active:not(:disabled):not(.disabled) {
+  background-color: #0f3d45;
+}
+
+.secondary {
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+.secondary:hover:not(:disabled):not(.disabled) {
+  background-color: var(--color-charcoal-dark);
+  text-decoration: none;
+}
+.secondary:active:not(:disabled):not(.disabled) {
+  background-color: #1a1c1f;
+}
+
+.destructive {
+  background-color: var(--color-danger);
+  color: var(--color-white);
+}
+.destructive:hover:not(:disabled):not(.disabled) {
+  background-color: var(--color-danger-dark);
+  text-decoration: none;
+}
+.destructive:active:not(:disabled):not(.disabled) {
+  background-color: #8e0000;
+}
+
+.outline {
+  background-color: var(--color-white);
+  border-color: var(--border-color-neutral);
+  color: var(--color-charcoal);
+}
+.outline:hover:not(:disabled):not(.disabled) {
+  background-color: var(--color-bg-light);
+  border-color: var(--border-color-neutral-dark);
+  text-decoration: none;
+}
+.outline:active:not(:disabled):not(.disabled) {
+  background-color: #dbe0e6;
+}
+
+.ghost {
+  background-color: transparent;
+  color: var(--color-charcoal);
+  border-color: transparent;
+}
+.ghost:hover:not(:disabled):not(.disabled) {
+  background-color: rgba(0, 0, 0, 0.05);
+  text-decoration: none;
+}
+.ghost:active:not(:disabled):not(.disabled) {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* --- Estados Deshabilitado / Loading --- */
+.disabled,
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* --- Spinner --- */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: var(--color-white);
+  border-radius: var(--radius-round, 9999px);
+  animation: buttonSpin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.outline .spinner,
+.ghost .spinner {
+  border: 2px solid rgba(59, 63, 69, 0.3);
+  border-top-color: var(--color-charcoal);
+}
+
+@keyframes buttonSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

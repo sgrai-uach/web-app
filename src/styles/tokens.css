@@ -1,0 +1,138 @@
+/* ==========================================================================
+   Tokens de diseño — SGRAI PWA (Municipalidad de Valdivia)
+   Referencia: GEMINI.md § 4 / docs/design/design-system.md
+   ========================================================================== */
+
+:root {
+  /* ==========================================================================
+     1. PALETA INSTITUCIONAL
+     ========================================================================== */
+  /* Primarios */
+  --color-primary-teal: #1B6F7D;
+  --color-primary-teal-dark: #14505A;
+
+  /* Acentos */
+  --color-accent-mint: #4FAE9B;
+  --color-sage: #A9CBA4;
+
+  /* Neutros */
+  --color-charcoal: #3B3F45;
+  --color-charcoal-dark: #24272B;
+  --color-bg-light: #ECEFF3;
+  --color-white: #FFFFFF;
+
+  /* Texto */
+  --color-text-dark: #2B2B2B;
+  --color-text-light: #FFFFFF;
+  --color-text-muted: #5F676E;
+
+  /* ==========================================================================
+     2. ESTADOS SEMÁNTICOS (Alertas, badges, feedback de terreno)
+     ========================================================================== */
+  --color-danger: #D32F2F;
+  --color-danger-dark: #B71C1C;
+  --color-danger-bg: #FFEBEE;
+  --color-danger-border: #FFCDD2;
+
+  --color-success: #2E7D32;
+  --color-success-bg: #E8F5E9;
+  --color-success-border: #A5D6A7;
+
+  --color-warning: #E65100;
+  --color-warning-bg: #FFF3E0;
+  --color-warning-border: #FFE0B2;
+
+  --color-info: var(--color-primary-teal);
+  --color-info-bg: #E0F2F1;
+  --color-info-border: #B2DFDB;
+
+  /* ==========================================================================
+     3. TIPOGRAFÍA (Fuente institucional: Noto Sans)
+     ========================================================================== */
+  --font-family-base: var(--font-noto-sans), 'Noto Sans', system-ui, -apple-system, sans-serif;
+  --font-family-heading: var(--font-noto-sans), 'Noto Sans', system-ui, -apple-system, sans-serif;
+
+  /* Escala de Tamaños */
+  --font-size-xs: 0.75rem;    /* 12px */
+  --font-size-sm: 0.8125rem;  /* 13px */
+  --font-size-base: 0.875rem; /* 14px */
+  --font-size-md: 1rem;       /* 16px */
+  --font-size-lg: 1.125rem;   /* 18px */
+  --font-size-xl: 1.25rem;    /* 20px */
+  --font-size-2xl: 1.5rem;    /* 24px */
+  --font-size-3xl: 1.75rem;   /* 28px */
+
+  /* Pesos */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  /* Interlineado */
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* Tracking */
+  --letter-spacing-tight: -0.3px;
+  --letter-spacing-normal: 0px;
+  --letter-spacing-display: -0.5px;
+
+  /* ==========================================================================
+     4. ESPACIADOS (Sistema Base 4px / 8px)
+     ========================================================================== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ==========================================================================
+     5. BORDES Y RADIOS (Estándar Plano Municipal)
+     ========================================================================== */
+  --radius-none: 0px;
+  --radius-round: 9999px; /* Exclusivo para dots/indicadores de estado */
+
+  --border-color-neutral: #DFE3E8;
+  --border-color-neutral-dark: #CCD2D9;
+  --border-color-dark: #3B3F45;
+
+  /* ==========================================================================
+     6. ELEVACIÓN Y SOMBRAS (Diseño plano: contrastes por color)
+     ========================================================================== */
+  --shadow-none: none;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+  /* ==========================================================================
+     7. Z-INDEX
+     ========================================================================== */
+  --z-base: 1;
+  --z-sticky: 100;
+  --z-dropdown: 500;
+  --z-drawer: 1000;
+  --z-modal-backdrop: 2000;
+  --z-modal: 2010;
+  --z-toast: 9999;
+
+  /* ==========================================================================
+     8. TRANSICIONES Y FOCO
+     ========================================================================== */
+  --transition-fast: 150ms ease-in-out;
+  --transition-normal: 250ms ease-in-out;
+  --focus-ring: 2px solid var(--color-primary-teal);
+  --focus-ring-offset: 2px;
+
+  /* ==========================================================================
+     9. ERGONOMÍA DE TERRENO (Móvil / Una Mano / Guantes)
+     ========================================================================== */
+  --touch-target-min: 48px;
+  --header-height: 52px;
+  --bottom-bar-height: 60px;
+}

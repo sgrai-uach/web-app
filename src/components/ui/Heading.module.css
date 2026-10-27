@@ -1,0 +1,109 @@
+/* ==========================================================================
+   Heading Component Styles — SGRAI Flat Municipal
+   ========================================================================== */
+
+.heading {
+  font-family: var(--font-family-heading);
+  line-height: var(--line-height-tight);
+  margin-top: 0;
+  margin-bottom: var(--space-2);
+}
+
+.noMargin {
+  margin: 0 !important;
+}
+
+/* --- Variantes visuales --- */
+.display {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-extrabold);
+  letter-spacing: var(--letter-spacing-display);
+}
+
+.h1 {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-extrabold);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.h2 {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-normal);
+}
+
+.h4 {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-normal);
+}
+
+.h5 {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-normal);
+}
+
+.subtitle {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-charcoal);
+  line-height: var(--line-height-normal);
+}
+
+/* --- Colores --- */
+.colorTealDark {
+  color: var(--color-primary-teal-dark);
+}
+
+.colorTeal {
+  color: var(--color-primary-teal);
+}
+
+.colorCharcoalDark {
+  color: var(--color-charcoal-dark);
+}
+
+.colorCharcoal {
+  color: var(--color-charcoal);
+}
+
+.colorWhite {
+  color: var(--color-white);
+}
+
+.colorInherit {
+  color: inherit;
+}
+
+/* --- Alineación --- */
+.alignLeft {
+  text-align: left;
+}
+
+.alignCenter {
+  text-align: center;
+}
+
+.alignRight {
+  text-align: right;
+}
+
+/* --- Responsive (Mobile) --- */
+@media (max-width: 768px) {
+  .display {
+    font-size: var(--font-size-2xl);
+  }
+  .h1 {
+    font-size: var(--font-size-xl);
+  }
+  .h2 {
+    font-size: var(--font-size-lg);
+  }
+}
