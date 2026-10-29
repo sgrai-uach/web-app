@@ -17,7 +17,6 @@
 .greetingArea {
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
 
 .heading {
@@ -28,18 +27,10 @@
   margin: 0;
 }
 
-.subtitle {
-  font-size: 0.8125rem;
-  color: var(--color-bg-light, #ECEFF3);
-  margin: 0;
-}
-
 .metaArea {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
-  width: 100%;
 }
 
 .roleBadge {
@@ -56,12 +47,6 @@
   border-radius: var(--radius-none, 0px);
 }
 
-.unitLabel {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--color-sage, #A9CBA4);
-}
-
 @media (min-width: 640px) {
   .banner {
     padding: var(--space-6, 24px);
@@ -76,6 +61,5 @@
 
   .metaArea {
     align-items: flex-end;
-    width: auto;
   }
 }

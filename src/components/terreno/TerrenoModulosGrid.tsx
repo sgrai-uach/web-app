@@ -26,7 +26,6 @@ export interface ModuloTerrenoConfig {
   icon: ComponentType<LucideProps>;
   rolesPermitidos: Array<'PATRULLA_VERIFICADORA' | 'DELEGADO_CUADRILLA'>;
   requiredPermissions: string[];
-  badge?: string;
   accionPrimaria: string;
   soloLecturaEnInactividad?: boolean;
 }
@@ -42,7 +41,6 @@ const MODULOS_TERRENO: ModuloTerrenoConfig[] = [
     icon: Compass,
     rolesPermitidos: ['PATRULLA_VERIFICADORA'],
     requiredPermissions: ['patrulla:misiones:leer', 'misiones:aceptar'],
-    badge: 'Operativo • H35 / H36 / H69',
     accionPrimaria: 'Ver Misiones de Patrulla',
     soloLecturaEnInactividad: true,
   },
@@ -55,7 +53,6 @@ const MODULOS_TERRENO: ModuloTerrenoConfig[] = [
     icon: CheckSquare,
     rolesPermitidos: ['PATRULLA_VERIFICADORA'],
     requiredPermissions: ['patrulla:triage:evaluar', 'incidentes:tipologia:actualizar'],
-    badge: 'Triage en Sitio • H37 / H38 / H39',
     accionPrimaria: 'Evaluar Incidente en Curso',
     soloLecturaEnInactividad: true,
   },
@@ -68,7 +65,6 @@ const MODULOS_TERRENO: ModuloTerrenoConfig[] = [
     icon: Archive,
     rolesPermitidos: ['PATRULLA_VERIFICADORA'],
     requiredPermissions: ['patrulla:historial:leer'],
-    badge: 'Registro Local • H85',
     accionPrimaria: 'Consultar Historial de Patrulla',
     soloLecturaEnInactividad: true,
   },
@@ -83,7 +79,6 @@ const MODULOS_TERRENO: ModuloTerrenoConfig[] = [
     icon: HardHat,
     rolesPermitidos: ['DELEGADO_CUADRILLA'],
     requiredPermissions: ['cuadrilla:misiones:leer', 'misiones:aceptar'],
-    badge: 'Operativo • H40 / H41 / H42',
     accionPrimaria: 'Ver Faenas de Cuadrilla',
     soloLecturaEnInactividad: true,
   },
@@ -96,7 +91,6 @@ const MODULOS_TERRENO: ModuloTerrenoConfig[] = [
     icon: Camera,
     rolesPermitidos: ['DELEGADO_CUADRILLA'],
     requiredPermissions: ['cuadrilla:faena:ejecutar', 'evidencia:adjuntar'],
-    badge: 'Ejecución • H43 / H44 / H68',
     accionPrimaria: 'Gestionar Faena Activa',
     soloLecturaEnInactividad: true,
   },
@@ -109,7 +103,6 @@ const MODULOS_TERRENO: ModuloTerrenoConfig[] = [
     icon: Archive,
     rolesPermitidos: ['DELEGADO_CUADRILLA'],
     requiredPermissions: ['cuadrilla:historial:leer'],
-    badge: 'Registro Local • H82',
     accionPrimaria: 'Consultar Historial de Faenas',
     soloLecturaEnInactividad: true,
   },
@@ -166,13 +159,6 @@ export function TerrenoModulosGrid() {
                     <div className={styles.iconBox} aria-hidden="true">
                       <Icon size={22} />
                     </div>
-                    <span
-                      className={`${styles.badge} ${
-                        enModoHistorico ? styles.badgeWarning : ''
-                      }`.trim()}
-                    >
-                      {enModoHistorico ? 'Solo Lectura • Unidad Inactiva' : modulo.badge}
-                    </span>
                   </div>
 
                   <Heading as="h3" variant="h4" color="teal" noMargin>

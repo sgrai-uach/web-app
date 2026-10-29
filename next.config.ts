@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   basePath: "/terreno",
+  devIndicators: false,
   async headers() {
     return [
       {

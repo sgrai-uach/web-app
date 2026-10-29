@@ -3,22 +3,19 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutGrid, Compass, HardHat, RefreshCw, Home } from 'lucide-react';
+import { LayoutGrid, Compass, HardHat, LogOut } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useConnectivity } from '@/hooks/useConnectivity';
 import styles from './TerrenoBottomNav.module.css';
 
 export function TerrenoBottomNav() {
   const pathname = usePathname() || '/';
-  const { esCuadrilla, unidadActiva } = useAuth();
-  const { pendientes, sincronizar, status } = useConnectivity();
+  const { esCuadrilla, unidadActiva, logout } = useAuth();
 
   const esRutaInicio = pathname === '/' || pathname === '/terreno';
   const esRutaMisiones =
     pathname.startsWith('/patrulla') || pathname.startsWith('/cuadrilla');
 
   const misionesHref = esCuadrilla ? '/cuadrilla/misiones' : '/patrulla/misiones';
-  const portalPrincipalHref = '/';
   const misionesLabel = !unidadActiva
     ? 'Historial'
     : esCuadrilla
@@ -59,35 +56,14 @@ export function TerrenoBottomNav() {
           <button
             type="button"
             className={styles.navButton}
-            onClick={() => void sincronizar()}
-            aria-label={
-              pendientes > 0
-                ? `Sincronizar cola local (${pendientes} pendientes)`
-                : 'Sincronizar estado con servidor'
-            }
-            title={
-              status === 'offline'
-                ? 'Sin conexión a internet. Se sincronizará al recuperar red.'
-                : 'Sincronizar operaciones pendientes'
-            }
+            onClick={logout}
+            title="Cerrar sesión"
           >
             <span className={styles.iconWrapper} aria-hidden="true">
-              <RefreshCw size={20} />
-              {pendientes > 0 && (
-                <span className={styles.badgeCount}>{pendientes}</span>
-              )}
+              <LogOut size={20} />
             </span>
-            <span className={styles.label}>Sincronizar</span>
+            <span className={styles.label}>Salir</span>
           </button>
-        </li>
-
-        <li className={styles.navItem}>
-          <a href={portalPrincipalHref} className={styles.navLink}>
-            <span className={styles.iconWrapper} aria-hidden="true">
-              <Home size={20} />
-            </span>
-            <span className={styles.label}>Portal SGRAI</span>
-          </a>
         </li>
       </ul>
     </nav>

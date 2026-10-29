@@ -12,19 +12,12 @@ export function TerrenoWelcomeBanner() {
   const rolTexto =
     usuario?.rolNombre ||
     (esCuadrilla ? 'Delegado de Cuadrilla' : 'Patrulla Verificadora');
-  const unidadODelegacion =
-    usuario?.unidadNombre ||
-    usuario?.delegacionNombre ||
-    'Dirección de Gestión de Riesgos de Desastres';
 
   return (
     <section className={styles.banner} aria-label="Bienvenida del operador de terreno">
       <div className={styles.content}>
         <div className={styles.greetingArea}>
           <h1 className={styles.heading}>Bienvenido/a, {nombreOperador}</h1>
-          <p className={styles.subtitle}>
-            Plataforma Operativa de Terreno &bull; Municipalidad de Valdivia
-          </p>
         </div>
 
         <div className={styles.metaArea}>
@@ -32,7 +25,6 @@ export function TerrenoWelcomeBanner() {
             <UserCheck size={15} aria-hidden="true" />
             <span>Rol: {rolTexto}</span>
           </div>
-          <span className={styles.unitLabel}>{unidadODelegacion}</span>
         </div>
       </div>
     </section>
