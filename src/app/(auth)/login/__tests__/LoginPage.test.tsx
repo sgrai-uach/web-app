@@ -24,7 +24,7 @@ vi.mock('@/context/AuthContext', () => ({
   }),
 }));
 
-describe('Pantalla LoginPage (Inicio de Sesión en Terreno)', () => {
+describe('Pantalla LoginPage (Inicio de Sesión alineado a Web)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAutenticado = false;
@@ -38,30 +38,73 @@ describe('Pantalla LoginPage (Inicio de Sesión en Terreno)', () => {
       </ToastProvider>
     );
 
-  it('renderiza encabezados institucionales y campos de formulario', () => {
+  it('renderiza banner institucional, título, campos y botones oficiales', () => {
     renderComponent();
 
-    expect(screen.getByRole('heading', { name: /acceso a operaciones/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/rut o correo institucional/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /iniciar turno de terreno/i })
-    ).toBeInTheDocument();
+    // Banner institucional en tarjeta
+    expect(screen.getByText('SGRAI')).toBeInTheDocument();
+    expect(screen.getByText('DGRD VALDIVIA')).toBeInTheDocument();
+
+    // Título y subtítulo
+    expect(screen.getByRole('heading', { name: /inicio de sesión/i })).toBeInTheDocument();
+    expect(screen.getByText(/ingrese sus credenciales para acceder a la plataforma/i)).toBeInTheDocument();
+
+    // Campos
+    expect(screen.getByLabelText(/identificador/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/correo o rut con dígito verificador/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^contraseña/i, { selector: 'input' })).toBeInTheDocument();
+
+    // Botones
+    expect(screen.getByRole('button', { name: /ingresar al sistema/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /volver al inicio de sgrai/i })).toBeInTheDocument();
+
+    // Aviso de restricción en pie
+    expect(screen.getByText(/acceso restringido a personal autorizado/i)).toBeInTheDocument();
+
+    // NO deben existir leyendas obsoletas
+    expect(screen.queryByText(/acceso exclusivo de emergencia/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/patrulla verificadora \/ delegado de cuadrilla/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /iniciar turno de terreno/i })).not.toBeInTheDocument();
+  });
+
+  it('permite escribir correos electrónicos sin filtrado destructivo de letras', () => {
+    renderComponent();
+
+    const inputIdentificador = screen.getByLabelText(/identificador/i);
+    fireEvent.change(inputIdentificador, { target: { value: 'operador.terreno@valdivia.cl' } });
+
+    expect(inputIdentificador).toHaveValue('operador.terreno@valdivia.cl');
+  });
+
+  it('permite alternar la visibilidad de la contraseña con el botón toggle', () => {
+    renderComponent();
+
+    const inputPassword = screen.getByLabelText(/^contraseña/i, { selector: 'input' });
+    expect(inputPassword).toHaveAttribute('type', 'password');
+
+    const toggleBtn = screen.getByRole('button', { name: /mostrar contraseña/i });
+    fireEvent.click(toggleBtn);
+
+    expect(inputPassword).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: /ocultar contraseña/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /ocultar contraseña/i }));
+    expect(inputPassword).toHaveAttribute('type', 'password');
   });
 
   it('valida campos obligatorios antes de procesar el envío', async () => {
     renderComponent();
 
-    const botonSubmit = screen.getByRole('button', { name: /iniciar turno de terreno/i });
+    const botonSubmit = screen.getByRole('button', { name: /ingresar al sistema/i });
     fireEvent.click(botonSubmit);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Ingrese su RUT institucional o correo electrónico.'
+      'Ingrese su RUT o correo electrónico.'
     );
     expect(mockLogin).not.toHaveBeenCalled();
   });
 
-  it('llama a login con datos formateados y redirige según rol', async () => {
+  it('llama a login con RUT formateado y redirige según rol', async () => {
     mockLogin.mockResolvedValueOnce({
       id: 'p-1',
       nombre: 'Líder Patrulla',
@@ -70,14 +113,14 @@ describe('Pantalla LoginPage (Inicio de Sesión en Terreno)', () => {
 
     renderComponent();
 
-    fireEvent.change(screen.getByLabelText(/rut o correo institucional/i), {
+    fireEvent.change(screen.getByLabelText(/identificador/i), {
       target: { value: '111111111' },
     });
-    fireEvent.change(screen.getByLabelText(/contraseña/i), {
+    fireEvent.change(screen.getByLabelText(/^contraseña/i, { selector: 'input' }), {
       target: { value: 'Valdivia2026!' },
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /iniciar turno de terreno/i }));
+    fireEvent.click(screen.getByRole('button', { name: /ingresar al sistema/i }));
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith({
@@ -88,6 +131,42 @@ describe('Pantalla LoginPage (Inicio de Sesión en Terreno)', () => {
     });
   });
 
+  it('llama a login con correo electrónico sin alterarlo', async () => {
+    mockLogin.mockResolvedValueOnce({
+      id: 'c-1',
+      nombre: 'Delegado Cuadrilla',
+      rolCodigo: 'DELEGADO_CUADRILLA',
+    });
+
+    renderComponent();
+
+    fireEvent.change(screen.getByLabelText(/identificador/i), {
+      target: { value: 'cuadrilla@valdivia.cl' },
+    });
+    fireEvent.change(screen.getByLabelText(/^contraseña/i, { selector: 'input' }), {
+      target: { value: 'Valdivia2026!' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /ingresar al sistema/i }));
+
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith({
+        identificador: 'cuadrilla@valdivia.cl',
+        password: 'Valdivia2026!',
+      });
+      expect(mockPush).toHaveBeenCalledWith('/cuadrilla');
+    });
+  });
+
+  it('permite volver al inicio al presionar el botón secundario', () => {
+    renderComponent();
+
+    const botonVolver = screen.getByRole('button', { name: /volver al inicio de sgrai/i });
+    fireEvent.click(botonVolver);
+
+    expect(mockPush).toHaveBeenCalledWith('/');
+  });
+
   it('muestra mensaje de alerta si el servicio rechaza las credenciales', async () => {
     mockLogin.mockRejectedValueOnce(
       new Error('Credenciales inválidas. Verifique su identificador o contraseña.')
@@ -95,14 +174,14 @@ describe('Pantalla LoginPage (Inicio de Sesión en Terreno)', () => {
 
     renderComponent();
 
-    fireEvent.change(screen.getByLabelText(/rut o correo institucional/i), {
+    fireEvent.change(screen.getByLabelText(/identificador/i), {
       target: { value: 'operador@valdivia.cl' },
     });
-    fireEvent.change(screen.getByLabelText(/contraseña/i), {
+    fireEvent.change(screen.getByLabelText(/^contraseña/i, { selector: 'input' }), {
       target: { value: 'erronea' },
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /iniciar turno de terreno/i }));
+    fireEvent.click(screen.getByRole('button', { name: /ingresar al sistema/i }));
 
     await waitFor(() => {
       const alerts = screen.getAllByRole('alert');

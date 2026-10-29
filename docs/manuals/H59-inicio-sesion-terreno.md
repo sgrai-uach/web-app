@@ -28,11 +28,11 @@ Para operar la aplicación de terreno de forma óptima, el dispositivo móvil de
 
 ## 3. Instrucciones Paso a Paso
 
-1. Ingrese a la URL institucional de la PWA desde el navegador móvil (Chrome, Edge o Safari).
-2. En la pantalla de bienvenida verá el logotipo y colores institucionales de la Municipalidad de Valdivia.
-3. En el campo **"RUT o Correo Institucional"**, ingrese su RUT (ej. `11.111.111-1` o `11111111-1`) o su correo institucional (`nombre@valdivia.cl`).
-4. En el campo **"Contraseña"**, ingrese su clave secreta. Puede utilizar el botón del ojo para mostrar/ocultar los caracteres ingresados.
-5. Presione el botón principal **"Iniciar Sesión"** (área táctil optimizada de al menos 48px).
+1. Ingrese a la URL de terreno institucional de la PWA (`/terreno/login`) desde el navegador móvil (Chrome, Edge o Safari).
+2. Se desplegará la tarjeta institucional con la cabecera **SGRAI | DGRD VALDIVIA**, titulada **"Inicio de Sesión"** y con la indicación *"Ingrese sus credenciales para acceder a la plataforma."*
+3. En el campo **"Identificador"** (placeholder: *Correo o RUT con dígito verificador*), ingrese su RUT (con o sin puntos, ej. `11.111.111-1` o `11111111-1`) o su correo institucional (`nombre@valdivia.cl`). El campo permite escribir ambos formatos sin restricciones.
+4. En el campo **"Contraseña"**, ingrese su clave secreta. Puede utilizar el botón del ojo ubicado a la derecha para mostrar u ocultar los caracteres ingresados.
+5. Presione el botón verde principal **"Ingresar al Sistema"** (área táctil optimizada de al menos 48px). Si desea regresar a la pantalla de bienvenida previa, puede presionar el botón secundario **"Volver al Inicio de SGRAI"**.
 6. Una vez autenticado, será redirigido automáticamente a la bandeja de misiones correspondiente a su rol:
    - Patrulla Verificadora $\rightarrow$ `/patrulla/misiones`
    - Delegado de Cuadrilla $\rightarrow$ `/cuadrilla/misiones`

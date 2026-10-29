@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button, Heading, Input, useToast } from '@/components/ui';
 import ConnectionStatusBadge from '@/components/common/ConnectionStatusBadge';
 import { validarRutChileno, formatearRut } from '@/lib/validations/rut';
-import { LogIn, ShieldAlert } from 'lucide-react';
+import { LogIn, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import styles from './LoginPage.module.css';
 
 export default function LoginPage() {
@@ -16,6 +16,7 @@ export default function LoginPage() {
 
   const [identificador, setIdentificador] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
 
@@ -31,11 +32,14 @@ export default function LoginPage() {
   }, [autenticado, usuario, router]);
 
   const handleIdentificadorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    if (val.includes('@')) {
-      setIdentificador(val);
-    } else {
-      setIdentificador(formatearRut(val));
+    setIdentificador(e.target.value);
+  };
+
+  const handleIdentificadorBlur = () => {
+    const trimmed = identificador.trim();
+    // Si no contiene arroba y parece un número/RUT, aplicar formato estándar con guion
+    if (trimmed && !trimmed.includes('@') && /^[0-9kK.-]+$/.test(trimmed)) {
+      setIdentificador(formatearRut(trimmed));
     }
   };
 
@@ -45,7 +49,7 @@ export default function LoginPage() {
 
     const limpio = identificador.trim();
     if (!limpio) {
-      setErrorLocal('Ingrese su RUT institucional o correo electrónico.');
+      setErrorLocal('Ingrese su RUT o correo electrónico.');
       return;
     }
 
@@ -54,17 +58,29 @@ export default function LoginPage() {
       return;
     }
 
-    // Validación básica de formato
+    // Validación de formato según tipo de identificador
     const esEmail = limpio.includes('@');
-    if (!esEmail && !validarRutChileno(limpio)) {
-      setErrorLocal('El formato de RUT ingresado no es válido (ej: 12.345.678-K).');
-      return;
+    let identificadorFinal = limpio;
+
+    if (!esEmail) {
+      const soloDigitos = limpio.replace(/[^0-9kK]/g, '');
+      if (!validarRutChileno(limpio) && !validarRutChileno(soloDigitos)) {
+        setErrorLocal('El formato de RUT ingresado no es válido (ej: 12.345.678-K).');
+        return;
+      }
+      identificadorFinal = formatearRut(limpio);
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(limpio)) {
+        setErrorLocal('El formato de correo electrónico ingresado no es válido.');
+        return;
+      }
     }
 
     setProcesando(true);
     try {
-      const perfil = await login({ identificador: limpio, password });
-      showSuccess(`Bienvenido(a), ${perfil.nombre}. Turno iniciado.`);
+      const perfil = await login({ identificador: identificadorFinal, password });
+      showSuccess(`Bienvenido(a), ${perfil.nombre}. Sesión iniciada.`);
 
       if (perfil.rolCodigo === 'PATRULLA_VERIFICADORA') {
         router.push('/patrulla');
@@ -85,84 +101,107 @@ export default function LoginPage() {
     }
   };
 
+  const handleVolver = () => {
+    router.push('/');
+  };
+
   return (
     <div className={styles.container}>
-      <header className={styles.topBar}>
-        <div className={styles.brand}>
-          <span className={styles.institution}>DGRD • Municipalidad de Valdivia</span>
-          <span className={styles.systemName}>SGRAI — App Terreno</span>
-        </div>
+      <div className={styles.topUtilityBar}>
         <ConnectionStatusBadge connected={typeof navigator !== 'undefined' ? navigator.onLine : true} />
-      </header>
+      </div>
 
       <main className={styles.mainContent}>
         <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <Heading as="h1" variant="h2" color="teal-dark" noMargin>
-              Acceso a Operaciones
-            </Heading>
-            <div className={styles.roleNote}>
-              Patrulla Verificadora / Delegado de Cuadrilla
-            </div>
+          <div className={styles.cardHeaderBanner}>
+            <span className={styles.brandTitle}>SGRAI</span>
+            <span className={styles.brandDivider}>|</span>
+            <span className={styles.brandSubtitle}>DGRD VALDIVIA</span>
           </div>
 
-          {errorLocal && (
-            <div className={styles.errorMessage} role="alert">
-              {errorLocal}
-            </div>
-          )}
+          <div className={styles.cardBody}>
+            <Heading as="h1" variant="h2" color="teal-dark" noMargin className={styles.title}>
+              Inicio de Sesión
+            </Heading>
+            <p className={styles.subtitle}>
+              Ingrese sus credenciales para acceder a la plataforma.
+            </p>
 
-          <form className={styles.form} onSubmit={handleSubmit}>
-            <Input
-              id="identificador-input"
-              label="RUT o Correo Institucional"
-              placeholder="12.345.678-K o usuario@valdivia.cl"
-              value={identificador}
-              onChange={handleIdentificadorChange}
-              disabled={procesando || cargando}
-              requiredIndicator
-              autoComplete="username"
-              autoFocus
-            />
+            {errorLocal && (
+              <div className={styles.errorMessage} role="alert">
+                {errorLocal}
+              </div>
+            )}
 
-            <Input
-              id="password-input"
-              type="password"
-              label="Contraseña"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={procesando || cargando}
-              requiredIndicator
-              autoComplete="current-password"
-            />
+            <form className={styles.form} onSubmit={handleSubmit} noValidate>
+              <Input
+                id="identificador-input"
+                label="Identificador"
+                placeholder="Correo o RUT con dígito verificador"
+                value={identificador}
+                onChange={handleIdentificadorChange}
+                onBlur={handleIdentificadorBlur}
+                disabled={procesando || cargando}
+                requiredIndicator
+                autoComplete="username"
+                autoFocus
+              />
 
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              fullWidth
-              loading={procesando || cargando}
-              icon={<LogIn size={20} />}
-            >
-              Iniciar Turno de Terreno
-            </Button>
-          </form>
+              <Input
+                id="password-input"
+                type={showPassword ? 'text' : 'password'}
+                label="Contraseña"
+                placeholder="••••••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={procesando || cargando}
+                requiredIndicator
+                autoComplete="current-password"
+                rightElement={
+                  <button
+                    type="button"
+                    className={styles.togglePasswordBtn}
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    disabled={procesando || cargando}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                }
+              />
 
-          <div className={styles.infoBanner}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, marginBottom: '4px' }}>
-              <ShieldAlert size={16} />
-              <span>Acceso Exclusivo de Emergencia</span>
-            </div>
-            Esta aplicación móvil está destinada estrictamente para la gestión de incidentes en terreno.
-            Los roles de Centro de Mando, Call Center y Supervisión deben operar desde la plataforma web central.
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                fullWidth
+                loading={procesando || cargando}
+                icon={<LogIn size={20} />}
+              >
+                Ingresar al Sistema
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                fullWidth
+                icon={<ArrowLeft size={18} />}
+                onClick={handleVolver}
+                disabled={procesando || cargando}
+              >
+                Volver al Inicio de SGRAI
+              </Button>
+
+              <hr className={styles.divider} />
+
+              <p className={styles.restrictionNotice}>
+                Acceso restringido a personal autorizado.
+              </p>
+            </form>
           </div>
         </div>
       </main>
-
-      <footer className={styles.footer}>
-        Ilustre Municipalidad de Valdivia • Gestión de Riesgos de Desastres (DGRD)
-      </footer>
     </div>
   );
 }
