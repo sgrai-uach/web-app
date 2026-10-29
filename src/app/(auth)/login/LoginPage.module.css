@@ -3,35 +3,17 @@
   display: flex;
   flex-direction: column;
   background-color: var(--color-bg-light, #ECEFF3);
+  position: relative;
 }
 
-.topBar {
-  background-color: var(--color-primary-teal-dark, #14505A);
-  color: var(--color-white, #FFFFFF);
+.topUtilityBar {
+  display: flex;
+  justify-content: flex-end;
   padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 2px solid var(--color-accent-mint, #4FAE9B);
-}
-
-.brand {
-  display: flex;
-  flex-direction: column;
-}
-
-.institution {
-  font-size: var(--font-size-xs, 12px);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.9;
-  font-weight: 600;
-}
-
-.systemName {
-  font-size: var(--font-size-md, 16px);
-  font-weight: 800;
-  color: var(--color-white, #FFFFFF);
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 10;
 }
 
 .mainContent {
@@ -48,23 +30,60 @@
   background-color: var(--color-white, #FFFFFF);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
   border-radius: var(--radius-none, 0px);
-  padding: var(--space-6, 24px);
-  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-.cardHeader {
-  margin-bottom: var(--space-5, 20px);
-  border-bottom: 1px solid var(--border-color-neutral, #DFE3E8);
-  padding-bottom: var(--space-3, 12px);
+.cardHeaderBanner {
+  background-color: var(--color-primary-teal-dark, #14505A);
+  color: var(--color-white, #FFFFFF);
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  user-select: none;
 }
 
-.roleNote {
-  font-size: var(--font-size-xs, 12px);
-  color: var(--color-primary-teal, #1B6F7D);
-  font-weight: 700;
-  text-transform: uppercase;
+.brandTitle {
+  font-size: 20px;
+  font-weight: 800;
   letter-spacing: 0.5px;
-  margin-top: var(--space-1, 4px);
+  color: var(--color-white, #FFFFFF);
+}
+
+.brandDivider {
+  color: var(--color-sage, #A9CBA4);
+  font-size: 18px;
+  font-weight: 300;
+  opacity: 0.8;
+}
+
+.brandSubtitle {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--color-sage, #A9CBA4);
+}
+
+.cardBody {
+  padding: 28px 24px 24px 24px;
+}
+
+.title {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text-dark, #2B2B2B);
+  margin: 0 0 6px 0;
+}
+
+.subtitle {
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-muted, #5F676E);
+  margin: 0 0 20px 0;
 }
 
 .form {
@@ -81,23 +100,39 @@
   font-size: var(--font-size-sm, 13px);
   font-weight: 600;
   line-height: 1.4;
+  margin-bottom: var(--space-4, 16px);
 }
 
-.infoBanner {
-  margin-top: var(--space-6, 24px);
-  padding: 12px;
-  background-color: var(--color-info-bg, #E0F2F1);
-  border-left: 4px solid var(--color-primary-teal, #1B6F7D);
-  font-size: var(--font-size-xs, 12px);
-  color: var(--color-primary-teal-dark, #14505A);
-  line-height: 1.4;
+.togglePasswordBtn {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--color-charcoal, #3B3F45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
 }
 
-.footer {
-  padding: 12px 16px;
+.togglePasswordBtn:hover {
+  color: var(--color-primary-teal, #1B6F7D);
+}
+
+.togglePasswordBtn:focus-visible {
+  outline: 2px solid var(--color-primary-teal, #1B6F7D);
+  outline-offset: 2px;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border-color-neutral, #DFE3E8);
+  margin: 18px 0 14px 0;
+}
+
+.restrictionNotice {
   text-align: center;
   font-size: var(--font-size-xs, 12px);
   color: var(--color-text-muted, #5F676E);
-  background-color: var(--color-white, #FFFFFF);
-  border-top: 1px solid var(--border-color-neutral, #DFE3E8);
+  margin: 0;
 }
