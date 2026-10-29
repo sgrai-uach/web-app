@@ -92,7 +92,7 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
       wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
     });
 
-    let errorCapturado: Error | null = null;
+    let errorCapturado = '';
     await act(async () => {
       try {
         await result.current.login({
@@ -100,12 +100,11 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
           password: 'Password123!',
         });
       } catch (err: unknown) {
-        errorCapturado = err as Error;
+        errorCapturado = err instanceof Error ? err.message : String(err);
       }
     });
 
-    expect(errorCapturado).not.toBeNull();
-    expect(errorCapturado?.message).toContain('Acceso restringido');
+    expect(errorCapturado).toContain('Acceso restringido');
     expect(result.current.autenticado).toBe(false);
     expect(cookieUtils.setAuthCookie).not.toHaveBeenCalled();
   });

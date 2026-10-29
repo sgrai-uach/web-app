@@ -36,7 +36,7 @@ export async function loginUsuario(
 
   if (error || !data || !('data' in data) || !data.data) {
     let mensaje = 'Error al procesar el inicio de sesión.';
-    const errObj = error as { error?: string; message?: string } | null;
+    const errObj = error as unknown as { error?: string; message?: string } | null;
 
     if (response?.status === 401) {
       mensaje = 'Credenciales inválidas. Verifique su identificador o contraseña.';
@@ -66,7 +66,7 @@ export async function loginUsuario(
 }
 
 export async function obtenerUsuarioActivo(): Promise<UsuarioActivoDetalle> {
-  const { data, error, response } = await apiClient.GET('/api/seguridad/usuario-activo');
+  const { data, error, response } = await apiClient.GET('/api/seguridad/usuario-activo', {});
 
   if (error || !data || !('data' in data) || !data.data) {
     let mensaje = 'Error al consultar la sesión y permisos del usuario activo';
