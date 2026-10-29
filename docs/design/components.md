@@ -63,18 +63,17 @@ Barra de conectividad persistente que informa al funcionario en terreno si su di
 Barra de navegación inferior fija (`min-height: 56px`, ubicada en la *Thumb Zone* móvil) que adapta el patrón `AppSidebar` de `sgrai-web` para teléfonos en terreno.
 - **Pestañas incluidas:**
   1. `Inicio` (`/`) — Hub Operativo de Terreno.
-  2. `Misiones` / `Faenas` (`/patrulla/misiones` o `/cuadrilla/misiones` según el rol activo).
-  3. `Sincronizar` — Botón de sincronización manual con indicador de pendientes (`pendingCount`).
-  4. `Portal` (`http(s)://<host>/`) — Retorno a la portada general de SGRAI.
+  2. `Misiones` / `Faenas` / `Historial` (`/patrulla/misiones` o `/cuadrilla/misiones` según el rol activo).
+  3. `Salir` — Cierre seguro de sesión y retorno a `/login`.
 
 ### 5.2 `<TerrenoWelcomeBanner />`
-Banner institucional de bienvenida en `/terreno` homologado con `GestionWelcomeBanner` de `sgrai-web`, adaptado en CSS Modules *Mobile-First* (apilado vertical en `< 640px`, fila horizontal en `>= 640px`).
+Banner institucional de bienvenida en `/terreno` homologado con `GestionWelcomeBanner` de `sgrai-web`, mostrando exclusivamente el mensaje de bienvenida y el badge con el rol asignado.
 
 ### 5.3 `<TerrenoResumenOperativo />`
-Panel de resumen con tarjetas de estado de la unidad (incluyendo `<UnidadInactivaBanner />` cuando `unidadActiva === false` para H82/H85) y estado de la cola de sincronización offline (`IndexedDB`).
+Panel de resumen con contadores operativos de misiones (*Pendientes*, *En Curso* y *Finalizadas*) y el bloque **Sincronización fuera de línea** con su botón **Sincronizar** (incluyendo `<UnidadInactivaBanner />` cuando `unidadActiva === false` para H82/H85).
 
 ### 5.4 `<TerrenoModulosGrid />`
-Catálogo dinámico de módulos y funcionalidades habilitadas en terreno filtrado por el rol (`PATRULLA_VERIFICADORA` o `DELEGADO_CUADRILLA`) y permisos RBAC del usuario activo. En móvil renderiza tarjetas en 1 columna con botones de acción de `48px` a ancho completo (`100%`).
+Catálogo dinámico de módulos y funcionalidades habilitadas en terreno filtrado por el rol (`PATRULLA_VERIFICADORA` o `DELEGADO_CUADRILLA`) y permisos RBAC del usuario activo, sin anotaciones superiores en las tarjetas. En móvil renderiza tarjetas en 1 columna con botones de acción de `48px` a ancho completo (`100%`).
 
 ---
 

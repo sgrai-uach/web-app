@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import TerrenoLayout from '../layout';
 import TerrenoHomePage from '../page';
 import type { AuthContextValue } from '@/context/AuthContext';
@@ -26,6 +26,22 @@ vi.mock('@/hooks/useConnectivity', () => ({
     pendientes: 2,
     sincronizar: mockSincronizar,
   }),
+}));
+
+vi.mock('@/services/offlineQueue', () => ({
+  obtenerMisionesLocales: vi.fn().mockResolvedValue([
+    {
+      id: 'm-1',
+      incidenteId: 'inc-1',
+      codigoIncidente: 'INC-2026-0001',
+      tipologia: 'CAIDA_ARBOL',
+      direccion: 'Av. Alemania 600',
+      prioridad: 'ALTA',
+      estado: 'EN_CURSO',
+      fechaDespacho: '2026-10-29T10:00:00Z',
+      actualizadoEn: '2026-10-29T10:05:00Z',
+    },
+  ]),
 }));
 
 function buildAuthMock(overrides: Partial<AuthContextValue> = {}): AuthContextValue {
@@ -77,8 +93,9 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
     vi.clearAllMocks();
   });
 
-  it('renderiza bienvenida, resumen operativo, módulos de Patrulla Verificadora y barra inferior', () => {
-    mockUseAuth.mockReturnValue(buildAuthMock());
+  it('renderiza bienvenida simplificada, resumen operativo, sincronización fuera de línea y barra inferior con botón Salir', () => {
+    const mockLogout = vi.fn();
+    mockUseAuth.mockReturnValue(buildAuthMock({ logout: mockLogout }));
 
     render(
       <TerrenoLayout>
@@ -86,23 +103,36 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
       </TerrenoLayout>
     );
 
+    // Bienvenida: solo nombre y rol
     expect(
       screen.getByRole('heading', { name: /bienvenido\/a, camila soto/i })
     ).toBeInTheDocument();
-    expect(screen.getByText(/patrulla alfa 01/i)).toBeInTheDocument();
+    expect(screen.getByText(/rol: patrulla verificadora/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/dirección de gestión de riesgos de desastres/i)
+    ).not.toBeInTheDocument();
 
-    // Módulos de Patrulla Verificadora visibles
+    // Resumen Operativo y Sincronización fuera de línea
+    expect(
+      screen.getByRole('heading', { name: /resumen operativo/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/sincronización fuera de línea/i)).toBeInTheDocument();
+    expect(screen.getByText(/conexión estable con el servidor\./i)).toBeInTheDocument();
+
+    const btnSincronizar = screen.getByRole('button', { name: /sincronizar/i });
+    fireEvent.click(btnSincronizar);
+    expect(mockSincronizar).toHaveBeenCalledTimes(1);
+
+    // Módulos de Patrulla Verificadora visibles sin badges superiores
     expect(
       screen.getByRole('heading', { name: /bandeja de misiones de patrulla/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: /triage, tipología y prioridad/i })
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: /bandeja de faenas de cuadrilla/i })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/operativo • h35/i)).not.toBeInTheDocument();
 
-    // Barra de navegación inferior (TerrenoBottomNav)
+    // Barra de navegación inferior (Inicio, Misiones, Salir)
     const navInferior = screen.getByRole('navigation', {
       name: /navegación principal de terreno/i,
     });
@@ -111,6 +141,10 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
       'href',
       '/patrulla/misiones'
     );
+
+    const btnSalir = screen.getByRole('button', { name: /^salir$/i });
+    fireEvent.click(btnSalir);
+    expect(mockLogout).toHaveBeenCalledTimes(1);
   });
 
   it('renderiza los módulos de Delegado de Cuadrilla y enlace a Faenas en la barra inferior', () => {
@@ -150,9 +184,6 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
     expect(
       screen.getByRole('heading', { name: /evidencia, apoyos y cierre de faena/i })
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: /bandeja de misiones de patrulla/i })
-    ).not.toBeInTheDocument();
 
     expect(screen.getByRole('link', { name: /^faenas$/i })).toHaveAttribute(
       'href',
@@ -160,7 +191,7 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
     );
   });
 
-  it('muestra advertencia de unidad inactiva y modo lectura cuando unidadActiva es false (H82/H85)', () => {
+  it('muestra banner de unidad inactiva y botones en modo lectura cuando unidadActiva es false (H82/H85)', () => {
     mockUseAuth.mockReturnValue(
       buildAuthMock({
         unidadActiva: false,
@@ -173,9 +204,8 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
       </TerrenoLayout>
     );
 
-    expect(screen.getByText(/modo histórico \(inactiva\)/i)).toBeInTheDocument();
     expect(
-      screen.getAllByText(/solo lectura • unidad inactiva/i).length
+      screen.getAllByRole('link', { name: /ver en modo lectura/i }).length
     ).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: /^historial$/i })).toHaveAttribute(
       'href',

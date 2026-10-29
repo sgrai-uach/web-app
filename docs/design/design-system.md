@@ -104,13 +104,11 @@ Cuando una decisión de diseño de `sgrai-web` (pensada para monitores de oficin
 
 ## 4. Arquitectura de Layout y Hub Operativo de Terreno (`/terreno`)
 
-Toda vista autenticada de terreno se envuelve en `<TerrenoLayout />` y se organiza alrededor del **Hub Operativo de Terreno (`/terreno`)**:
+Toda vista autenticada de terreno se envuelve en `<TerrenoLayout />` (sin cabecera superior redundante para maximizar el área útil en pantallas móviles) y se organiza alrededor del **Hub Operativo de Terreno (`/terreno`)**:
 
-1. **Cabecera Institucional (`TerrenoLayout` Header):**
-   - Muestra el identificador `SGRAI Terreno • Municipalidad de Valdivia` (con enlace directo al Hub `/terreno`), el nombre del operador, botón `Salir`, el rol activo y el `<ConnectionStatusBadge />`.
-2. **Estructura del Hub Principal (`/terreno`):**
-   - **`TerrenoWelcomeBanner`:** Saludo institucional con rol y unidad/delegación asignada.
-   - **`TerrenoResumenOperativo`:** Indicadores de estado de unidad (`DISPONIBLE` o `MODO HISTÓRICO INACTIVO` H82/H85) y cola local de sincronización (`IndexedDB`).
-   - **`TerrenoModulosGrid`:** Cuadrícula de módulos y operaciones habilitadas filtradas por rol (`PATRULLA_VERIFICADORA` o `DELEGADO_CUADRILLA`) y permisos RBAC.
-3. **Barra de Navegación Inferior (`TerrenoBottomNav`):**
-   - Fija en el borde inferior (`min-height: 56px` + `safe-area-inset-bottom`), con pestañas de alto contraste para cambiar entre *Inicio*, *Misiones / Faenas*, *Sincronizar* y *Portal SGRAI*.
+1. **Estructura del Hub Principal (`/terreno`):**
+   - **`TerrenoWelcomeBanner`:** Muestra únicamente el saludo (`Bienvenido/a, {nombre}`) y el badge del rol asignado (`Rol: {rolNombre}`).
+   - **`TerrenoResumenOperativo`:** Incluye el bloque de **Resumen Operativo** con contadores de misiones (*Pendientes*, *En Curso*, *Finalizadas*) y el bloque **Sincronización fuera de línea** con el texto *"Conexión estable con el servidor."* y el botón **"Sincronizar"**.
+   - **`TerrenoModulosGrid`:** Cuadrícula limpia de módulos y operaciones habilitadas filtradas por rol (`PATRULLA_VERIFICADORA` o `DELEGADO_CUADRILLA`) y permisos RBAC, sin anotaciones ni badges internos.
+2. **Barra de Navegación Inferior (`TerrenoBottomNav`):**
+   - Fija en el borde inferior (`min-height: 56px` + `safe-area-inset-bottom`), con 3 pestañas de alto contraste en la zona del pulgar: *Inicio*, *Misiones / Faenas* y *Salir*.
