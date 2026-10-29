@@ -81,9 +81,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const perfil = mapDetalleAUsuarioPerfil(detalle);
 
       if (!esRolTerrenoPermitido(perfil.rolCodigo)) {
-        removeAuthCookie();
+        // No eliminar la cookie sgrai_auth_token para preservar la sesión activa en sgrai-web (/gestion)
         setUsuario(null);
         setToken(null);
+        try {
+          if (typeof window !== 'undefined' && window.location) {
+            window.location.assign('/gestion');
+          }
+        } catch {
+          // Ignorado en pruebas unitarias
+        }
         return;
       }
 
@@ -131,8 +138,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     removeAuthCookie();
     setUsuario(null);
     setToken(null);
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
+    try {
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.assign('/login');
+      }
+    } catch {
+      // Ignorado en pruebas unitarias
     }
   }, []);
 

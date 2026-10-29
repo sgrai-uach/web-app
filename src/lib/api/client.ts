@@ -12,7 +12,7 @@ export function handleUnauthorizedSession() {
     if (hadToken || pathname !== '/') {
       const returnUrl = encodeURIComponent(pathname + window.location.search);
       try {
-        window.location.href = `/login?motivo=sesion_expirada&returnUrl=${returnUrl}`;
+        window.location.assign(`/login?motivo=sesion_expirada&returnUrl=${returnUrl}`);
       } catch {
         // Ignorar excepciones en entornos jsdom
       }

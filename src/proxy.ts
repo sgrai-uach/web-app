@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { AUTH_COOKIE_NAME } from '@/lib/utils/cookieUtils';
 
+export const UNIFIED_LOGIN_PATH = process.env.NEXT_PUBLIC_LOGIN_URL || '/login';
+
 function esRutaPublica(pathname: string): boolean {
   if (
-    pathname === '/login' ||
     pathname === '/sw.js' ||
     pathname === '/site.webmanifest' ||
     pathname === '/favicon.ico'
@@ -15,23 +16,34 @@ function esRutaPublica(pathname: string): boolean {
 }
 
 export function proxy(request: NextRequest) {
-  const { pathname, search } = request.nextUrl;
+  const { pathname, search, basePath } = request.nextUrl;
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const prefijoTerreno = basePath || '/terreno';
 
-  // Si ya tiene sesión activa e intenta ir a login
-  if (pathname === '/login' && token) {
-    return NextResponse.next();
+  // Redirigir /terreno/login hacia el portal de autenticación unificado (/login)
+  if (pathname === '/login') {
+    if (token) {
+      return NextResponse.redirect(new URL(prefijoTerreno, request.nextUrl.origin));
+    }
+    const returnUrl = encodeURIComponent(prefijoTerreno);
+    return NextResponse.redirect(
+      new URL(`${UNIFIED_LOGIN_PATH}?returnUrl=${returnUrl}`, request.nextUrl.origin)
+    );
   }
 
-  // Rutas públicas
+  // Rutas públicas de infraestructura PWA
   if (esRutaPublica(pathname)) {
     return NextResponse.next();
   }
 
-  // Si la ruta raíz y no tiene token, mandar a login
+  // Si no cuenta con token de sesión, redirigir al login unificado (/login)
   if (!token) {
-    const returnUrl = encodeURIComponent(pathname + search);
-    const loginUrl = new URL(`/login?returnUrl=${returnUrl}`, request.url);
+    const fullPath = `${prefijoTerreno}${pathname === '/' ? '' : pathname}${search}`;
+    const returnUrl = encodeURIComponent(fullPath);
+    const loginUrl = new URL(
+      `${UNIFIED_LOGIN_PATH}?returnUrl=${returnUrl}`,
+      request.nextUrl.origin
+    );
     return NextResponse.redirect(loginUrl);
   }
 
