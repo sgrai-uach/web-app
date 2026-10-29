@@ -1,0 +1,91 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  width: 100%;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3, 12px);
+  width: 100%;
+}
+
+.card {
+  background-color: var(--color-white, #FFFFFF);
+  border: 1px solid var(--border-color-neutral, #DFE3E8);
+  border-left: 4px solid var(--color-primary-teal, #1B6F7D);
+  border-radius: var(--radius-none, 0px);
+  padding: var(--space-4, 16px);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3, 12px);
+}
+
+.cardSuccess {
+  border-left-color: var(--color-success, #2E7D32);
+}
+
+.cardWarning {
+  border-left-color: var(--color-warning, #E65100);
+}
+
+.iconBox {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-none, 0px);
+}
+
+.iconBoxSuccess {
+  background-color: var(--color-success-bg, #E8F5E9);
+  color: var(--color-success, #2E7D32);
+}
+
+.iconBoxWarning {
+  background-color: var(--color-warning-bg, #FFF3E0);
+  color: var(--color-warning, #E65100);
+}
+
+.iconBoxTeal {
+  background-color: var(--color-info-bg, #E0F2F1);
+  color: var(--color-primary-teal, #1B6F7D);
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cardLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-text-muted, #5F676E);
+}
+
+.cardValue {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: var(--color-text-dark, #2B2B2B);
+}
+
+.cardHelper {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #5F676E);
+  line-height: 1.4;
+}
+
+@media (min-width: 540px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4, 16px);
+  }
+}

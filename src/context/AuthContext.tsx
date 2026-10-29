@@ -26,6 +26,8 @@ export interface AuthContextValue {
   esPatrulla: boolean;
   esCuadrilla: boolean;
   unidadActiva: boolean;
+  tienePermiso: (permiso: string) => boolean;
+  tieneAlgunPermiso: (permisos: string[]) => boolean;
   login: (credenciales: LoginRequest) => Promise<UsuarioPerfilSesion>;
   logout: () => void;
   recargarSesion: () => Promise<void>;
@@ -153,6 +155,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const unidadActiva = usuario?.unidadActiva !== false;
   const autenticado = Boolean(token && usuario);
 
+  const tienePermiso = useCallback(
+    (permiso: string): boolean => {
+      if (!usuario) return false;
+      const listaPermisos = usuario.permisos || [];
+      if (listaPermisos.includes('*') || listaPermisos.includes(permiso)) {
+        return true;
+      }
+      // Fallback por rol canónico de terreno cuando el token o mock no desglosa permisos granulares
+      if (esPatrulla && permiso.startsWith('patrulla:')) {
+        return true;
+      }
+      if (esCuadrilla && permiso.startsWith('cuadrilla:')) {
+        return true;
+      }
+      return false;
+    },
+    [usuario, esPatrulla, esCuadrilla]
+  );
+
+  const tieneAlgunPermiso = useCallback(
+    (permisos: string[]): boolean => {
+      if (permisos.length === 0) return true;
+      return permisos.some((p) => tienePermiso(p));
+    },
+    [tienePermiso]
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -163,6 +192,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         esPatrulla,
         esCuadrilla,
         unidadActiva,
+        tienePermiso,
+        tieneAlgunPermiso,
         login,
         logout,
         recargarSesion,
