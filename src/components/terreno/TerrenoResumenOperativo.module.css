@@ -1,34 +1,112 @@
 .wrapper {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3, 12px);
+  gap: var(--space-4, 16px);
   width: 100%;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
 }
 
 .grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-3, 12px);
+  gap: var(--space-4, 16px);
   width: 100%;
 }
 
-.card {
+.kpiCard {
+  background-color: var(--color-white, #FFFFFF);
+  border: 1px solid var(--border-color-neutral, #DFE3E8);
+  border-top: 4px solid var(--color-primary-teal, #1B6F7D);
+  border-radius: var(--radius-none, 0px);
+  padding: var(--space-4, 16px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+}
+
+.kpiCardWarning {
+  border-top-color: var(--color-warning, #E65100);
+}
+
+.kpiHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+}
+
+.kpiTitle {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-primary-teal, #1B6F7D);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kpiStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2, 8px);
+}
+
+.statBox {
+  background-color: var(--color-bg-light, #ECEFF3);
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #5F676E);
+}
+
+.statNumber {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--color-charcoal-dark, #24272B);
+}
+
+.statNumberTeal {
+  color: var(--color-primary-teal, #1B6F7D);
+}
+
+.statNumberSuccess {
+  color: var(--color-success, #2E7D32);
+}
+
+.syncCard {
   background-color: var(--color-white, #FFFFFF);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
   border-left: 4px solid var(--color-primary-teal, #1B6F7D);
   border-radius: var(--radius-none, 0px);
   padding: var(--space-4, 16px);
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  justify-content: space-between;
   gap: var(--space-3, 12px);
 }
 
-.cardSuccess {
-  border-left-color: var(--color-success, #2E7D32);
+.syncCardWarning {
+  border-left-color: var(--color-warning, #E65100);
 }
 
-.cardWarning {
-  border-left-color: var(--color-warning, #E65100);
+.syncTop {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3, 12px);
 }
 
 .iconBox {
@@ -61,6 +139,7 @@
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  flex: 1;
 }
 
 .cardLabel {
@@ -83,7 +162,20 @@
   line-height: 1.4;
 }
 
-@media (min-width: 540px) {
+.syncActions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-2, 8px);
+  border-top: 1px solid var(--color-bg-light, #ECEFF3);
+}
+
+@media (max-width: 639px) {
+  .syncActions button {
+    width: 100%;
+  }
+}
+
+@media (min-width: 640px) {
   .grid {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--space-4, 16px);
