@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Activity, CloudCheck, WifiOff, RefreshCw, Compass, HardHat } from 'lucide-react';
+import Link from 'next/link';
+import { CloudCheck, WifiOff, RefreshCw, Compass, HardHat } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { sincronizarMisiones } from '@/services/misionesService';
@@ -100,22 +101,34 @@ export function TerrenoResumenOperativo() {
           </div>
 
           <div className={styles.kpiStatsGrid}>
-            <div className={styles.statBox}>
+            <Link
+              href={`${esCuadrilla ? '/cuadrilla/misiones' : '/patrulla/misiones'}?estado=pendientes`}
+              className={styles.statBox}
+              aria-label={`Ver ${metricas.pendientes} misiones pendientes`}
+            >
               <span className={styles.statLabel}>Pendientes</span>
               <span className={styles.statNumber}>{metricas.pendientes}</span>
-            </div>
-            <div className={styles.statBox}>
+            </Link>
+            <Link
+              href={`${esCuadrilla ? '/cuadrilla/misiones' : '/patrulla/misiones'}?estado=en_curso`}
+              className={styles.statBox}
+              aria-label={`Ver ${metricas.enCurso} misiones en curso`}
+            >
               <span className={styles.statLabel}>En Curso</span>
               <span className={`${styles.statNumber} ${styles.statNumberTeal}`}>
                 {metricas.enCurso}
               </span>
-            </div>
-            <div className={styles.statBox}>
+            </Link>
+            <Link
+              href={`${esCuadrilla ? '/cuadrilla/misiones' : '/patrulla/misiones'}?estado=finalizadas`}
+              className={styles.statBox}
+              aria-label={`Ver ${metricas.finalizadas} misiones finalizadas`}
+            >
               <span className={styles.statLabel}>Finalizadas</span>
               <span className={`${styles.statNumber} ${styles.statNumberSuccess}`}>
                 {metricas.finalizadas}
               </span>
-            </div>
+            </Link>
           </div>
         </div>
 

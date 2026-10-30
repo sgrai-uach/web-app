@@ -1,0 +1,72 @@
+.chipsContainer {
+  display: flex;
+  gap: var(--space-2, 8px);
+  overflow-x: auto;
+  padding-bottom: var(--space-1, 4px);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.chipsContainer::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2, 8px);
+  padding: 8px 14px;
+  min-height: 40px;
+  font-family: var(--font-family-base);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  border-radius: 0;
+  border: 1px solid var(--color-border, #CBD5E1);
+  background-color: var(--color-white, #FFFFFF);
+  color: var(--color-text-dark, #2B2B2B);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.chip:hover {
+  background-color: var(--color-bg-light, #ECEFF3);
+}
+
+.chip:active {
+  background-color: #DEE4EA;
+}
+
+.chip:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.chipActive {
+  background-color: var(--color-primary-teal, #1B6F7D) !important;
+  border-color: var(--color-primary-teal, #1B6F7D) !important;
+  color: var(--color-white, #FFFFFF) !important;
+}
+
+.badgeCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 0;
+  background-color: var(--color-bg-light, #ECEFF3);
+  color: var(--color-text-dark, #2B2B2B);
+}
+
+.chipActive .badgeCount {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: var(--color-white, #FFFFFF);
+}

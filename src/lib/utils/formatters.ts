@@ -62,3 +62,28 @@ export function formatearFechaHora24h(fecha?: string | Date | null): string {
 
   return `${dia}-${mes}-${anio} ${horas}:${minutos}`;
 }
+
+const PRIORIDAD_PESO: Record<string, number> = {
+  CRITICA: 4,
+  ALTA: 3,
+  MEDIA: 2,
+  BAJA: 1,
+};
+
+/**
+ * Ordena misiones primero por prioridad (Crítica > Alta > Media > Baja) y secundariamente por fecha más reciente.
+ */
+export function ordenarMisionesPorPrioridadYFecha<T extends { prioridad?: string | null; fechaDespacho?: string | null; actualizadoEn?: string | null }>(
+  misiones: T[]
+): T[] {
+  return [...misiones].sort((a, b) => {
+    const pesoA = PRIORIDAD_PESO[a.prioridad?.toUpperCase() || ''] || 0;
+    const pesoB = PRIORIDAD_PESO[b.prioridad?.toUpperCase() || ''] || 0;
+    if (pesoB !== pesoA) {
+      return pesoB - pesoA;
+    }
+    const fechaA = new Date(a.fechaDespacho || a.actualizadoEn || 0).getTime();
+    const fechaB = new Date(b.fechaDespacho || b.actualizadoEn || 0).getTime();
+    return fechaB - fechaA;
+  });
+}
