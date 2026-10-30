@@ -59,6 +59,10 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
         prioridad: item.prioridad,
         estado: item.estado,
         fechaDespacho: item.fechaInicio || item.creadoEn,
+        datosAdicionales: {
+          trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
+          titulo: item.titulo,
+        },
         actualizadoEn: item.actualizadoEn,
       }));
 
@@ -104,6 +108,13 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         prioridad: d.prioridad,
         estado: d.estado,
         fechaDespacho: d.fechaInicio || d.creadoEn,
+        datosAdicionales: {
+          trabajo:
+            d.descripcion ||
+            d.incidente?.descripcion ||
+            'Sin instrucciones adicionales especificadas.',
+          titulo: d.titulo,
+        },
         actualizadoEn: d.actualizadoEn,
       };
 

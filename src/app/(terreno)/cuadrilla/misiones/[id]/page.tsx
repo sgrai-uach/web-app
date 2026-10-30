@@ -2,11 +2,13 @@
 
 import React, { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Calendar, Archive } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Archive, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { obtenerMisionLocalPorId } from '@/services/offlineQueue';
+import { Button } from '@/components/ui/Button';
+import { EstadoBadge } from '@/components/misiones/EstadoBadge';
+import { obtenerDetalleMision } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
-import { formatearEstado, formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
+import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaDetailPage.module.css';
 
@@ -24,18 +26,17 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const cargarDetalle = useCallback(async () => {
     setCargando(true);
     try {
-      const encontrada = await obtenerMisionLocalPorId(misionId);
+      const encontrada = await obtenerDetalleMision(misionId);
       if (encontrada) {
         setMision(encontrada);
       } else {
-        // Fallback demostrativo
         setMision({
           id: misionId,
           incidenteId: `inc-${misionId}`,
           codigoIncidente: `INC-2026-${misionId.substring(0, 5).toUpperCase()}`,
-          tipologia: 'CAIDA_ARBOL',
+          tipologia: 'Caída de árbol',
           direccion: 'Av. Ramón Picarte 1100, Valdivia',
-          coordenadas: { lat: -39.81, lng: -73.25 },
+          coordenadas: { lat: -39.82, lng: -73.23 },
           prioridad: 'ALTA',
           estado: 'FINALIZADA',
           fechaDespacho: '2026-10-20T14:30:00Z',
@@ -52,8 +53,28 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   }, [cargarDetalle]);
 
   if (cargando || !mision) {
-    return <div>Cargando registro histórico...</div>;
+    return <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>Cargando misión...</div>;
   }
+
+  const normPrioridad = mision.prioridad?.toUpperCase() || '';
+  let prioridadClase = styles.priorityNeutro;
+  if (normPrioridad === 'CRITICA') {
+    prioridadClase = styles.priorityCritica;
+  } else if (normPrioridad === 'ALTA') {
+    prioridadClase = styles.priorityAlta;
+  }
+
+  // Enlace a OpenStreetMap (como en sgrai-web)
+  const urlMapa = mision.coordenadas?.lat && mision.coordenadas?.lng
+    ? `https://www.openstreetmap.org/?mlat=${mision.coordenadas.lat}&mlon=${mision.coordenadas.lng}#map=16/${mision.coordenadas.lat}/${mision.coordenadas.lng}`
+    : `https://www.openstreetmap.org/search?query=${encodeURIComponent(mision.direccion + ', Valdivia')}`;
+
+  const trabajoTexto = (mision.datosAdicionales?.trabajo as string) || mision.direccion;
+  const esSoloLectura =
+    !unidadActiva ||
+    mision.estado === 'FINALIZADA' ||
+    mision.estado === 'COMPLETADA' ||
+    mision.estado === 'CERRADA';
 
   return (
     <div className={styles.container}>
@@ -71,33 +92,56 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
 
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
-          <span className={styles.code}>{mision.codigoIncidente}</span>
-          <span className={styles.statusBadge}>{formatearEstado(mision.estado)}</span>
+          <div className={styles.codeArea}>
+            <span className={styles.code}>{mision.codigoIncidente}</span>
+            <span className={`${styles.priorityChip} ${prioridadClase}`}>
+              {formatearPrioridad(mision.prioridad)}
+            </span>
+          </div>
+          <EstadoBadge estado={mision.estado} />
         </div>
 
         <div className={styles.detailGrid}>
-          <div className={styles.detailItem}>
+          {/* Bloque Tipo (único en negrita) */}
+          <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Tipo</span>
-            <span className={styles.itemValue}><strong>{mision.tipologia}</strong></span>
+            <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
+              {mision.tipologia}
+            </span>
           </div>
 
-          <div className={styles.detailItem}>
+          {/* Bloque Ubicación separado */}
+          <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Ubicación</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <MapPin size={16} color="var(--color-primary-teal)" aria-hidden="true" />
-              <span className={styles.itemValue}>{mision.direccion}</span>
+            <div className={styles.locationActionRow}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <MapPin size={16} color="var(--color-primary-teal)" aria-hidden="true" />
+                <span className={styles.itemValue}>{mision.direccion}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<ExternalLink size={14} />}
+                href={urlMapa}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Abrir en mapa
+              </Button>
             </div>
           </div>
 
-          <div className={styles.detailItem}>
-            <span className={styles.itemLabel}>Prioridad</span>
-            <span className={styles.itemValue}>{formatearPrioridad(mision.prioridad)}</span>
+          {/* Bloque Trabajo separado */}
+          <div className={styles.sectionBlock}>
+            <span className={styles.itemLabel}>Trabajo</span>
+            <span className={styles.itemValue}>{trabajoTexto}</span>
           </div>
 
-          <div className={styles.detailItem}>
+          {/* Fecha Despachada */}
+          <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Despachada</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Calendar size={16} aria-hidden="true" />
+              <Calendar size={15} color="var(--color-text-muted)" aria-hidden="true" />
               <span className={styles.itemValue}>
                 {formatearFechaHora24h(mision.fechaDespacho)}
               </span>
@@ -106,7 +150,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {(!unidadActiva || mision.estado === 'FINALIZADA' || mision.estado === 'COMPLETADA' || mision.estado === 'CERRADA') && (
+      {esSoloLectura && (
         <div className={styles.readOnlyNotice}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
             <Archive size={16} aria-hidden="true" />
