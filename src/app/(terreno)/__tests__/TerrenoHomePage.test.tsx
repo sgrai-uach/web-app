@@ -110,11 +110,11 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
       </TerrenoLayout>
     );
 
-    // Bienvenida: solo nombre y rol
+    // Bienvenida: nombre de operador, unidad y rol
     expect(
       screen.getByRole('heading', { name: /bienvenido\/a, camila soto/i })
     ).toBeInTheDocument();
-    expect(screen.getByText(/rol: patrulla verificadora/i)).toBeInTheDocument();
+    expect(screen.getByText(/patrulla alfa 01 · patrulla verificadora/i)).toBeInTheDocument();
 
     // Sincronización compacta
     expect(screen.getByText(/sincronizado recién/i)).toBeInTheDocument();
@@ -132,9 +132,9 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
       '/patrulla/misiones?estado=en_curso'
     );
 
-    // Siguiente misión
+    // Misiones en atención (tarjetas compactas)
     await waitFor(() => {
-      expect(screen.getByText(/siguiente misión/i)).toBeInTheDocument();
+      expect(screen.getByText(/misiones en atención/i)).toBeInTheDocument();
       expect(screen.getByText('INC-2026-00315')).toBeInTheDocument();
       expect(screen.getByText('Anegamiento de calzada')).toBeInTheDocument();
     });

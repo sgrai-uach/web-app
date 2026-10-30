@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { UserCheck } from 'lucide-react';
+import { Compass, HardHat } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import styles from './TerrenoWelcomeBanner.module.css';
 
@@ -12,6 +12,8 @@ export function TerrenoWelcomeBanner() {
   const rolTexto =
     usuario?.rolNombre ||
     (esCuadrilla ? 'Delegado de Cuadrilla' : 'Patrulla Verificadora');
+  const unidadNombre = usuario?.unidadNombre || (esCuadrilla ? 'Cuadrilla de Terreno' : 'Patrulla Verificadora');
+  const UnidadIcon = esCuadrilla ? HardHat : Compass;
 
   return (
     <section className={styles.banner} aria-label="Bienvenida del operador de terreno">
@@ -22,8 +24,8 @@ export function TerrenoWelcomeBanner() {
 
         <div className={styles.metaArea}>
           <div className={styles.roleBadge}>
-            <UserCheck size={15} aria-hidden="true" />
-            <span>Rol: {rolTexto}</span>
+            <UnidadIcon size={15} aria-hidden="true" />
+            <span>{unidadNombre} · {rolTexto}</span>
           </div>
         </div>
       </div>

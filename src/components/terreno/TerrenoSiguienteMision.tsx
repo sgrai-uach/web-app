@@ -1,49 +1,49 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { MapPin, CheckCircle, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronRight, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
-import { Button } from '@/components/ui/Button';
 import { formatearPrioridad, ordenarMisionesPorPrioridadYFecha } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './TerrenoSiguienteMision.module.css';
 
 export function TerrenoSiguienteMision() {
   const { esCuadrilla, unidadActiva } = useAuth();
-  const [siguienteMision, setSiguienteMision] = useState<MisionLocal | null>(null);
+  const [misionesActivas, setMisionesActivas] = useState<MisionLocal[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
 
   useEffect(() => {
     let cancelado = false;
 
-    async function buscarSiguiente() {
+    async function buscarMisiones() {
       try {
         const misiones = await sincronizarMisiones({
           tipoMision: esCuadrilla ? 'ATENCION_CUADRILLA' : 'VERIFICACION',
         });
         if (cancelado) return;
 
-        // 1. Prioridad: misión actualmente en curso o en ruta
-        const enCurso = misiones.find((m) => {
+        // 1. Misiones actualmente activas (en curso, en terreno o en ruta)
+        const enCurso = misiones.filter((m) => {
           const e = m.estado?.toUpperCase();
           return e === 'EN_CURSO' || e === 'EN_TERRENO' || e === 'EN_RUTA';
         });
 
-        if (enCurso) {
-          setSiguienteMision(enCurso);
+        if (enCurso.length > 0) {
+          setMisionesActivas(ordenarMisionesPorPrioridadYFecha(enCurso));
           return;
         }
 
-        // 2. Misiones pendientes ordenadas por prioridad (Crítica > Alta...) y fecha más reciente
+        // 2. Si no hay en curso, tomar la misión prioritaria despachada o asignada
         const pendientes = misiones.filter((m) => {
           const e = m.estado?.toUpperCase();
           return e === 'ASIGNADA' || e === 'DESPACHADA' || e === 'PENDIENTE';
         });
 
         const ordenadas = ordenarMisionesPorPrioridadYFecha(pendientes);
-        setSiguienteMision(ordenadas.length > 0 ? ordenadas[0] : null);
+        setMisionesActivas(ordenadas.slice(0, 1));
       } catch {
         // En caso de error, mantener neutro
       } finally {
@@ -51,7 +51,7 @@ export function TerrenoSiguienteMision() {
       }
     }
 
-    void buscarSiguiente();
+    void buscarMisiones();
 
     return () => {
       cancelado = true;
@@ -60,81 +60,80 @@ export function TerrenoSiguienteMision() {
 
   if (cargando) {
     return (
-      <div className={styles.container}>
-        <span className={styles.sectionTitle}>Siguiente misión</span>
-        <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
-          Buscando despacho prioritario...
-        </p>
+      <div className={styles.sectionWrapper}>
+        <div className={styles.sectionHeader}>
+          <span className={styles.sectionTitle}>Misiones en atención</span>
+        </div>
+        <div className={styles.emptyCard}>
+          <span>Buscando misiones activas...</span>
+        </div>
       </div>
     );
   }
 
   const rutaBase = esCuadrilla ? '/cuadrilla/misiones' : '/patrulla/misiones';
 
-  if (!siguienteMision) {
+  if (misionesActivas.length === 0) {
     return (
-      <div className={styles.container}>
-        <span className={styles.sectionTitle}>Siguiente misión</span>
-        <div className={styles.emptyState}>
+      <div className={styles.sectionWrapper}>
+        <div className={styles.sectionHeader}>
+          <span className={styles.sectionTitle}>Misiones en atención</span>
+        </div>
+        <div className={styles.emptyCard}>
           <CheckCircle size={20} color="var(--color-success, #2E7D32)" aria-hidden="true" />
           <span>
             {!unidadActiva
               ? 'Unidad inactiva en modo de solo lectura.'
-              : 'Sin misiones pendientes. La unidad se encuentra disponible para despacho.'}
+              : 'Sin misiones activas ni pendientes. La unidad se encuentra disponible.'}
           </span>
         </div>
       </div>
     );
   }
 
-  const normPrioridad = siguienteMision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
-  }
-
-  const esEnCurso =
-    siguienteMision.estado === 'EN_CURSO' ||
-    siguienteMision.estado === 'EN_TERRENO' ||
-    siguienteMision.estado === 'EN_RUTA';
-
   return (
-    <div className={styles.container}>
-      <div className={styles.headerRow}>
-        <div className={styles.titleGroup}>
-          <span className={styles.sectionTitle}>
-            {esEnCurso ? 'Misión en curso' : 'Siguiente misión'}
-          </span>
-          <span className={styles.code}>{siguienteMision.codigoIncidente}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className={`${styles.priorityChip} ${prioridadClase}`}>
-            {formatearPrioridad(siguienteMision.prioridad)}
-          </span>
-          <EstadoBadge estado={siguienteMision.estado} />
-        </div>
+    <div className={styles.sectionWrapper}>
+      <div className={styles.sectionHeader}>
+        <span className={styles.sectionTitle}>Misiones en atención</span>
       </div>
 
-      <div className={styles.typology}>{siguienteMision.tipologia}</div>
+      <div className={styles.misionesList}>
+        {misionesActivas.map((mision) => {
+          const normPrioridad = mision.prioridad?.toUpperCase() || '';
+          let prioridadClase = styles.priorityNeutro;
+          if (normPrioridad === 'CRITICA') {
+            prioridadClase = styles.priorityCritica;
+          } else if (normPrioridad === 'ALTA') {
+            prioridadClase = styles.priorityAlta;
+          }
 
-      <div className={styles.locationRow}>
-        <MapPin size={16} color="var(--color-primary-teal)" aria-hidden="true" />
-        <span>{siguienteMision.direccion}</span>
-      </div>
+          return (
+            <Link
+              key={mision.id}
+              href={`${rutaBase}/${mision.id}`}
+              className={styles.compactCard}
+              title={`Ver detalle de misión ${mision.codigoIncidente}`}
+            >
+              <div className={styles.cardMainInfo}>
+                <div className={styles.metaRow}>
+                  <span className={styles.code}>{mision.codigoIncidente}</span>
+                  <span className={`${styles.priorityChip} ${prioridadClase}`}>
+                    {formatearPrioridad(mision.prioridad)}
+                  </span>
+                  <EstadoBadge estado={mision.estado} />
+                </div>
+                <div className={styles.typology}>{mision.tipologia}</div>
+              </div>
 
-      <div style={{ alignSelf: 'flex-start', marginTop: 'var(--space-1)' }}>
-        <Button
-          variant="primary"
-          size="md"
-          href={`${rutaBase}/${siguienteMision.id}`}
-          icon={<ArrowRight size={16} />}
-          iconPosition="right"
-        >
-          Abrir
-        </Button>
+              <div className={styles.chevronArea} aria-hidden="true">
+                <ChevronRight size={22} />
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
 }
+
+export default TerrenoSiguienteMision;
