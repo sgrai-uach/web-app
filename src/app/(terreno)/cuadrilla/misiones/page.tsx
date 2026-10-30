@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { obtenerMisionesLocales, guardarMisionesLocales } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
+import { formatearEstado, formatearPrioridad } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaMisionesPage.module.css';
 
@@ -98,7 +99,7 @@ export default function CuadrillaMisionesPage() {
             <p style={{ fontSize: '0.875rem', margin: 0 }}>
               {!unidadActiva
                 ? 'No se encontraron faenas históricas registradas para esta cuadrilla.'
-                : 'La cuadrilla se encuentra DISPONIBLE para despacho.'}
+                : 'La cuadrilla se encuentra disponible para despacho.'}
             </p>
           </div>
           <Button
@@ -126,7 +127,7 @@ export default function CuadrillaMisionesPage() {
                       : styles.badgeStatusFinalizada
                   }`}
                 >
-                  {mision.estado}
+                  {formatearEstado(mision.estado)}
                 </span>
               </div>
 
@@ -138,7 +139,7 @@ export default function CuadrillaMisionesPage() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                <span>Prioridad: <strong>{mision.prioridad}</strong></span>
+                <span>Prioridad: <strong>{formatearPrioridad(mision.prioridad)}</strong></span>
                 {!unidadActiva && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Archive size={14} aria-hidden="true" />

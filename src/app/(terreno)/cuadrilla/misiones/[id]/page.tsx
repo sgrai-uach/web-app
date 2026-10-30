@@ -6,6 +6,7 @@ import { ArrowLeft, MapPin, Calendar, Archive } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { obtenerMisionLocalPorId } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
+import { formatearEstado, formatearPrioridad } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaDetailPage.module.css';
 
@@ -71,7 +72,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
           <span className={styles.code}>{mision.codigoIncidente}</span>
-          <span className={styles.statusBadge}>{mision.estado}</span>
+          <span className={styles.statusBadge}>{formatearEstado(mision.estado)}</span>
         </div>
 
         <div className={styles.detailGrid}>
@@ -90,7 +91,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
 
           <div className={styles.detailItem}>
             <span className={styles.itemLabel}>Nivel de Prioridad Registrado</span>
-            <span className={styles.itemValue}>{mision.prioridad}</span>
+            <span className={styles.itemValue}>{formatearPrioridad(mision.prioridad)}</span>
           </div>
 
           <div className={styles.detailItem}>
