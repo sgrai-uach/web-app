@@ -2,11 +2,15 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, CheckCircle } from 'lucide-react';
+import { ChevronRight, CheckCircle, Clock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
-import { formatearPrioridad, ordenarMisionesPorPrioridadYFecha } from '@/lib/utils/formatters';
+import {
+  formatearPrioridad,
+  formatearFechaHora24h,
+  ordenarMisionesPorPrioridadYFecha,
+} from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './TerrenoSiguienteMision.module.css';
 
@@ -123,6 +127,12 @@ export function TerrenoSiguienteMision() {
                   <EstadoBadge estado={mision.estado} />
                 </div>
                 <div className={styles.typology}>{mision.tipologia}</div>
+                <div className={styles.timestampRow}>
+                  <Clock size={12} aria-hidden="true" />
+                  <span>
+                    Actualizada {formatearFechaHora24h(mision.actualizadoEn || mision.fechaDespacho)}
+                  </span>
+                </div>
               </div>
 
               <div className={styles.chevronArea} aria-hidden="true">
