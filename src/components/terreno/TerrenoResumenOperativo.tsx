@@ -2,13 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { CloudCheck, WifiOff, RefreshCw, Compass, HardHat } from 'lucide-react';
+import { Compass, HardHat } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useConnectivity } from '@/hooks/useConnectivity';
 import { sincronizarMisiones } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
-import { Heading } from '@/components/ui/Heading';
-import { Button } from '@/components/ui/Button';
 import styles from './TerrenoResumenOperativo.module.css';
 
 interface MetricasTerreno {
@@ -19,7 +16,6 @@ interface MetricasTerreno {
 
 export function TerrenoResumenOperativo() {
   const { usuario, esCuadrilla, unidadActiva } = useAuth();
-  const { status, pendientes, sincronizar } = useConnectivity();
   const [metricas, setMetricas] = useState<MetricasTerreno>({
     pendientes: 0,
     enCurso: 0,
@@ -70,8 +66,6 @@ export function TerrenoResumenOperativo() {
     };
   }, []);
 
-  const esOffline = status === 'offline';
-  const esSincronizando = status === 'syncing';
   const UnidadIcon = esCuadrilla ? HardHat : Compass;
 
   return (

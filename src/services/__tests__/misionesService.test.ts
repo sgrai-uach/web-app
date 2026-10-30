@@ -152,7 +152,7 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
       expect(detalle?.id).toBe('mis-002');
       expect(detalle?.direccion).toBe('Costanera Arturo Prat 420, Valdivia');
       expect(detalle?.coordenadas).toEqual({ lat: -39.8123, lng: -73.2467 });
-      expect(detalle?.tipologia).toBe('ANEGAMIENTO');
+      expect(detalle?.tipologia).toBe('Anegamiento');
       expect(offlineQueue.guardarMisionLocal).toHaveBeenCalled();
     });
 

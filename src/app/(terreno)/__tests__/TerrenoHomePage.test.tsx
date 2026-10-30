@@ -1,60 +1,59 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import TerrenoLayout from '../layout';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import TerrenoHomePage from '../page';
+import TerrenoLayout from '../layout';
+import { useAuth } from '@/context/AuthContext';
+import { useConnectivity } from '@/hooks/useConnectivity';
 import type { AuthContextValue } from '@/context/AuthContext';
 
-const mockUseAuth = vi.fn<() => AuthContextValue>();
-const mockSincronizar = vi.fn();
-
-vi.mock('next/navigation', () => ({
-  usePathname: () => '/',
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-  }),
-}));
-
 vi.mock('@/context/AuthContext', () => ({
-  useAuth: () => mockUseAuth(),
+  useAuth: vi.fn(),
 }));
 
 vi.mock('@/hooks/useConnectivity', () => ({
-  useConnectivity: () => ({
-    status: 'connected',
-    pendientes: 2,
-    sincronizar: mockSincronizar,
-  }),
+  useConnectivity: vi.fn(),
 }));
 
 vi.mock('@/services/offlineQueue', () => ({
-  obtenerMisionesLocales: vi.fn().mockResolvedValue([
-    {
-      id: 'm-1',
-      incidenteId: 'inc-1',
-      codigoIncidente: 'INC-2026-0001',
-      tipologia: 'CAIDA_ARBOL',
-      direccion: 'Av. Alemania 600',
-      prioridad: 'ALTA',
-      estado: 'EN_CURSO',
-      fechaDespacho: '2026-10-29T10:00:00Z',
-      actualizadoEn: '2026-10-29T10:05:00Z',
-    },
-  ]),
+  obtenerMisionesLocales: vi.fn().mockResolvedValue([]),
+  guardarMisionesLocales: vi.fn().mockResolvedValue(undefined),
+  obtenerMisionLocalPorId: vi.fn().mockResolvedValue(undefined),
+  guardarMisionLocal: vi.fn().mockResolvedValue(undefined),
 }));
 
-function buildAuthMock(overrides: Partial<AuthContextValue> = {}): AuthContextValue {
-  const rolCodigo = overrides.usuario?.rolCodigo || 'PATRULLA_VERIFICADORA';
-  const esPatrulla = rolCodigo === 'PATRULLA_VERIFICADORA';
-  const esCuadrilla = rolCodigo === 'DELEGADO_CUADRILLA';
+vi.mock('@/services/misionesService', () => ({
+  sincronizarMisiones: vi.fn().mockResolvedValue([
+    {
+      id: 'mis-next-01',
+      incidenteId: 'inc-01',
+      codigoIncidente: 'INC-2026-00315',
+      tipologia: 'Anegamiento de calzada',
+      direccion: 'Costanera Arturo Prat 420',
+      prioridad: 'CRITICA',
+      estado: 'DESPACHADA',
+      fechaDespacho: '2026-10-30T04:00:00Z',
+      actualizadoEn: '2026-10-30T04:00:00Z',
+    },
+  ]),
+  obtenerDetalleMision: vi.fn().mockResolvedValue(null),
+}));
+
+const mockUseAuth = vi.mocked(useAuth);
+const mockUseConnectivity = vi.mocked(useConnectivity);
+
+const mockSincronizar = vi.fn().mockResolvedValue(undefined);
+
+function buildAuthMock(overrides?: Partial<AuthContextValue>): AuthContextValue {
+  const esPatrulla = overrides?.esPatrulla ?? true;
+  const esCuadrilla = overrides?.esCuadrilla ?? false;
 
   return {
     usuario: {
       id: 'usr-1',
       rut: '15.555.555-5',
       nombre: 'Camila Soto',
-      email: 'patrulla@valdivia.cl',
+      email: 'csoto@valdivia.cl',
       rolId: 'rol-patrulla',
       rolNombre: 'Patrulla Verificadora',
       rolCodigo: 'PATRULLA_VERIFICADORA',
@@ -91,9 +90,17 @@ function buildAuthMock(overrides: Partial<AuthContextValue> = {}): AuthContextVa
 describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseConnectivity.mockReturnValue({
+      status: 'connected',
+      pendientes: 0,
+      sincronizando: false,
+      sincronizar: mockSincronizar,
+      online: true,
+      actualizarPendientes: vi.fn().mockResolvedValue(undefined),
+    });
   });
 
-  it('renderiza bienvenida simplificada, resumen operativo, sincronización fuera de línea y barra inferior con botón Salir', () => {
+  it('renderiza bienvenida, resumen operativo con enlaces a filtros, sincronización compacta y modal de confirmación al salir', async () => {
     const mockLogout = vi.fn();
     mockUseAuth.mockReturnValue(buildAuthMock({ logout: mockLogout }));
 
@@ -108,31 +115,31 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
       screen.getByRole('heading', { name: /bienvenido\/a, camila soto/i })
     ).toBeInTheDocument();
     expect(screen.getByText(/rol: patrulla verificadora/i)).toBeInTheDocument();
-    expect(
-      screen.queryByText(/dirección de gestión de riesgos de desastres/i)
-    ).not.toBeInTheDocument();
 
-    // Resumen Operativo y Sincronización fuera de línea
-    expect(
-      screen.getByRole('heading', { name: /resumen operativo/i })
-    ).toBeInTheDocument();
-    expect(screen.getByText(/sincronización fuera de línea/i)).toBeInTheDocument();
-    expect(screen.getByText(/conexión estable con el servidor\./i)).toBeInTheDocument();
-
-    const btnSincronizar = screen.getByRole('button', { name: /sincronizar/i });
-    fireEvent.click(btnSincronizar);
+    // Sincronización compacta
+    expect(screen.getByText(/sincronizado recién/i)).toBeInTheDocument();
+    const btnSync = screen.getByRole('button', { name: /sincronizar ahora/i });
+    fireEvent.click(btnSync);
     expect(mockSincronizar).toHaveBeenCalledTimes(1);
 
-    // Módulos de Patrulla Verificadora visibles sin badges superiores
-    expect(
-      screen.getByRole('heading', { name: /bandeja de misiones de patrulla/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: /triage, tipología y prioridad/i })
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/operativo • h35/i)).not.toBeInTheDocument();
+    // Resumen Operativo: enlaces a las listas filtradas
+    expect(screen.getByRole('link', { name: /ver 0 misiones pendientes/i })).toHaveAttribute(
+      'href',
+      '/patrulla/misiones?estado=pendientes'
+    );
+    expect(screen.getByRole('link', { name: /ver 0 misiones en curso/i })).toHaveAttribute(
+      'href',
+      '/patrulla/misiones?estado=en_curso'
+    );
 
-    // Barra de navegación inferior (Inicio, Misiones, Salir)
+    // Siguiente misión
+    await waitFor(() => {
+      expect(screen.getByText(/siguiente misión/i)).toBeInTheDocument();
+      expect(screen.getByText('INC-2026-00315')).toBeInTheDocument();
+      expect(screen.getByText('Anegamiento de calzada')).toBeInTheDocument();
+    });
+
+    // Barra de navegación inferior
     const navInferior = screen.getByRole('navigation', {
       name: /navegación principal de terreno/i,
     });
@@ -142,12 +149,19 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
       '/patrulla/misiones'
     );
 
+    // Botón Salir abre modal de confirmación
     const btnSalir = screen.getByRole('button', { name: /^salir$/i });
     fireEvent.click(btnSalir);
+
+    // Modal de confirmación
+    expect(screen.getByText('¿Cerrar sesión de terreno?')).toBeInTheDocument();
+    const btnConfirmarSalir = screen.getByRole('button', { name: /cerrar sesión/i });
+    fireEvent.click(btnConfirmarSalir);
+
     expect(mockLogout).toHaveBeenCalledTimes(1);
   });
 
-  it('renderiza los módulos de Delegado de Cuadrilla y enlace a Faenas en la barra inferior', () => {
+  it('renderiza enlaces a Faenas para el Delegado de Cuadrilla', async () => {
     mockUseAuth.mockReturnValue(
       buildAuthMock({
         usuario: {
@@ -178,12 +192,6 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
     expect(
       screen.getByRole('heading', { name: /bienvenido\/a, roberto muñoz/i })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: /bandeja de faenas de cuadrilla/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: /evidencia, apoyos y cierre de faena/i })
-    ).toBeInTheDocument();
 
     expect(screen.getByRole('link', { name: /^faenas$/i })).toHaveAttribute(
       'href',
@@ -191,10 +199,24 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
     );
   });
 
-  it('muestra banner de unidad inactiva y botones en modo lectura cuando unidadActiva es false (H82/H85)', () => {
+  it('muestra banner de advertencia cuando la unidad está inactiva (H82/H85)', async () => {
     mockUseAuth.mockReturnValue(
       buildAuthMock({
         unidadActiva: false,
+        usuario: {
+          id: 'usr-1',
+          rut: '15.555.555-5',
+          nombre: 'Camila Soto',
+          email: 'csoto@valdivia.cl',
+          rolId: 'rol-patrulla',
+          rolNombre: 'Patrulla Verificadora',
+          rolCodigo: 'PATRULLA_VERIFICADORA',
+          delegacionId: 'del-1',
+          delegacionNombre: 'Delegación Centro',
+          unidadNombre: 'Patrulla Alfa 01',
+          unidadActiva: false,
+          permisos: [],
+        },
       })
     );
 
@@ -204,9 +226,7 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
       </TerrenoLayout>
     );
 
-    expect(
-      screen.getAllByRole('link', { name: /ver en modo lectura/i }).length
-    ).toBeGreaterThan(0);
+    expect(screen.getByText(/patrulla desactivada/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^historial$/i })).toHaveAttribute(
       'href',
       '/patrulla/misiones'

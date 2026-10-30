@@ -2,7 +2,6 @@
 
 import React from 'react';
 import {
-  Layers,
   Compass,
   CheckSquare,
   Archive,

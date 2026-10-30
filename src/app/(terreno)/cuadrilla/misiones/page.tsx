@@ -1,20 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
-import Link from 'next/link';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { MapPin, AlertCircle, RefreshCw, Archive } from 'lucide-react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Heading } from '@/components/ui/Heading';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
 import { guardarMisionesLocales } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
-import {
-  formatearEstado,
-  formatearPrioridad,
-  ordenarMisionesPorPrioridadYFecha,
-} from '@/lib/utils/formatters';
+import { ordenarMisionesPorPrioridadYFecha } from '@/lib/utils/formatters';
 import {
   MisionFiltrosChips,
   type FiltroEstado,
