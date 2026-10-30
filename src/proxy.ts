@@ -29,8 +29,12 @@ export function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(prefijoTerreno, request.nextUrl.origin));
     }
     const returnUrl = encodeURIComponent(prefijoTerreno);
+    let targetOrigin = request.nextUrl.origin;
+    if (request.nextUrl.port === '3002') {
+      targetOrigin = `${request.nextUrl.protocol}//${request.nextUrl.hostname}:3000`;
+    }
     return NextResponse.redirect(
-      new URL(`${UNIFIED_LOGIN_PATH}?returnUrl=${returnUrl}`, request.nextUrl.origin)
+      new URL(`${UNIFIED_LOGIN_PATH}?returnUrl=${returnUrl}`, targetOrigin)
     );
   }
 
@@ -43,9 +47,13 @@ export function proxy(request: NextRequest) {
   if (!token) {
     const fullPath = `${prefijoTerreno}${pathname === '/' ? '' : pathname}${search}`;
     const returnUrl = encodeURIComponent(fullPath);
+    let targetOrigin = request.nextUrl.origin;
+    if (request.nextUrl.port === '3002') {
+      targetOrigin = `${request.nextUrl.protocol}//${request.nextUrl.hostname}:3000`;
+    }
     const loginUrl = new URL(
       `${UNIFIED_LOGIN_PATH}?returnUrl=${returnUrl}`,
-      request.nextUrl.origin
+      targetOrigin
     );
     return NextResponse.redirect(loginUrl);
   }

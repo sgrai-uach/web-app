@@ -24,7 +24,11 @@ export default function LoginRedirectPage() {
       }
     }
 
-    const destino = `${UNIFIED_LOGIN_PATH}?returnUrl=${encodeURIComponent('/terreno')}`;
+    let loginHost = '';
+    if (typeof window !== 'undefined' && window.location.port === '3002') {
+      loginHost = `${window.location.protocol}//${window.location.hostname}:3000`;
+    }
+    const destino = `${loginHost}${UNIFIED_LOGIN_PATH}?returnUrl=${encodeURIComponent('/terreno')}`;
     router.push(destino);
     try {
       if (typeof window !== 'undefined' && window.location) {
