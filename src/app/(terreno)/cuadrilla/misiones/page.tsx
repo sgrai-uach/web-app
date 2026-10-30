@@ -20,6 +20,7 @@ import {
   type FiltroEstado,
   type ConteoFiltros,
 } from '@/components/misiones/MisionFiltrosChips';
+import { MisionCard } from '@/components/misiones/MisionCard';
 import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaMisionesPage.module.css';
 
@@ -212,41 +213,12 @@ function CuadrillaMisionesContenido() {
       ) : (
         <div className={styles.missionList}>
           {misionesFiltradas.map((mision) => (
-            <Link
+            <MisionCard
               key={mision.id}
+              mision={mision}
               href={`/cuadrilla/misiones/${mision.id}`}
-              className={styles.missionCard}
-            >
-              <div className={styles.cardHeader}>
-                <span className={styles.code}>{mision.codigoIncidente}</span>
-                <span
-                  className={`${styles.badgeStatus} ${
-                    !unidadActiva
-                      ? styles.badgeStatusInactiva
-                      : styles.badgeStatusFinalizada
-                  }`}
-                >
-                  {formatearEstado(mision.estado)}
-                </span>
-              </div>
-
-              <div className={styles.typology}>{mision.tipologia}</div>
-
-              <div className={styles.addressRow}>
-                <MapPin size={16} aria-hidden="true" />
-                <span>{mision.direccion}</span>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                <span>Prioridad: <strong>{formatearPrioridad(mision.prioridad)}</strong></span>
-                {!unidadActiva && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Archive size={14} aria-hidden="true" />
-                    Solo lectura
-                  </span>
-                )}
-              </div>
-            </Link>
+              esInactiva={!unidadActiva}
+            />
           ))}
         </div>
       )}

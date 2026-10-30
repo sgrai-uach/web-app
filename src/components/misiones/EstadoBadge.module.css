@@ -1,0 +1,44 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family-base);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 0;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.despachada {
+  background-color: var(--color-info-bg, #E0F2F1);
+  color: var(--color-primary-teal, #1B6F7D);
+  border-color: var(--color-primary-teal, #1B6F7D);
+}
+
+.enCurso {
+  background-color: #E0F2FE;
+  color: #0369A1;
+  border-color: #0369A1;
+}
+
+.finalizada {
+  background-color: var(--color-success-bg, #E8F5E9);
+  color: var(--color-success, #2E7D32);
+  border-color: var(--color-success, #2E7D32);
+}
+
+.cancelada {
+  background-color: var(--color-danger-bg, #FFEBEE);
+  color: var(--color-danger, #D32F2F);
+  border-color: var(--color-danger, #D32F2F);
+}
+
+.neutro {
+  background-color: var(--color-bg-light, #ECEFF3);
+  color: var(--color-text-muted, #5F676E);
+  border-color: var(--color-border, #CBD5E1);
+}
