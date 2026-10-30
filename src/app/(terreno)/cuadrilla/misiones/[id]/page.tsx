@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Calendar, Archive, ExternalLink } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Archive, Map } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import { obtenerDetalleMision } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
+import { MapaModal } from '@/components/maps/MapaModal';
 import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaDetailPage.module.css';
@@ -22,6 +23,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
 
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
+  const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
 
   const cargarDetalle = useCallback(async () => {
     setCargando(true);
@@ -63,11 +65,6 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   } else if (normPrioridad === 'ALTA') {
     prioridadClase = styles.priorityAlta;
   }
-
-  // Enlace a OpenStreetMap (como en sgrai-web)
-  const urlMapa = mision.coordenadas?.lat && mision.coordenadas?.lng
-    ? `https://www.openstreetmap.org/?mlat=${mision.coordenadas.lat}&mlon=${mision.coordenadas.lng}#map=16/${mision.coordenadas.lat}/${mision.coordenadas.lng}`
-    : `https://www.openstreetmap.org/search?query=${encodeURIComponent(mision.direccion + ', Valdivia')}`;
 
   const trabajoTexto = (mision.datosAdicionales?.trabajo as string) || mision.direccion;
   const esSoloLectura =
@@ -121,12 +118,10 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
               <Button
                 variant="outline"
                 size="sm"
-                icon={<ExternalLink size={14} />}
-                href={urlMapa}
-                target="_blank"
-                rel="noopener noreferrer"
+                icon={<Map size={14} />}
+                onClick={() => setMapaAbierto(true)}
               >
-                Abrir en mapa
+                Ver mapa
               </Button>
             </div>
           </div>
@@ -158,6 +153,15 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
           </div>
         </div>
       )}
+
+      <MapaModal
+        abierto={mapaAbierto}
+        alCerrar={() => setMapaAbierto(false)}
+        latitud={mision.coordenadas?.lat}
+        longitud={mision.coordenadas?.lng}
+        titulo={mision.tipologia || mision.codigoIncidente}
+        direccion={mision.direccion}
+      />
     </div>
   );
 }
