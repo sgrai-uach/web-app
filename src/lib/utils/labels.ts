@@ -93,6 +93,13 @@ export function formatearEtiquetaSegura(
 }
 
 /**
+ * Obtiene la etiqueta en lenguaje natural para un rol institucional.
+ */
+export function formatRolLabel(rol?: string | null): string {
+  return formatearEtiquetaSegura(rol, ETIQUETAS_ROL);
+}
+
+/**
  * Limpia prefijos técnicos de títulos generados ("Triage Caída de árbol..." -> "Caída de árbol...")
  */
 export function limpiarTituloMision(titulo?: string | null): string {
