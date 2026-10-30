@@ -6,6 +6,7 @@ import { UNIFIED_LOGIN_PATH } from '@/proxy';
 import { TerrenoWelcomeBanner } from '@/components/terreno/TerrenoWelcomeBanner';
 import { TerrenoResumenOperativo } from '@/components/terreno/TerrenoResumenOperativo';
 import { TerrenoModulosGrid } from '@/components/terreno/TerrenoModulosGrid';
+import { PWAInstallBanner } from '@/components/pwa/PWAInstallBanner';
 
 export default function TerrenoHomePage() {
   const { autenticado, cargando } = useAuth();
@@ -49,6 +50,7 @@ export default function TerrenoHomePage() {
       }}
     >
       <TerrenoWelcomeBanner />
+      <PWAInstallBanner />
       <TerrenoResumenOperativo />
       <TerrenoModulosGrid />
     </div>

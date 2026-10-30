@@ -62,3 +62,4 @@ export function formatearPrioridad(prioridad?: string | null): string {
       return prioridad.charAt(0).toUpperCase() + prioridad.slice(1).toLowerCase();
   }
 }
+
