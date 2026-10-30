@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, Calendar, Archive } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { obtenerMisionLocalPorId } from '@/services/offlineQueue';
+import { obtenerDetalleMision } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { formatearEstado, formatearPrioridad } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
@@ -24,7 +24,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const cargarDetalle = useCallback(async () => {
     setCargando(true);
     try {
-      const encontrada = await obtenerMisionLocalPorId(misionId);
+      const encontrada = await obtenerDetalleMision(misionId);
       if (encontrada) {
         setMision(encontrada);
       } else {

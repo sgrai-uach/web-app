@@ -6,7 +6,8 @@ import { MapPin, AlertCircle, RefreshCw, Archive } from 'lucide-react';
 import { Heading } from '@/components/ui/Heading';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
-import { obtenerMisionesLocales, guardarMisionesLocales } from '@/services/offlineQueue';
+import { sincronizarMisiones } from '@/services/misionesService';
+import { guardarMisionesLocales } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { formatearEstado, formatearPrioridad } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
@@ -20,7 +21,9 @@ export default function PatrullaMisionesPage() {
   const cargarMisiones = useCallback(async () => {
     setCargando(true);
     try {
-      let locales = await obtenerMisionesLocales();
+      let locales = await sincronizarMisiones({
+        tipoMision: 'VERIFICACION',
+      });
 
       // Si la patrulla está desactivada y no hay locales, inicializar con registro histórico demostrativo
       if (!unidadActiva && locales.length === 0) {

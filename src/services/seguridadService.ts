@@ -66,7 +66,13 @@ export async function loginUsuario(
 }
 
 export async function obtenerUsuarioActivo(): Promise<UsuarioActivoDetalle> {
-  const { data, error, response } = await apiClient.GET('/api/seguridad/usuario-activo', {});
+  const { data, error, response } = await apiClient.GET('/api/seguridad/usuario-activo', {
+    params: {
+      header: {
+        'x-user-id': '',
+      },
+    },
+  });
 
   if (error || !data || !('data' in data) || !data.data) {
     let mensaje = 'Error al consultar la sesión y permisos del usuario activo';

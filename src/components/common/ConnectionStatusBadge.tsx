@@ -2,6 +2,7 @@ import React from 'react';
 import styles from './ConnectionStatusBadge.module.css';
 
 export type ConnectivityState = 'connected' | 'offline' | 'syncing';
+export type ConnectionStatus = ConnectivityState;
 
 export interface ConnectionStatusBadgeProps {
   connected?: boolean;

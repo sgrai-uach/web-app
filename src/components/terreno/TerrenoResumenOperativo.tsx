@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Activity, CloudCheck, WifiOff, RefreshCw, Compass, HardHat } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
-import { obtenerMisionesLocales } from '@/services/offlineQueue';
+import { sincronizarMisiones } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { Heading } from '@/components/ui/Heading';
 import { Button } from '@/components/ui/Button';
@@ -30,17 +30,26 @@ export function TerrenoResumenOperativo() {
 
     async function cargarResumenMisiones() {
       try {
-        const misiones = await obtenerMisionesLocales();
+        const misiones = await sincronizarMisiones();
         if (cancelado) return;
 
         const misionesPendientes = misiones.filter(
-          (m) => m.estado === 'ASIGNADA' || m.estado === 'PENDIENTE'
+          (m) =>
+            m.estado === 'ASIGNADA' ||
+            m.estado === 'DESPACHADA' ||
+            m.estado === 'PENDIENTE'
         ).length;
         const misionesEnCurso = misiones.filter(
-          (m) => m.estado === 'EN_CURSO' || m.estado === 'EN_TERRENO'
+          (m) =>
+            m.estado === 'EN_CURSO' ||
+            m.estado === 'EN_TERRENO' ||
+            m.estado === 'EN_RUTA'
         ).length;
         const misionesFinalizadas = misiones.filter(
-          (m) => m.estado === 'FINALIZADA' || m.estado === 'CERRADA'
+          (m) =>
+            m.estado === 'FINALIZADA' ||
+            m.estado === 'COMPLETADA' ||
+            m.estado === 'CERRADA'
         ).length;
 
         setMetricas({
