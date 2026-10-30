@@ -21,7 +21,7 @@
 .kpiCard {
   background-color: var(--color-white, #FFFFFF);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
-  border-top: 4px solid var(--color-primary-teal, #1B6F7D);
+  border-left: 4px solid var(--color-primary-teal, #1B6F7D);
   border-radius: var(--radius-none, 0px);
   padding: var(--space-4, 16px);
   display: flex;
@@ -31,7 +31,7 @@
 }
 
 .kpiCardWarning {
-  border-top-color: var(--color-warning, #E65100);
+  border-left-color: var(--color-warning, #E65100);
 }
 
 .kpiHeader {
