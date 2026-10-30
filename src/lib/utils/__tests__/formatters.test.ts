@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { formatearEstado, formatearPrioridad } from '../formatters';
+import {
+  formatearEstado,
+  formatearPrioridad,
+  formatearTipologia,
+  formatearFechaHora24h,
+} from '../formatters';
 
 describe('formatters — Conversión de Enums a Lenguaje Natural', () => {
   describe('formatearEstado', () => {
@@ -36,6 +41,26 @@ describe('formatters — Conversión de Enums a Lenguaje Natural', () => {
       expect(formatearPrioridad(null)).toBe('');
       expect(formatearPrioridad(undefined)).toBe('');
       expect(formatearPrioridad('')).toBe('');
+    });
+  });
+
+  describe('formatearTipologia', () => {
+    it('debe traducir enums de tipología técnica a texto natural', () => {
+      expect(formatearTipologia('CAIDA_ARBOL')).toBe('Caída de árbol');
+      expect(formatearTipologia('ANEGAMIENTO')).toBe('Anegamiento');
+      expect(formatearTipologia('DESCONOCIDO_TIPO')).toBe('Desconocido tipo');
+    });
+  });
+
+  describe('formatearFechaHora24h', () => {
+    it('formatea fechas a formato 24 horas DD-MM-YYYY HH:mm sin segundos', () => {
+      const fecha = new Date(2026, 9, 30, 1, 7); // 30 de Octubre de 2026, 01:07
+      expect(formatearFechaHora24h(fecha)).toBe('30-10-2026 01:07');
+    });
+
+    it('devuelve Sin fecha ante valores vacíos', () => {
+      expect(formatearFechaHora24h(null)).toBe('Sin fecha');
+      expect(formatearFechaHora24h('')).toBe('Sin fecha');
     });
   });
 });

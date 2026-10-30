@@ -7,6 +7,7 @@ import {
   obtenerMisionesLocales,
   obtenerMisionLocalPorId,
 } from '@/services/offlineQueue';
+import { limpiarTituloMision, formatearTipologia } from '@/lib/utils/formatters';
 
 type TipoMisionFiltro =
   | 'VERIFICACION'
@@ -51,7 +52,7 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
         id: item.id,
         incidenteId: item.incidenteId || '',
         codigoIncidente: item.incidenteCodigo || item.codigo,
-        tipologia: item.titulo,
+        tipologia: limpiarTituloMision(item.titulo),
         direccion:
           item.descripcion ||
           (item.delegacionNombre ? `Sector ${item.delegacionNombre}` : 'Valdivia'),
@@ -92,7 +93,9 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         id: d.id,
         incidenteId: d.incidente?.id || '',
         codigoIncidente: d.incidente?.codigo || d.codigo,
-        tipologia: d.incidente?.tipoAfectacion || d.titulo,
+        tipologia: d.incidente?.tipoAfectacion
+          ? formatearTipologia(d.incidente.tipoAfectacion)
+          : limpiarTituloMision(d.titulo),
         direccion: d.incidente?.direccion || d.descripcion || 'Valdivia',
         coordenadas:
           d.incidente?.latitud && d.incidente?.longitud
