@@ -139,7 +139,7 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
       expect(screen.getByText('Anegamiento de calzada')).toBeInTheDocument();
     });
 
-    // Barra de navegación inferior
+    // Barra de navegación inferior con Inicio, Misiones y Perfil
     const navInferior = screen.getByRole('navigation', {
       name: /navegación principal de terreno/i,
     });
@@ -148,17 +148,10 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
       'href',
       '/patrulla/misiones'
     );
-
-    // Botón Salir abre modal de confirmación
-    const btnSalir = screen.getByRole('button', { name: /^salir$/i });
-    fireEvent.click(btnSalir);
-
-    // Modal de confirmación
-    expect(screen.getByText('¿Cerrar sesión de terreno?')).toBeInTheDocument();
-    const btnConfirmarSalir = screen.getByRole('button', { name: /cerrar sesión/i });
-    fireEvent.click(btnConfirmarSalir);
-
-    expect(mockLogout).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('link', { name: /^perfil$/i })).toHaveAttribute(
+      'href',
+      '/perfil'
+    );
   });
 
   it('renderiza enlaces a Faenas para el Delegado de Cuadrilla', async () => {
