@@ -67,3 +67,4 @@ describe('usePWAInstall', () => {
     expect(result.current.puedeInstalar).toBe(false);
   });
 });
+

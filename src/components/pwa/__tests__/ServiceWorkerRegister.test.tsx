@@ -33,3 +33,4 @@ describe('ServiceWorkerRegister', () => {
     expect(() => render(<ServiceWorkerRegister />)).not.toThrow();
   });
 });
+

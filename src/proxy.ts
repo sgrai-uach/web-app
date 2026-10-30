@@ -8,7 +8,10 @@ function esRutaPublica(pathname: string): boolean {
   if (
     pathname === '/sw.js' ||
     pathname === '/site.webmanifest' ||
-    pathname === '/favicon.ico'
+    pathname === '/manifest.webmanifest' ||
+    pathname === '/manifest.json' ||
+    pathname === '/favicon.ico' ||
+    pathname.endsWith('.webmanifest')
   ) {
     return true;
   }

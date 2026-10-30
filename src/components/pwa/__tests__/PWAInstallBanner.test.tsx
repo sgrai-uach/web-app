@@ -38,3 +38,4 @@ describe('PWAInstallBanner', () => {
     expect(mockInstalar).toHaveBeenCalledTimes(1);
   });
 });
+
