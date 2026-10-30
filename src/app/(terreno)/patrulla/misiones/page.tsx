@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { MapPin, AlertCircle, RefreshCw, Archive, ArrowLeft } from 'lucide-react';
+import { MapPin, AlertCircle, RefreshCw, Archive } from 'lucide-react';
 import { Heading } from '@/components/ui/Heading';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
@@ -63,25 +63,6 @@ export default function PatrullaMisionesPage() {
 
   return (
     <div className={styles.container}>
-      <div>
-        <Link
-          href="/"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            minHeight: '44px',
-            fontSize: '0.875rem',
-            fontWeight: 700,
-            color: 'var(--color-primary-teal, #1B6F7D)',
-            textDecoration: 'none',
-          }}
-        >
-          <ArrowLeft size={16} aria-hidden="true" />
-          <span>Volver al Inicio de Terreno</span>
-        </Link>
-      </div>
-
       {/* Banner de advertencia si la patrulla está desactivada (H85) */}
       {!unidadActiva && (
         <UnidadInactivaBanner
