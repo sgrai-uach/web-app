@@ -38,7 +38,7 @@
   border: none;
   border-top: 3px solid transparent;
   border-radius: var(--radius-none, 0px);
-  color: var(--color-bg-light, #ECEFF3);
+  color: #CBD5E1;
   text-decoration: none !important;
   font-family: var(--font-noto-sans), sans-serif;
   font-size: 0.75rem;
@@ -87,8 +87,8 @@
 .navLinkActive:focus,
 .navLinkActive:active {
   background-color: var(--color-primary-teal-dark, #14505A);
-  color: var(--color-accent-mint, #4FAE9B);
-  border-top-color: var(--color-accent-mint, #4FAE9B);
+  color: var(--color-white, #FFFFFF) !important;
+  border-top-color: var(--color-accent-mint, #4FAE9B) !important;
   text-decoration: none !important;
 }
 
