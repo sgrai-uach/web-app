@@ -85,19 +85,6 @@ export function TerrenoResumenOperativo() {
         />
       )}
 
-      <div className={styles.sectionHeader}>
-        <Activity size={20} color="var(--color-primary-teal, #1B6F7D)" aria-hidden="true" />
-        <Heading
-          as="h2"
-          variant="h3"
-          color="teal"
-          noMargin
-          id="resumen-operativo-terreno-heading"
-        >
-          Resumen Operativo
-        </Heading>
-      </div>
-
       <div className={styles.grid}>
         {/* Tarjeta 1: Resumen Operativo de Misiones / Faenas */}
         <div

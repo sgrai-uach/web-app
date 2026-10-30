@@ -77,15 +77,8 @@ export default function CuadrillaMisionesPage() {
 
       <div className={styles.titleArea}>
         <Heading variant="h1">
-          {!unidadActiva
-            ? 'Historial de Faenas Operativas'
-            : 'Misiones de Cuadrilla'}
+          {!unidadActiva ? 'Historial' : 'Misiones'}
         </Heading>
-        {!unidadActiva && (
-          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: 0 }}>
-            Modo histórico de solo lectura. Consulte los registros previos de faenas de esta unidad.
-          </p>
-        )}
       </div>
 
       {cargando ? (

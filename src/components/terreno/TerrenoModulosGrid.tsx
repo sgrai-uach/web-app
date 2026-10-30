@@ -123,15 +123,8 @@ export function TerrenoModulosGrid() {
   return (
     <section
       className={styles.section}
-      aria-labelledby="terreno-modulos-heading"
+      aria-label="Módulos de terreno"
     >
-      <div className={styles.sectionHeader}>
-        <Layers size={20} color="var(--color-primary-teal, #1B6F7D)" aria-hidden="true" />
-        <Heading as="h2" variant="h3" color="teal" noMargin id="terreno-modulos-heading">
-          Módulos y Operaciones Disponibles
-        </Heading>
-      </div>
-
       {modulosAutorizados.length === 0 ? (
         <div className={styles.emptyState}>
           <ShieldAlert size={40} color="var(--color-warning, #E65100)" aria-hidden="true" />

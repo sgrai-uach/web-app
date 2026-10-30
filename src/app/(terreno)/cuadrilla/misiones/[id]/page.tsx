@@ -6,7 +6,7 @@ import { ArrowLeft, MapPin, Calendar, Archive } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { obtenerMisionLocalPorId } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
-import { formatearEstado, formatearPrioridad } from '@/lib/utils/formatters';
+import { formatearEstado, formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaDetailPage.module.css';
 
@@ -59,7 +59,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     <div className={styles.container}>
       <Link href="/cuadrilla/misiones" className={styles.backLink}>
         <ArrowLeft size={16} aria-hidden="true" />
-        <span>Volver al Historial</span>
+        <span>Historial</span>
       </Link>
 
       {!unidadActiva && (
@@ -77,12 +77,12 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
 
         <div className={styles.detailGrid}>
           <div className={styles.detailItem}>
-            <span className={styles.itemLabel}>Tipología de la Emergencia</span>
-            <span className={styles.itemValue}>{mision.tipologia}</span>
+            <span className={styles.itemLabel}>Tipo</span>
+            <span className={styles.itemValue}><strong>{mision.tipologia}</strong></span>
           </div>
 
           <div className={styles.detailItem}>
-            <span className={styles.itemLabel}>Ubicación de Faena</span>
+            <span className={styles.itemLabel}>Ubicación</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <MapPin size={16} color="var(--color-primary-teal)" aria-hidden="true" />
               <span className={styles.itemValue}>{mision.direccion}</span>
@@ -90,33 +90,30 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
           </div>
 
           <div className={styles.detailItem}>
-            <span className={styles.itemLabel}>Nivel de Prioridad Registrado</span>
+            <span className={styles.itemLabel}>Prioridad</span>
             <span className={styles.itemValue}>{formatearPrioridad(mision.prioridad)}</span>
           </div>
 
           <div className={styles.detailItem}>
-            <span className={styles.itemLabel}>Fecha y Hora de Despacho</span>
+            <span className={styles.itemLabel}>Despachada</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Calendar size={16} aria-hidden="true" />
               <span className={styles.itemValue}>
-                {new Date(mision.fechaDespacho).toLocaleString('es-CL')}
+                {formatearFechaHora24h(mision.fechaDespacho)}
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className={styles.readOnlyNotice}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-          <Archive size={18} aria-hidden="true" />
-          <span>Registro Histórico de Faena — Modo Solo Lectura</span>
+      {(!unidadActiva || mision.estado === 'FINALIZADA' || mision.estado === 'COMPLETADA' || mision.estado === 'CERRADA') && (
+        <div className={styles.readOnlyNotice}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <Archive size={16} aria-hidden="true" />
+            <span>Solo lectura</span>
+          </div>
         </div>
-        <p style={{ fontSize: '0.8125rem', marginTop: 'var(--space-2)', marginBottom: 0 }}>
-          {!unidadActiva
-            ? 'Esta cuadrilla se encuentra inactiva. No se admiten mutaciones ni reapertura de faenas.'
-            : 'Misión concluida en los registros municipales.'}
-        </p>
-      </div>
+      )}
     </div>
   );
 }

@@ -77,15 +77,8 @@ export default function PatrullaMisionesPage() {
 
       <div className={styles.titleArea}>
         <Heading variant="h1">
-          {!unidadActiva
-            ? 'Historial de Misiones de Triage'
-            : 'Misiones de Patrulla'}
+          {!unidadActiva ? 'Historial' : 'Misiones'}
         </Heading>
-        {!unidadActiva && (
-          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: 0 }}>
-            Modo histórico de solo lectura. Consulte los registros de triage y evaluaciones previas.
-          </p>
-        )}
       </div>
 
       {cargando ? (
@@ -142,7 +135,7 @@ export default function PatrullaMisionesPage() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                <span>Prioridad Evaluada: <strong>{formatearPrioridad(mision.prioridad)}</strong></span>
+                <span>Prioridad: <strong>{formatearPrioridad(mision.prioridad)}</strong></span>
                 {!unidadActiva && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Archive size={14} aria-hidden="true" />
