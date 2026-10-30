@@ -6,9 +6,9 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: 'SGRAI Terreno',
     description:
       'Aplicación de terreno (PWA) para Patrulla Verificadora y Delegado de Cuadrilla, Municipalidad de Valdivia.',
-    id: '/terreno/',
+    id: '/terreno',
     start_url: '/terreno',
-    scope: '/terreno/',
+    scope: '/terreno',
     display: 'standalone',
     orientation: 'portrait-primary',
     background_color: '#ECEFF3',

@@ -15,7 +15,7 @@ export function ServiceWorkerRegister() {
     ) {
       const registrar = () => {
         navigator.serviceWorker
-          .register('/terreno/sw.js', { scope: '/terreno/' })
+          .register('/terreno/sw.js', { scope: '/terreno' })
           .then((registration) => {
             if (process.env.NODE_ENV !== 'production') {
               console.log('[PWA] Service Worker registrado exitosamente. Alcance:', registration.scope);

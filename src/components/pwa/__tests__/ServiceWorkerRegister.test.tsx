@@ -8,8 +8,8 @@ describe('ServiceWorkerRegister', () => {
     vi.clearAllMocks();
   });
 
-  it('debe invocar navigator.serviceWorker.register con scope /terreno/ cuando el soporte esté disponible', () => {
-    const mockRegister = vi.fn().mockResolvedValue({ scope: '/terreno/' });
+  it('debe invocar navigator.serviceWorker.register con scope /terreno cuando el soporte esté disponible', () => {
+    const mockRegister = vi.fn().mockResolvedValue({ scope: '/terreno' });
     Object.defineProperty(global.navigator, 'serviceWorker', {
       value: {
         register: mockRegister,
@@ -20,7 +20,7 @@ describe('ServiceWorkerRegister', () => {
 
     render(<ServiceWorkerRegister />);
 
-    expect(mockRegister).toHaveBeenCalledWith('/terreno/sw.js', { scope: '/terreno/' });
+    expect(mockRegister).toHaveBeenCalledWith('/terreno/sw.js', { scope: '/terreno' });
   });
 
   it('no debe fallar si navigator.serviceWorker no está presente', () => {
