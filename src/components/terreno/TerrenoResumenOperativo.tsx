@@ -131,61 +131,6 @@ export function TerrenoResumenOperativo() {
             </Link>
           </div>
         </div>
-
-        {/* Tarjeta 2: Sincronización fuera de línea */}
-        <div
-          className={`${styles.syncCard} ${
-            esOffline ? styles.syncCardWarning : ''
-          }`.trim()}
-        >
-          <div className={styles.syncTop}>
-            <div
-              className={`${styles.iconBox} ${
-                esOffline
-                  ? styles.iconBoxWarning
-                  : pendientes > 0
-                  ? styles.iconBoxTeal
-                  : styles.iconBoxSuccess
-              }`.trim()}
-              aria-hidden="true"
-            >
-              {esOffline ? (
-                <WifiOff size={22} />
-              ) : pendientes > 0 ? (
-                <RefreshCw size={22} />
-              ) : (
-                <CloudCheck size={22} />
-              )}
-            </div>
-            <div className={styles.cardBody}>
-              <span className={styles.cardLabel}>Sincronización fuera de línea</span>
-              <span className={styles.cardValue}>
-                {pendientes === 0
-                  ? 'Sincronizado (0 pendientes)'
-                  : `${pendientes} operación(es) en cola local`}
-              </span>
-              <span className={styles.cardHelper}>
-                {esOffline
-                  ? 'Sin red móvil. Sus acciones se guardarán en el dispositivo.'
-                  : 'Conexión estable con el servidor.'}
-              </span>
-            </div>
-          </div>
-
-          <div className={styles.syncActions}>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              loading={esSincronizando}
-              disabled={esOffline || esSincronizando}
-              icon={<RefreshCw size={16} />}
-              onClick={() => void sincronizar()}
-            >
-              Sincronizar
-            </Button>
-          </div>
-        </div>
       </div>
     </section>
   );

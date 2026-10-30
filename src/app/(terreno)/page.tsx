@@ -4,8 +4,9 @@ import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { UNIFIED_LOGIN_PATH } from '@/proxy';
 import { TerrenoWelcomeBanner } from '@/components/terreno/TerrenoWelcomeBanner';
+import { TerrenoSyncCompactCard } from '@/components/terreno/TerrenoSyncCompactCard';
 import { TerrenoResumenOperativo } from '@/components/terreno/TerrenoResumenOperativo';
-import { TerrenoModulosGrid } from '@/components/terreno/TerrenoModulosGrid';
+import { TerrenoSiguienteMision } from '@/components/terreno/TerrenoSiguienteMision';
 import { PWAInstallBanner } from '@/components/pwa/PWAInstallBanner';
 
 export default function TerrenoHomePage() {
@@ -50,9 +51,10 @@ export default function TerrenoHomePage() {
       }}
     >
       <TerrenoWelcomeBanner />
+      <TerrenoSyncCompactCard />
       <PWAInstallBanner />
       <TerrenoResumenOperativo />
-      <TerrenoModulosGrid />
+      <TerrenoSiguienteMision />
     </div>
   );
 }
