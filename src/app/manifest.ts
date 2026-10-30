@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
       'Aplicación de terreno (PWA) para Patrulla Verificadora y Delegado de Cuadrilla, Municipalidad de Valdivia.',
     id: '/terreno',
     start_url: '/terreno',
-    scope: '/terreno',
+    scope: '/',
     display: 'standalone',
     orientation: 'portrait-primary',
     background_color: '#ECEFF3',
