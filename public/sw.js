@@ -3,10 +3,9 @@
    Estrategia de caché para assets estáticos y soporte offline-first.
    ========================================================================== */
 
-const CACHE_NAME = 'sgrai-pwa-v3';
+const CACHE_NAME = 'sgrai-pwa-v4';
 
 const STATIC_ASSETS = [
-  '/terreno',
   '/terreno/favicon.ico',
   '/terreno/site.webmanifest',
   '/terreno/manifest.webmanifest',
