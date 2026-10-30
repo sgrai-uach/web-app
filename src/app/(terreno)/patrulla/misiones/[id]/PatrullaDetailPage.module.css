@@ -76,12 +76,16 @@
 .priorityChip {
   display: inline-flex;
   align-items: center;
-  font-size: 0.6875rem;
+  justify-content: center;
+  font-family: var(--font-family-base);
+  font-size: 0.75rem;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 4px 8px;
   border-radius: 0;
   border: 1px solid transparent;
-  line-height: 1.2;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .priorityCritica {
