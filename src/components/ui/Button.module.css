@@ -10,7 +10,7 @@
   font-family: var(--font-family-base);
   font-weight: var(--font-weight-semibold);
   line-height: 1.2;
-  text-decoration: none;
+  text-decoration: none !important;
   border-radius: var(--radius-none, 0px);
   border: 1px solid transparent;
   cursor: pointer;
@@ -19,6 +19,14 @@
   user-select: none;
   box-sizing: border-box;
   text-align: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.button:hover,
+.button:active,
+.button:focus {
+  text-decoration: none !important;
 }
 
 .button:focus-visible {
