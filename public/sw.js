@@ -3,20 +3,23 @@
    Estrategia de caché para assets estáticos y soporte offline-first.
    ========================================================================== */
 
-const CACHE_NAME = 'sgrai-pwa-v1';
+const CACHE_NAME = 'sgrai-pwa-v5';
 
 const STATIC_ASSETS = [
-  '/terreno',
-  '/terreno/login',
   '/terreno/favicon.ico',
   '/terreno/site.webmanifest',
+  '/terreno/manifest.webmanifest',
+  '/terreno/android-chrome-192x192.png',
+  '/terreno/android-chrome-512x512.png',
 ];
 
 // Instalación: pre-caching de assets esenciales
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      return cache.addAll(STATIC_ASSETS).catch((err) => {
+        console.warn('Advertencia al pre-cachear assets estáticos:', err);
+      });
     })
   );
   self.skipWaiting();
@@ -67,9 +70,9 @@ self.addEventListener('fetch', (event) => {
           if (cachedResponse) {
             return cachedResponse;
           }
-          // Si era navegación a página, retornar fallback de la raíz
+          // Si era navegación a página, retornar fallback de la raíz de terreno
           if (request.mode === 'navigate') {
-            return caches.match('/');
+            return caches.match('/terreno');
           }
           return new Response('Sin conexión', {
             status: 503,

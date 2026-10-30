@@ -26,6 +26,8 @@ export interface AuthContextValue {
   esPatrulla: boolean;
   esCuadrilla: boolean;
   unidadActiva: boolean;
+  tienePermiso: (permiso: string) => boolean;
+  tieneAlgunPermiso: (permisos: string[]) => boolean;
   login: (credenciales: LoginRequest) => Promise<UsuarioPerfilSesion>;
   logout: () => void;
   recargarSesion: () => Promise<void>;
@@ -81,9 +83,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const perfil = mapDetalleAUsuarioPerfil(detalle);
 
       if (!esRolTerrenoPermitido(perfil.rolCodigo)) {
-        removeAuthCookie();
+        // No eliminar la cookie sgrai_auth_token para preservar la sesión activa en sgrai-web (/gestion)
         setUsuario(null);
         setToken(null);
+        try {
+          if (typeof window !== 'undefined' && window.location) {
+            window.location.assign('/gestion');
+          }
+        } catch {
+          // Ignorado en pruebas unitarias
+        }
         return;
       }
 
@@ -131,8 +140,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     removeAuthCookie();
     setUsuario(null);
     setToken(null);
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
+    try {
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.assign('/login');
+      }
+    } catch {
+      // Ignorado en pruebas unitarias
     }
   }, []);
 
@@ -141,6 +154,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const esCuadrilla = rolCodigoActual === 'DELEGADO_CUADRILLA';
   const unidadActiva = usuario?.unidadActiva !== false;
   const autenticado = Boolean(token && usuario);
+
+  const tienePermiso = useCallback(
+    (permiso: string): boolean => {
+      if (!usuario) return false;
+      const listaPermisos = usuario.permisos || [];
+      if (listaPermisos.includes('*') || listaPermisos.includes(permiso)) {
+        return true;
+      }
+      // Fallback por rol canónico de terreno cuando el token o mock no desglosa permisos granulares
+      if (esPatrulla && permiso.startsWith('patrulla:')) {
+        return true;
+      }
+      if (esCuadrilla && permiso.startsWith('cuadrilla:')) {
+        return true;
+      }
+      return false;
+    },
+    [usuario, esPatrulla, esCuadrilla]
+  );
+
+  const tieneAlgunPermiso = useCallback(
+    (permisos: string[]): boolean => {
+      if (permisos.length === 0) return true;
+      return permisos.some((p) => tienePermiso(p));
+    },
+    [tienePermiso]
+  );
 
   return (
     <AuthContext.Provider
@@ -152,6 +192,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         esPatrulla,
         esCuadrilla,
         unidadActiva,
+        tienePermiso,
+        tieneAlgunPermiso,
         login,
         logout,
         recargarSesion,

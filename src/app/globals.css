@@ -54,10 +54,30 @@ a {
   color: var(--color-primary-teal);
   text-decoration: none;
   transition: color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-a:hover {
+/* El subrayado queda reservado exclusivamente para enlaces de texto dentro de párrafos */
+p a {
   text-decoration: underline;
+}
+
+p a:hover {
+  text-decoration: underline;
+  color: var(--color-primary-teal-dark);
+}
+
+a:hover,
+a:active,
+a:focus {
+  text-decoration: none;
+}
+
+p a:focus-visible,
+a:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 /* --- Accesibilidad de Foco Universal --- */

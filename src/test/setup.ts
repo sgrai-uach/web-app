@@ -1,7 +1,19 @@
 import '@testing-library/jest-dom';
 import 'fake-indexeddb/auto';
+import { vi } from 'vitest';
 
 // Polyfill / Mock Storage para entornos Vitest / JSDOM en Node.js
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/',
+}));
+
 const createStorageMock = (): Storage => {
   let store: Record<string, string> = {};
   return {

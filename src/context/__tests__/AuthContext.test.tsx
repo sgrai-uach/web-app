@@ -92,7 +92,7 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
       wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
     });
 
-    let errorCapturado: Error | null = null;
+    let errorCapturado = '';
     await act(async () => {
       try {
         await result.current.login({
@@ -100,13 +100,42 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
           password: 'Password123!',
         });
       } catch (err: unknown) {
-        errorCapturado = err as Error;
+        errorCapturado = err instanceof Error ? err.message : String(err);
       }
     });
 
-    expect(errorCapturado).not.toBeNull();
-    expect(errorCapturado?.message).toContain('Acceso restringido');
+    expect(errorCapturado).toContain('Acceso restringido');
     expect(result.current.autenticado).toBe(false);
     expect(cookieUtils.setAuthCookie).not.toHaveBeenCalled();
+  });
+
+  it('preserva la cookie sgrai_auth_token si un rol de oficina (ej: ADMIN) accede a /terreno sin destruir su sesión web', async () => {
+    vi.mocked(cookieUtils.getAuthCookie).mockReturnValue('token-admin-activo');
+    vi.mocked(seguridadService.obtenerUsuarioActivo).mockResolvedValue({
+      id: 'user-admin-1',
+      rut: '22.222.222-2',
+      nombre: 'Carlos Admin',
+      email: 'admin@valdivia.cl',
+      activo: true,
+      rol: {
+        id: 'rol-admin',
+        nombre: 'Administrador General',
+        codigo: 'ADMIN',
+        permisos: ['todo'],
+      },
+      delegacionId: null,
+      delegacion: null,
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await act(async () => {
+      await result.current.recargarSesion();
+    });
+
+    expect(result.current.autenticado).toBe(false);
+    expect(cookieUtils.removeAuthCookie).not.toHaveBeenCalled();
   });
 });

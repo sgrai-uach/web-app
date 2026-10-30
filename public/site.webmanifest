@@ -1,14 +1,38 @@
 {
-  "name": "SGRAI — Municipalidad de Valdivia",
-  "short_name": "SGRAI",
+  "id": "/terreno",
+  "name": "SGRAI — App Terreno",
+  "short_name": "SGRAI Terreno",
+  "description": "Aplicación de terreno (PWA) para Patrulla Verificadora y Delegado de Cuadrilla, Municipalidad de Valdivia.",
+  "start_url": "/terreno",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ECEFF3",
+  "theme_color": "#14505A",
+  "lang": "es-CL",
   "icons": [
     {
-      "src": "/android-chrome-192x192.png",
+      "src": "/terreno/android-chrome-192x192.png",
       "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/terreno/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/terreno/icons/maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/terreno/apple-touch-icon.png",
+      "sizes": "180x180",
       "type": "image/png"
     }
-  ],
-  "theme_color": "#14505A",
-  "background_color": "#ECEFF3",
-  "display": "standalone"
+  ]
 }

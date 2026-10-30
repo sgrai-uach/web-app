@@ -2,10 +2,14 @@
 
 import React, { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Calendar, Archive } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Archive, Map } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { obtenerMisionLocalPorId } from '@/services/offlineQueue';
+import { Button } from '@/components/ui/Button';
+import { EstadoBadge } from '@/components/misiones/EstadoBadge';
+import { obtenerDetalleMision } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
+import { MapaModal } from '@/components/maps/MapaModal';
+import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaDetailPage.module.css';
 
@@ -19,22 +23,22 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
 
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
+  const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
 
   const cargarDetalle = useCallback(async () => {
     setCargando(true);
     try {
-      const encontrada = await obtenerMisionLocalPorId(misionId);
+      const encontrada = await obtenerDetalleMision(misionId);
       if (encontrada) {
         setMision(encontrada);
       } else {
-        // Fallback demostrativo
         setMision({
           id: misionId,
           incidenteId: `inc-${misionId}`,
           codigoIncidente: `INC-2026-${misionId.substring(0, 5).toUpperCase()}`,
-          tipologia: 'CAIDA_ARBOL',
+          tipologia: 'Caída de árbol',
           direccion: 'Av. Ramón Picarte 1100, Valdivia',
-          coordenadas: { lat: -39.81, lng: -73.25 },
+          coordenadas: { lat: -39.82, lng: -73.23 },
           prioridad: 'ALTA',
           estado: 'FINALIZADA',
           fechaDespacho: '2026-10-20T14:30:00Z',
@@ -51,14 +55,29 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   }, [cargarDetalle]);
 
   if (cargando || !mision) {
-    return <div>Cargando registro histórico...</div>;
+    return <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>Cargando misión...</div>;
   }
+
+  const normPrioridad = mision.prioridad?.toUpperCase() || '';
+  let prioridadClase = styles.priorityNeutro;
+  if (normPrioridad === 'CRITICA') {
+    prioridadClase = styles.priorityCritica;
+  } else if (normPrioridad === 'ALTA') {
+    prioridadClase = styles.priorityAlta;
+  }
+
+  const trabajoTexto = (mision.datosAdicionales?.trabajo as string) || mision.direccion;
+  const esSoloLectura =
+    !unidadActiva ||
+    mision.estado === 'FINALIZADA' ||
+    mision.estado === 'COMPLETADA' ||
+    mision.estado === 'CERRADA';
 
   return (
     <div className={styles.container}>
       <Link href="/cuadrilla/misiones" className={styles.backLink}>
         <ArrowLeft size={16} aria-hidden="true" />
-        <span>Volver al Historial</span>
+        <span>Historial</span>
       </Link>
 
       {!unidadActiva && (
@@ -70,52 +89,79 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
 
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
-          <span className={styles.code}>{mision.codigoIncidente}</span>
-          <span className={styles.statusBadge}>{mision.estado}</span>
+          <div className={styles.codeArea}>
+            <span className={styles.code}>{mision.codigoIncidente}</span>
+            <span className={`${styles.priorityChip} ${prioridadClase}`}>
+              {formatearPrioridad(mision.prioridad)}
+            </span>
+          </div>
+          <EstadoBadge estado={mision.estado} />
         </div>
 
         <div className={styles.detailGrid}>
-          <div className={styles.detailItem}>
-            <span className={styles.itemLabel}>Tipología de la Emergencia</span>
-            <span className={styles.itemValue}>{mision.tipologia}</span>
+          {/* Bloque Tipo (único en negrita) */}
+          <div className={styles.sectionBlock}>
+            <span className={styles.itemLabel}>Tipo</span>
+            <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
+              {mision.tipologia}
+            </span>
           </div>
 
-          <div className={styles.detailItem}>
-            <span className={styles.itemLabel}>Ubicación de Faena</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <MapPin size={16} color="var(--color-primary-teal)" aria-hidden="true" />
-              <span className={styles.itemValue}>{mision.direccion}</span>
+          {/* Bloque Ubicación separado */}
+          <div className={styles.sectionBlock}>
+            <span className={styles.itemLabel}>Ubicación</span>
+            <div className={styles.locationActionRow}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <MapPin size={16} color="var(--color-primary-teal)" aria-hidden="true" />
+                <span className={styles.itemValue}>{mision.direccion}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<Map size={14} />}
+                onClick={() => setMapaAbierto(true)}
+              >
+                Ver mapa
+              </Button>
             </div>
           </div>
 
-          <div className={styles.detailItem}>
-            <span className={styles.itemLabel}>Nivel de Prioridad Registrado</span>
-            <span className={styles.itemValue}>{mision.prioridad}</span>
+          {/* Bloque Trabajo separado */}
+          <div className={styles.sectionBlock}>
+            <span className={styles.itemLabel}>Trabajo</span>
+            <span className={styles.itemValue}>{trabajoTexto}</span>
           </div>
 
-          <div className={styles.detailItem}>
-            <span className={styles.itemLabel}>Fecha y Hora de Despacho</span>
+          {/* Fecha Despachada */}
+          <div className={styles.sectionBlock}>
+            <span className={styles.itemLabel}>Despachada</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Calendar size={16} aria-hidden="true" />
+              <Calendar size={15} color="var(--color-text-muted)" aria-hidden="true" />
               <span className={styles.itemValue}>
-                {new Date(mision.fechaDespacho).toLocaleString('es-CL')}
+                {formatearFechaHora24h(mision.fechaDespacho)}
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className={styles.readOnlyNotice}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-          <Archive size={18} aria-hidden="true" />
-          <span>Registro Histórico de Faena — Modo Solo Lectura</span>
+      {esSoloLectura && (
+        <div className={styles.readOnlyNotice}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <Archive size={16} aria-hidden="true" />
+            <span>Solo lectura</span>
+          </div>
         </div>
-        <p style={{ fontSize: '0.8125rem', marginTop: 'var(--space-2)', marginBottom: 0 }}>
-          {!unidadActiva
-            ? 'Esta cuadrilla se encuentra inactiva. No se admiten mutaciones ni reapertura de faenas.'
-            : 'Misión concluida en los registros municipales.'}
-        </p>
-      </div>
+      )}
+
+      <MapaModal
+        abierto={mapaAbierto}
+        alCerrar={() => setMapaAbierto(false)}
+        latitud={mision.coordenadas?.lat}
+        longitud={mision.coordenadas?.lng}
+        titulo={mision.tipologia || mision.codigoIncidente}
+        direccion={mision.direccion}
+      />
     </div>
   );
 }

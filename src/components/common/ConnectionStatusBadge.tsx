@@ -2,6 +2,7 @@ import React from 'react';
 import styles from './ConnectionStatusBadge.module.css';
 
 export type ConnectivityState = 'connected' | 'offline' | 'syncing';
+export type ConnectionStatus = ConnectivityState;
 
 export interface ConnectionStatusBadgeProps {
   connected?: boolean;
@@ -11,11 +12,12 @@ export interface ConnectionStatusBadgeProps {
   inactiveLabel?: string;
   syncingLabel?: string;
   tooltip?: string;
+  onRetry?: () => void;
   className?: string;
   style?: React.CSSProperties;
 }
 
-export default function ConnectionStatusBadge({
+export function ConnectionStatusBadge({
   connected,
   status,
   pendingCount = 0,
@@ -23,6 +25,7 @@ export default function ConnectionStatusBadge({
   inactiveLabel = 'Trabajando offline',
   syncingLabel = 'Sincronizando...',
   tooltip,
+  onRetry,
   className = '',
   style,
 }: ConnectionStatusBadgeProps) {
@@ -55,10 +58,16 @@ export default function ConnectionStatusBadge({
       title={tooltip || defaultTooltip}
       role="status"
       aria-live="polite"
-      style={style}
+      onClick={onRetry}
+      style={{
+        cursor: onRetry ? 'pointer' : undefined,
+        ...style,
+      }}
     >
       <span className={`${styles.dot} ${statusClass}`} aria-hidden="true" />
       <span className={styles.label}>{label}</span>
     </div>
   );
 }
+
+export default ConnectionStatusBadge;

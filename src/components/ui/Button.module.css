@@ -10,7 +10,7 @@
   font-family: var(--font-family-base);
   font-weight: var(--font-weight-semibold);
   line-height: 1.2;
-  text-decoration: none;
+  text-decoration: none !important;
   border-radius: var(--radius-none, 0px);
   border: 1px solid transparent;
   cursor: pointer;
@@ -19,6 +19,14 @@
   user-select: none;
   box-sizing: border-box;
   text-align: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.button:hover,
+.button:active,
+.button:focus {
+  text-decoration: none !important;
 }
 
 .button:focus-visible {
@@ -64,14 +72,16 @@
 /* --- Variantes (Colores planos institucionales) --- */
 .primary {
   background-color: var(--color-accent-mint);
-  color: var(--color-white);
+  color: var(--color-charcoal-dark, #24272B);
 }
 .primary:hover:not(:disabled):not(.disabled) {
   background-color: #429584;
+  color: var(--color-charcoal-dark, #24272B);
   text-decoration: none;
 }
 .primary:active:not(:disabled):not(.disabled) {
   background-color: #387e6f;
+  color: var(--color-charcoal-dark, #24272B);
 }
 
 .teal {
@@ -160,6 +170,11 @@
 .ghost .spinner {
   border: 2px solid rgba(59, 63, 69, 0.3);
   border-top-color: var(--color-charcoal);
+}
+
+.primary .spinner {
+  border: 2px solid rgba(36, 39, 43, 0.35);
+  border-top-color: var(--color-charcoal-dark, #24272B);
 }
 
 @keyframes buttonSpin {

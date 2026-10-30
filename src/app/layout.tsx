@@ -3,6 +3,7 @@ import { Noto_Sans } from 'next/font/google';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
 import { AuthProvider } from '@/context/AuthContext';
+import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
 
 const notoSans = Noto_Sans({
   subsets: ['latin'],
@@ -23,22 +24,27 @@ export const metadata: Metadata = {
   title: 'SGRAI — App Terreno',
   description:
     'Aplicación de terreno (PWA) del Sistema de Gestión de Recursos para Atención de Incidentes, Dirección de Gestión de Riesgos de Desastres, Municipalidad de Valdivia.',
-  manifest: '/terreno/site.webmanifest',
   icons: {
     icon: [
-      { url: '/favicon.ico' },
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/terreno/favicon.ico' },
+      { url: '/terreno/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/terreno/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
     ],
     apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+      { url: '/terreno/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
     other: [
       {
         rel: 'icon',
         type: 'image/png',
         sizes: '192x192',
-        url: '/android-chrome-192x192.png',
+        url: '/terreno/android-chrome-192x192.png',
+      },
+      {
+        rel: 'icon',
+        type: 'image/png',
+        sizes: '512x512',
+        url: '/terreno/android-chrome-512x512.png',
       },
     ],
   },
@@ -55,6 +61,7 @@ export default function RootLayout({
         <AuthProvider>
           <ToastProvider>{children}</ToastProvider>
         </AuthProvider>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

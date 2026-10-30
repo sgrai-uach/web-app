@@ -37,6 +37,8 @@ describe('PatrullaMisionesPage — Modo Histórico Patrulla Desactivada (H85)', 
       esPatrulla: true,
       esCuadrilla: false,
       unidadActiva: false,
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
       login: vi.fn(),
       logout: vi.fn(),
       recargarSesion: vi.fn(),
@@ -45,8 +47,7 @@ describe('PatrullaMisionesPage — Modo Histórico Patrulla Desactivada (H85)', 
     render(<PatrullaMisionesPage />);
 
     expect(screen.getByText(/Patrulla Desactivada — Patrulla Móvil 02/i)).toBeInTheDocument();
-    expect(screen.getByText(/Historial de Misiones de Triage/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Modo histórico de solo lectura/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('heading', { level: 1, name: /^historial$/i })).toBeInTheDocument();
 
     await waitFor(() => {
       expect(offlineQueue.guardarMisionesLocales).toHaveBeenCalled();

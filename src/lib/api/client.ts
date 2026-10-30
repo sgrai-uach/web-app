@@ -12,7 +12,7 @@ export function handleUnauthorizedSession() {
     if (hadToken || pathname !== '/') {
       const returnUrl = encodeURIComponent(pathname + window.location.search);
       try {
-        window.location.href = `/login?motivo=sesion_expirada&returnUrl=${returnUrl}`;
+        window.location.assign(`/login?motivo=sesion_expirada&returnUrl=${returnUrl}`);
       } catch {
         // Ignorar excepciones en entornos jsdom
       }
@@ -20,8 +20,15 @@ export function handleUnauthorizedSession() {
   }
 }
 
+function resolveApiBaseUrl(): string {
+  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
+    return '';
+  }
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
+}
+
 const apiClient = createClient<paths>({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+  baseUrl: resolveApiBaseUrl(),
 });
 
 apiClient.use({

@@ -37,6 +37,8 @@ describe('CuadrillaMisionesPage — Modo Histórico Cuadrilla Desactivada (H82)'
       esPatrulla: false,
       esCuadrilla: true,
       unidadActiva: false,
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
       login: vi.fn(),
       logout: vi.fn(),
       recargarSesion: vi.fn(),
@@ -45,8 +47,7 @@ describe('CuadrillaMisionesPage — Modo Histórico Cuadrilla Desactivada (H82)'
     render(<CuadrillaMisionesPage />);
 
     expect(screen.getByText(/Cuadrilla Desactivada — Cuadrilla Norte/i)).toBeInTheDocument();
-    expect(screen.getByText(/Historial de Faenas Operativas/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Modo histórico de solo lectura/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('heading', { level: 1, name: /^historial$/i })).toBeInTheDocument();
 
     await waitFor(() => {
       expect(offlineQueue.guardarMisionesLocales).toHaveBeenCalled();

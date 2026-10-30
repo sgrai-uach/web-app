@@ -3,16 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0 -p 3002",
+    "dev:https": "next dev -H 0.0.0.0 -p 3002 --experimental-https",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3002",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
     "api:generate": "openapi-typescript ${API_SPEC_URL:-http://localhost:3001/openapi.json} -o src/types/api-generated.d.ts"
   },
   "dependencies": {
+    "@types/leaflet": "^1.9.22",
     "idb": "^8.0.2",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.48.0",
     "next": "16.3.4",
     "openapi-fetch": "^0.17.0",
