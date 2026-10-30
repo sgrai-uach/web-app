@@ -39,7 +39,7 @@
   border-top: 3px solid transparent;
   border-radius: var(--radius-none, 0px);
   color: var(--color-bg-light, #ECEFF3);
-  text-decoration: none;
+  text-decoration: none !important;
   font-family: var(--font-noto-sans), sans-serif;
   font-size: 0.75rem;
   font-weight: 700;
@@ -47,24 +47,49 @@
   cursor: pointer;
   position: relative;
   transition: background-color 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.navLink:hover,
+.navLink:focus,
+.navLink:focus-visible,
+.navLink:active,
+.navButton:hover,
+.navButton:focus,
+.navButton:focus-visible,
+.navButton:active {
+  text-decoration: none !important;
 }
 
 .navLink:hover,
 .navButton:hover {
   background-color: rgba(255, 255, 255, 0.06);
   color: var(--color-white, #FFFFFF);
+  text-decoration: none !important;
+}
+
+.navLink:active,
+.navButton:active {
+  background-color: rgba(255, 255, 255, 0.12);
+  text-decoration: none !important;
 }
 
 .navLink:focus-visible,
 .navButton:focus-visible {
   outline: 2px solid var(--color-accent-mint, #4FAE9B);
   outline-offset: -2px;
+  text-decoration: none !important;
 }
 
-.navLinkActive {
+.navLinkActive,
+.navLinkActive:hover,
+.navLinkActive:focus,
+.navLinkActive:active {
   background-color: var(--color-primary-teal-dark, #14505A);
   color: var(--color-accent-mint, #4FAE9B);
   border-top-color: var(--color-accent-mint, #4FAE9B);
+  text-decoration: none !important;
 }
 
 .iconWrapper {
@@ -96,4 +121,5 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  text-decoration: none !important;
 }
