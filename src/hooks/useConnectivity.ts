@@ -1,9 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { contarAccionesPendientes, sincronizarColaOutbox } from '@/services/offlineQueue';
+import {
+  contarAccionesPendientes,
+  sincronizarColaOutbox,
+  obtenerMisionLocalPorId,
+  guardarMisionLocal,
+} from '@/services/offlineQueue';
 import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
+import { DEV_PATRULLA_TOKEN, DEV_PATRULLA_USER_ID } from '@/lib/api/client';
 
 export function useConnectivity() {
   const [online, setOnline] = useState<boolean>(() => {
@@ -30,21 +36,69 @@ export function useConnectivity() {
     setSincronizando(true);
     try {
       const token = getAuthCookie();
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const apiUrl =
+        typeof window !== 'undefined' && process.env.NODE_ENV !== 'test'
+          ? ''
+          : process.env.NEXT_PUBLIC_API_URL || '';
 
       await sincronizarColaOutbox(async (accion) => {
+        const authHeaders: Record<string, string> =
+          token === DEV_PATRULLA_TOKEN
+            ? { 'x-user-id': DEV_PATRULLA_USER_ID }
+            : token
+              ? { Authorization: `Bearer ${token}` }
+              : {};
+
         const res = await fetch(`${apiUrl}${accion.url}`, {
           method: accion.metodo,
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...authHeaders,
           },
           body: JSON.stringify(accion.payload),
         });
 
-        // Códigos 2xx o 4xx que indiquen que el recurso ya fue procesado / idempotente
-        return res.ok || res.status === 409 || res.status === 422;
+        // Códigos 2xx o 409/422 que indiquen que el recurso ya fue procesado / idempotente
+        const procesada = res.ok || res.status === 409 || res.status === 422;
+
+        if (procesada && accion.tipo === 'ACEPTAR_MISION') {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/aceptar/);
+          const misionId = match?.[1];
+          if (misionId) {
+            try {
+              const local = await obtenerMisionLocalPorId(misionId);
+              if (local) {
+                let fechaInicioServidor = local.fechaInicio || new Date().toISOString();
+                if (res.ok) {
+                  try {
+                    const bodyJson = await res.clone().json();
+                    if (bodyJson?.data?.mision?.fechaInicio) {
+                      fechaInicioServidor = bodyJson.data.mision.fechaInicio;
+                    }
+                  } catch {
+                    // Ignorar si la respuesta no contiene JSON
+                  }
+                }
+                await guardarMisionLocal({
+                  ...local,
+                  estado: 'EN_CURSO',
+                  fechaInicio: fechaInicioServidor,
+                  sincronizacionPendiente: false,
+                  actualizadoEn: new Date().toISOString(),
+                });
+              }
+            } catch {
+              // Ignorar fallos de lectura/escritura secundaria en IndexedDB
+            }
+          }
+        }
+
+        return procesada;
       });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sgrai:outbox-synced'));
+      }
     } catch (err) {
       console.warn('[OfflineQueue] Error durante la sincronización:', err);
     } finally {
