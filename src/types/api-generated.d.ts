@@ -3600,6 +3600,159 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/misiones/{id}/rechazar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rechazo motivado de asignación de misión táctica
+         * @description Permite a una patrulla verificadora (o cuadrilla) rechazar una misión táctica en estado DESPACHADA/ASIGNADA ingresando obligatoriamente una justificación de al menos 5 caracteres (§3.3).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path: {
+                    /**
+                     * Format: uuid
+                     * @description Identificador único UUID de la misión asignada
+                     */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Justificación técnica obligatoria del rechazo (mínimo 5 caracteres) */
+                        justificacion_rechazo?: string;
+                        /** @description Alias camelCase de la justificación técnica */
+                        justificacionRechazo?: string;
+                        /** @description Latitud GPS al momento del rechazo */
+                        latitud?: number;
+                        /** @description Longitud GPS al momento del rechazo */
+                        longitud?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Misión rechazada exitosamente. El incidente ha vuelto a estado REPORTADO para su reasignación */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                            data: {
+                                mision: {
+                                    id: string;
+                                    codigo: string;
+                                    estado: "RECHAZADA";
+                                    justificacionRechazo: string;
+                                    actualizadoEn: string;
+                                };
+                                patrulla: {
+                                    id: string;
+                                    nombre: string;
+                                    estado: string;
+                                };
+                                incidente: {
+                                    id: string;
+                                    codigo: string;
+                                    estado: string;
+                                };
+                                hito: {
+                                    id: string;
+                                    hito: string;
+                                    descripcion: string;
+                                    creadoEn: string;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description UUID inválido o motivo < 5 caracteres */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description No autenticado */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description Usuario no pertenece a la unidad asignada */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description Misión no encontrada */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description Misión en estado no rechazable */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/incidentes/kpis": {
         parameters: {
             query?: never;
