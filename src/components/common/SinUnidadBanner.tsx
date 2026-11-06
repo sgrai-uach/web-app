@@ -37,3 +37,4 @@ export const SinUnidadBanner: React.FC<SinUnidadBannerProps> = ({
 };
 
 export default SinUnidadBanner;
+

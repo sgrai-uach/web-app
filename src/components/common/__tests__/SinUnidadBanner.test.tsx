@@ -21,3 +21,4 @@ describe('SinUnidadBanner', () => {
     expect(screen.getByText(/Actualmente no cuentas con una cuadrilla asignada/i)).toBeInTheDocument();
   });
 });
+
