@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import { obtenerDetalleMision } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
+import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
 import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
@@ -19,7 +20,7 @@ interface PageProps {
 
 export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const { id: misionId } = use(params);
-  const { usuario, unidadActiva } = useAuth();
+  const { usuario, unidadActiva, tieneUnidadAsignada } = useAuth();
 
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
@@ -80,12 +81,17 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         <span>Historial</span>
       </Link>
 
-      {!unidadActiva && (
+      {!tieneUnidadAsignada ? (
+        <SinUnidadBanner
+          tipoUnidad="patrulla"
+          nombreOperador={usuario?.nombre}
+        />
+      ) : !unidadActiva ? (
         <UnidadInactivaBanner
           tipoUnidad="patrulla"
           nombreUnidad={usuario?.unidadNombre}
         />
-      )}
+      ) : null}
 
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>

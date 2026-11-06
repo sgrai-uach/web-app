@@ -208,5 +208,43 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
     expect(result.current.esPatrulla).toBe(true);
     expect(result.current.usuario?.unidadActiva).toBe(true);
     expect(result.current.unidadActiva).toBe(true);
+    expect(result.current.tieneUnidadAsignada).toBe(true);
+    expect(result.current.estadoAsignacion).toBe('ACTIVA');
+  });
+
+  it('detecta estado SIN_ASIGNACION cuando el funcionario no tiene patrulla asignada', async () => {
+    vi.mocked(cookieUtils.getAuthCookie).mockReturnValue('token-sin-patrulla');
+    vi.mocked(seguridadService.obtenerUsuarioActivo).mockResolvedValue({
+      id: 'user-sin-patrulla-1',
+      rut: '12.345.678-9',
+      nombre: 'Pedro Sin Asignacion',
+      email: 'pedro@valdivia.cl',
+      activo: true,
+      rol: {
+        id: 'rol-patrulla',
+        nombre: 'Patrulla Verificadora',
+        codigo: 'PATRULLA_VERIFICADORA',
+        permisos: ['misiones:terreno:verificar'],
+      },
+      delegacionId: 'del-1',
+      delegacion: { id: 'del-1', nombre: 'Valdivia Sur' },
+      unidadId: null,
+      unidadNombre: null,
+      unidadActiva: false,
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await act(async () => {
+      await result.current.recargarSesion();
+    });
+
+    expect(result.current.autenticado).toBe(true);
+    expect(result.current.esPatrulla).toBe(true);
+    expect(result.current.tieneUnidadAsignada).toBe(false);
+    expect(result.current.estadoAsignacion).toBe('SIN_ASIGNACION');
+    expect(result.current.unidadActiva).toBe(false);
   });
 });

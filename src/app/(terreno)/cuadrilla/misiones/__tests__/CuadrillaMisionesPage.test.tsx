@@ -37,6 +37,8 @@ describe('CuadrillaMisionesPage — Modo Histórico Cuadrilla Desactivada (H82)'
       esPatrulla: false,
       esCuadrilla: true,
       unidadActiva: false,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'DESACTIVADA',
       tienePermiso: vi.fn().mockReturnValue(true),
       tieneAlgunPermiso: vi.fn().mockReturnValue(true),
       login: vi.fn(),
