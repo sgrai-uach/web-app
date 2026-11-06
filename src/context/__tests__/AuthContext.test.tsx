@@ -138,4 +138,75 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
     expect(result.current.autenticado).toBe(false);
     expect(cookieUtils.removeAuthCookie).not.toHaveBeenCalled();
   });
+
+  it('mapea correctamente unidadActiva=false cuando la patrulla verificadora fue desactivada (H85)', async () => {
+    vi.mocked(cookieUtils.getAuthCookie).mockReturnValue('token-patrulla-inactiva');
+    vi.mocked(seguridadService.obtenerUsuarioActivo).mockResolvedValue({
+      id: 'user-patrulla-1',
+      rut: '11.111.111-1',
+      nombre: 'Juan Patrullero',
+      email: 'juan@valdivia.cl',
+      activo: true,
+      rol: {
+        id: 'rol-patrulla',
+        nombre: 'Patrulla Verificadora',
+        codigo: 'PATRULLA_VERIFICADORA',
+        permisos: ['misiones:terreno:verificar'],
+      },
+      delegacionId: 'del-1',
+      delegacion: { id: 'del-1', nombre: 'Valdivia Sur' },
+      unidadId: 'pat-1',
+      unidadNombre: 'Patrulla Móvil 01',
+      unidadActiva: false,
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await act(async () => {
+      await result.current.recargarSesion();
+    });
+
+    expect(result.current.autenticado).toBe(true);
+    expect(result.current.esPatrulla).toBe(true);
+    expect(result.current.usuario?.unidadNombre).toBe('Patrulla Móvil 01');
+    expect(result.current.usuario?.unidadActiva).toBe(false);
+    expect(result.current.unidadActiva).toBe(false);
+  });
+
+  it('mapea correctamente unidadActiva=true cuando la patrulla verificadora está activa (H85)', async () => {
+    vi.mocked(cookieUtils.getAuthCookie).mockReturnValue('token-patrulla-activa');
+    vi.mocked(seguridadService.obtenerUsuarioActivo).mockResolvedValue({
+      id: 'user-patrulla-1',
+      rut: '11.111.111-1',
+      nombre: 'Juan Patrullero',
+      email: 'juan@valdivia.cl',
+      activo: true,
+      rol: {
+        id: 'rol-patrulla',
+        nombre: 'Patrulla Verificadora',
+        codigo: 'PATRULLA_VERIFICADORA',
+        permisos: ['misiones:terreno:verificar'],
+      },
+      delegacionId: 'del-1',
+      delegacion: { id: 'del-1', nombre: 'Valdivia Sur' },
+      unidadId: 'pat-1',
+      unidadNombre: 'Patrulla Móvil 01',
+      unidadActiva: true,
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await act(async () => {
+      await result.current.recargarSesion();
+    });
+
+    expect(result.current.autenticado).toBe(true);
+    expect(result.current.esPatrulla).toBe(true);
+    expect(result.current.usuario?.unidadActiva).toBe(true);
+    expect(result.current.unidadActiva).toBe(true);
+  });
 });

@@ -64,4 +64,7 @@ export interface UsuarioActivoDetalle {
     permisos?: string[];
   } | null;
   permisos?: string[];
+  unidadId?: string | null;
+  unidadNombre?: string | null;
+  unidadActiva?: boolean;
 }

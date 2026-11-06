@@ -63,6 +63,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         permisos: Array.isArray(detalle.permisos)
           ? detalle.permisos
           : detalle.rol?.permisos || [],
+        unidadId: detalle.unidadId ?? null,
+        unidadNombre: detalle.unidadNombre ?? null,
+        unidadActiva: detalle.unidadActiva,
       };
     },
     []
@@ -152,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const rolCodigoActual = usuario?.rolCodigo?.toUpperCase() || '';
   const esPatrulla = rolCodigoActual === 'PATRULLA_VERIFICADORA';
   const esCuadrilla = rolCodigoActual === 'DELEGADO_CUADRILLA';
-  const unidadActiva = usuario?.unidadActiva !== false;
+  const unidadActiva = usuario?.unidadActiva === true;
   const autenticado = Boolean(token && usuario);
 
   const tienePermiso = useCallback(
