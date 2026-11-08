@@ -1,7 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { contarAccionesPendientes, sincronizarColaOutbox } from '@/services/offlineQueue';
+import {
+  contarAccionesPendientes,
+  sincronizarColaOutbox,
+  obtenerMisionLocalPorId,
+  guardarMisionLocal,
+} from '@/services/offlineQueue';
 import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
 
@@ -43,8 +48,49 @@ export function useConnectivity() {
         });
 
         // Códigos 2xx o 4xx que indiquen que el recurso ya fue procesado / idempotente
-        return res.ok || res.status === 409 || res.status === 422;
+        const procesada = res.ok || res.status === 409 || res.status === 422;
+
+        if (procesada && (accion.tipo === 'REPORTAR_LLEGADA' || accion.tipo === 'ACEPTAR_MISION')) {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/(llegada|aceptar)/);
+          const misionId = match?.[1];
+          if (misionId) {
+            try {
+              const local = await obtenerMisionLocalPorId(misionId);
+              if (local) {
+                let fechaRegistro = local.fechaLlegada || local.fechaInicio || new Date().toISOString();
+                if (res.ok) {
+                  try {
+                    const bodyJson = await res.clone().json();
+                    if (bodyJson?.data?.registradoEn) {
+                      fechaRegistro = bodyJson.data.registradoEn;
+                    } else if (bodyJson?.data?.mision?.fechaInicio) {
+                      fechaRegistro = bodyJson.data.mision.fechaInicio;
+                    }
+                  } catch {
+                    // Ignorar si no contiene JSON parseable
+                  }
+                }
+                await guardarMisionLocal({
+                  ...local,
+                  estado: 'EN_CURSO',
+                  fechaLlegada: fechaRegistro,
+                  fechaInicio: local.fechaInicio || fechaRegistro,
+                  sincronizacionPendiente: false,
+                  actualizadoEn: new Date().toISOString(),
+                });
+              }
+            } catch {
+              // Ignorar fallo secundario de actualización IndexedDB
+            }
+          }
+        }
+
+        return procesada;
       });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sgrai:outbox-synced'));
+      }
     } catch (err) {
       console.warn('[OfflineQueue] Error durante la sincronización:', err);
     } finally {
