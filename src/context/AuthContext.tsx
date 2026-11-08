@@ -163,10 +163,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return true;
       }
       // Fallback por rol canónico de terreno cuando el token o mock no desglosa permisos granulares
-      if (esPatrulla && permiso.startsWith('patrulla:')) {
+      if (esPatrulla && (permiso.startsWith('patrulla:') || permiso === 'misiones:terreno:verificar')) {
         return true;
       }
-      if (esCuadrilla && permiso.startsWith('cuadrilla:')) {
+      if (esCuadrilla && (permiso.startsWith('cuadrilla:') || permiso === 'misiones:terreno:ejecutar')) {
         return true;
       }
       return false;

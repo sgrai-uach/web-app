@@ -3600,6 +3600,139 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/misiones/{id}/llegada": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path: {
+                    /** @description Identificador único UUID de la misión */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Latitud WGS84 capturada por el GPS del móvil en terreno
+                         * @example -39.81422
+                         */
+                        latitud: number;
+                        /**
+                         * @description Longitud WGS84 capturada por el GPS del móvil en terreno
+                         * @example -73.24591
+                         */
+                        longitud: number;
+                        /**
+                         * @description Observaciones operativas de arribo de la brigada (máx 500 caracteres)
+                         * @example Equipo en terreno iniciando maniobras de despeje.
+                         */
+                        observaciones?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Llegada a terreno reportada exitosamente */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                            data: {
+                                hitoId: string;
+                                misionId: string;
+                                codigoMision: string;
+                                hito: "LLEGADA_TERRENO";
+                                descripcion: string;
+                                latitud: number;
+                                longitud: number;
+                                registradoEn: string;
+                                registradoPor: {
+                                    id: string;
+                                    nombre: string;
+                                };
+                                estadoMision: "EN_CURSO";
+                                miembrosActualizados: number;
+                            };
+                        };
+                    };
+                };
+                /** @description Coordenadas inválidas o misión sin cuadrilla */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description No autenticado */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description No autorizado o no es el delegado de la brigada */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description Misión no encontrada */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description La llegada a terreno ya fue reportada o estado incompatible */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+            };
+        };
+        get?: never;
+        put?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/incidentes/kpis": {
         parameters: {
             query?: never;
