@@ -1,11 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { sincronizarMisiones, obtenerDetalleMision } from '../misionesService';
+import {
+  sincronizarMisiones,
+  obtenerDetalleMision,
+  reportarLlegadaCuadrilla,
+  validarPayloadLlegadaMision,
+  MisionServiceError,
+} from '../misionesService';
 import apiClient from '@/lib/api/client';
 import * as offlineQueue from '@/services/offlineQueue';
 
 vi.mock('@/lib/api/client', () => ({
   default: {
     GET: vi.fn(),
+    POST: vi.fn(),
   },
 }));
 
@@ -14,6 +21,7 @@ vi.mock('@/services/offlineQueue', () => ({
   guardarMisionLocal: vi.fn(),
   obtenerMisionesLocales: vi.fn(),
   obtenerMisionLocalPorId: vi.fn(),
+  encolarAccionOutbox: vi.fn(),
 }));
 
 describe('misionesService — Sincronización remota y persistencia IndexedDB (Offline-First)', () => {
@@ -175,6 +183,181 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
 
       expect(detalle).toEqual(mockLocal);
       expect(offlineQueue.obtenerMisionLocalPorId).toHaveBeenCalledWith('mis-fallback');
+    });
+  });
+
+  describe('validarPayloadLlegadaMision', () => {
+    it('debe aceptar coordenadas válidas dentro del rango geográfico', () => {
+      const payload = validarPayloadLlegadaMision({
+        latitud: -39.81422,
+        longitud: -73.24591,
+        observaciones: '  Equipo en terreno  ',
+      });
+
+      expect(payload.latitud).toBe(-39.81422);
+      expect(payload.longitud).toBe(-73.24591);
+      expect(payload.observaciones).toBe('Equipo en terreno');
+    });
+
+    it('debe arrojar MisionServiceError si la latitud está fuera de rango', () => {
+      expect(() =>
+        validarPayloadLlegadaMision({ latitud: -95, longitud: -73.24591 })
+      ).toThrow(MisionServiceError);
+    });
+
+    it('debe arrojar MisionServiceError si la longitud está fuera de rango', () => {
+      expect(() =>
+        validarPayloadLlegadaMision({ latitud: -39.8, longitud: 200 })
+      ).toThrow(MisionServiceError);
+    });
+  });
+
+  describe('reportarLlegadaCuadrilla (H42)', () => {
+    const mockMisionBase = {
+      id: 'mis-cuadrilla-01',
+      incidenteId: 'inc-01',
+      codigoIncidente: 'INC-2026-001',
+      tipologia: 'Caída de árbol',
+      direccion: 'Av. Ramón Picarte 1100',
+      coordenadas: { lat: -39.81422, lng: -73.24591 },
+      prioridad: 'ALTA',
+      estado: 'DESPACHADA',
+      fechaDespacho: '2026-11-08T19:00:00Z',
+      actualizadoEn: '2026-11-08T19:00:00Z',
+    };
+
+    it('debe reportar llegada exitosamente con 201 Created y actualizar a EN_CURSO', async () => {
+      const mockApiResponse = {
+        message: 'Llegada a terreno reportada exitosamente.',
+        data: {
+          hitoId: 'hito-001',
+          misionId: 'mis-cuadrilla-01',
+          codigoMision: 'MIS-2026-001',
+          hito: 'LLEGADA_TERRENO',
+          descripcion: 'Llegada a terreno reportada.',
+          latitud: -39.81422,
+          longitud: -73.24591,
+          registradoEn: '2026-11-08T19:30:00.000Z',
+          registradoPor: {
+            id: 'user-05',
+            nombre: 'Pedro Delegado',
+          },
+          estadoMision: 'EN_CURSO',
+          miembrosActualizados: 4,
+        },
+      };
+
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: mockApiResponse,
+        error: undefined,
+        response: new Response('', { status: 201 }),
+      } as never);
+
+      const resultado = await reportarLlegadaCuadrilla('mis-cuadrilla-01', {
+        misionActual: mockMisionBase,
+        coordenadas: { latitud: -39.81422, longitud: -73.24591 },
+      });
+
+      expect(resultado.enColaOffline).toBe(false);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.fechaLlegada).toBe('2026-11-08T19:30:00.000Z');
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalled();
+    });
+
+    it('debe manejar idempotencia ante respuesta 409 Conflict fijando estado EN_CURSO', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: undefined,
+        error: { message: 'La llegada a terreno ya fue reportada' },
+        response: new Response('', { status: 409 }),
+      } as never);
+
+      const resultado = await reportarLlegadaCuadrilla('mis-cuadrilla-01', {
+        misionActual: mockMisionBase,
+        coordenadas: { latitud: -39.81422, longitud: -73.24591 },
+      });
+
+      expect(resultado.yaReportadaPreviamente).toBe(true);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.enColaOffline).toBe(false);
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalled();
+    });
+
+    it('debe lanzar MisionServiceError con 403 si el usuario no tiene permisos o no es el delegado', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: undefined,
+        error: { message: 'No es el delegado asignado' },
+        response: new Response('', { status: 403 }),
+      } as never);
+
+      await expect(
+        reportarLlegadaCuadrilla('mis-cuadrilla-01', {
+          misionActual: mockMisionBase,
+          coordenadas: { latitud: -39.81422, longitud: -73.24591 },
+        })
+      ).rejects.toThrow(MisionServiceError);
+    });
+
+    it('debe usar coordenadas de la misión si se activa usarUbicacionMision', async () => {
+      const mockApiResponse = {
+        message: 'Llegada exitosa',
+        data: {
+          hitoId: 'hito-002',
+          misionId: 'mis-cuadrilla-01',
+          codigoMision: 'MIS-2026-001',
+          hito: 'LLEGADA_TERRENO',
+          descripcion: 'Llegada reportada con contingencia.',
+          latitud: -39.81422,
+          longitud: -73.24591,
+          registradoEn: '2026-11-08T19:35:00.000Z',
+          registradoPor: { id: 'user-05', nombre: 'Pedro Delegado' },
+          estadoMision: 'EN_CURSO',
+          miembrosActualizados: 4,
+        },
+      };
+
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: mockApiResponse,
+        error: undefined,
+        response: new Response('', { status: 201 }),
+      } as never);
+
+      const resultado = await reportarLlegadaCuadrilla('mis-cuadrilla-01', {
+        misionActual: mockMisionBase,
+        usarUbicacionMision: true,
+      });
+
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(apiClient.POST).toHaveBeenCalledWith(
+        '/api/misiones/{id}/llegada',
+        expect.objectContaining({
+          body: {
+            latitud: -39.81422,
+            longitud: -73.24591,
+          },
+        })
+      );
+    });
+
+    it('debe encolar en outbox y guardar optimistamente en IndexedDB en modo offline', async () => {
+      const onlineSpy = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+      const resultado = await reportarLlegadaCuadrilla('mis-cuadrilla-01', {
+        misionActual: mockMisionBase,
+        coordenadas: { latitud: -39.81422, longitud: -73.24591 },
+      });
+
+      expect(resultado.enColaOffline).toBe(true);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.sincronizacionPendiente).toBe(true);
+      expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tipo: 'REPORTAR_LLEGADA',
+          url: '/api/misiones/mis-cuadrilla-01/llegada',
+          metodo: 'POST',
+        })
+      );
+
+      onlineSpy.mockRestore();
     });
   });
 });
