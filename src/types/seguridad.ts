@@ -64,19 +64,4 @@ export interface UsuarioActivoDetalle {
     permisos?: string[];
   } | null;
   permisos?: string[];
-  unidadId?: string | null;
-  unidadNombre?: string | null;
-  unidadActiva?: boolean;
 }
-
-export type EstadoAsignacionUnidad = 'ACTIVA' | 'DESACTIVADA' | 'SIN_ASIGNACION';
-
-export interface HistorialUnidadOperador {
-  unidadId: string;
-  nombre: string;
-  tipoUnidad: 'PATRULLA' | 'CUADRILLA';
-  fechaPrimerRegistro: string;
-  ultimaVezVisto: string;
-  estadoAlMomento: 'ACTIVA' | 'DESACTIVADA';
-}
-

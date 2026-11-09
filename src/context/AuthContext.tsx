@@ -15,7 +15,6 @@ import type {
   LoginRequest,
   UsuarioPerfilSesion,
   UsuarioActivoDetalle,
-  EstadoAsignacionUnidad,
 } from '@/types/seguridad';
 import { esRolTerrenoPermitido } from '@/types/seguridad';
 
@@ -68,8 +67,6 @@ export interface AuthContextValue {
   esPatrulla: boolean;
   esCuadrilla: boolean;
   unidadActiva: boolean;
-  tieneUnidadAsignada: boolean;
-  estadoAsignacion: EstadoAsignacionUnidad;
   tienePermiso: (permiso: string) => boolean;
   tieneAlgunPermiso: (permisos: string[]) => boolean;
   login: (credenciales: LoginRequest) => Promise<UsuarioPerfilSesion>;
@@ -107,9 +104,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         permisos: Array.isArray(detalle.permisos)
           ? detalle.permisos
           : detalle.rol?.permisos || [],
-        unidadId: detalle.unidadId ?? null,
-        unidadNombre: detalle.unidadNombre ?? null,
-        unidadActiva: detalle.unidadActiva,
       };
     },
     []
@@ -220,13 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const rolCodigoActual = usuario?.rolCodigo?.toUpperCase() || '';
   const esPatrulla = rolCodigoActual === 'PATRULLA_VERIFICADORA';
   const esCuadrilla = rolCodigoActual === 'DELEGADO_CUADRILLA';
-  const tieneUnidadAsignada = Boolean(usuario?.unidadId || usuario?.unidadNombre);
-  const unidadActiva = tieneUnidadAsignada && usuario?.unidadActiva === true;
-  const estadoAsignacion: EstadoAsignacionUnidad = !tieneUnidadAsignada
-    ? 'SIN_ASIGNACION'
-    : usuario?.unidadActiva === true
-    ? 'ACTIVA'
-    : 'DESACTIVADA';
+  const unidadActiva = usuario?.unidadActiva !== false;
   const autenticado = Boolean(token && usuario);
 
   const tienePermiso = useCallback(
@@ -270,8 +258,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         esPatrulla,
         esCuadrilla,
         unidadActiva,
-        tieneUnidadAsignada,
-        estadoAsignacion,
         tienePermiso,
         tieneAlgunPermiso,
         login,

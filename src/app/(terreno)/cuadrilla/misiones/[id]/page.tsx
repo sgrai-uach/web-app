@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/Button';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import { obtenerDetalleMision } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
-import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
 import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
@@ -20,7 +19,7 @@ interface PageProps {
 
 export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const { id: misionId } = use(params);
-  const { usuario, unidadActiva, tieneUnidadAsignada } = useAuth();
+  const { usuario, unidadActiva } = useAuth();
 
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
@@ -81,17 +80,12 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         <span>Historial</span>
       </Link>
 
-      {!tieneUnidadAsignada ? (
-        <SinUnidadBanner
-          tipoUnidad="cuadrilla"
-          nombreOperador={usuario?.nombre}
-        />
-      ) : !unidadActiva ? (
+      {!unidadActiva && (
         <UnidadInactivaBanner
           tipoUnidad="cuadrilla"
           nombreUnidad={usuario?.unidadNombre}
         />
-      ) : null}
+      )}
 
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>

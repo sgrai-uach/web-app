@@ -9,7 +9,6 @@ import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
 import { guardarMisionesLocales } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
-import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { ordenarMisionesPorPrioridadYFecha } from '@/lib/utils/formatters';
 import {
   MisionFiltrosChips,
@@ -21,7 +20,7 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaMisionesPage.module.css';
 
 function CuadrillaMisionesContenido() {
-  const { usuario, unidadActiva, tieneUnidadAsignada } = useAuth();
+  const { usuario, unidadActiva } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -146,21 +145,16 @@ function CuadrillaMisionesContenido() {
 
   return (
     <div className={styles.container}>
-      {!tieneUnidadAsignada ? (
-        <SinUnidadBanner
-          tipoUnidad="cuadrilla"
-          nombreOperador={usuario?.nombre}
-        />
-      ) : !unidadActiva ? (
+      {!unidadActiva && (
         <UnidadInactivaBanner
           tipoUnidad="cuadrilla"
           nombreUnidad={usuario?.unidadNombre}
         />
-      ) : null}
+      )}
 
       <div className={styles.titleArea}>
         <Heading variant="h1">
-          {tieneUnidadAsignada && !unidadActiva ? 'Historial' : 'Misiones'}
+          {!unidadActiva ? 'Historial' : 'Misiones'}
         </Heading>
       </div>
 

@@ -6,7 +6,6 @@ import { Compass, HardHat } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
-import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import styles from './TerrenoResumenOperativo.module.css';
 
 interface MetricasTerreno {
@@ -16,7 +15,7 @@ interface MetricasTerreno {
 }
 
 export function TerrenoResumenOperativo() {
-  const { usuario, esCuadrilla, unidadActiva, tieneUnidadAsignada } = useAuth();
+  const { usuario, esCuadrilla, unidadActiva } = useAuth();
   const [metricas, setMetricas] = useState<MetricasTerreno>({
     pendientes: 0,
     enCurso: 0,
@@ -74,17 +73,12 @@ export function TerrenoResumenOperativo() {
       className={styles.wrapper}
       aria-labelledby="resumen-operativo-terreno-heading"
     >
-      {!tieneUnidadAsignada ? (
-        <SinUnidadBanner
-          tipoUnidad={esCuadrilla ? 'cuadrilla' : 'patrulla'}
-          nombreOperador={usuario?.nombre}
-        />
-      ) : !unidadActiva ? (
+      {!unidadActiva && (
         <UnidadInactivaBanner
           tipoUnidad={esCuadrilla ? 'cuadrilla' : 'patrulla'}
           nombreUnidad={usuario?.unidadNombre}
         />
-      ) : null}
+      )}
 
       <div className={styles.grid}>
         {/* Tarjeta 1: Resumen Operativo de Misiones / Faenas */}

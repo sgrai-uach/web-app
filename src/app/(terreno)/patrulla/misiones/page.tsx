@@ -9,7 +9,6 @@ import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
 import { guardarMisionesLocales } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
-import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { ordenarMisionesPorPrioridadYFecha } from '@/lib/utils/formatters';
 import {
   MisionFiltrosChips,
@@ -21,7 +20,7 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaMisionesPage.module.css';
 
 function PatrullaMisionesContenido() {
-  const { usuario, unidadActiva, tieneUnidadAsignada } = useAuth();
+  const { usuario, unidadActiva } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -167,21 +166,16 @@ function PatrullaMisionesContenido() {
 
   return (
     <div className={styles.container}>
-      {!tieneUnidadAsignada ? (
-        <SinUnidadBanner
-          tipoUnidad="patrulla"
-          nombreOperador={usuario?.nombre}
-        />
-      ) : !unidadActiva ? (
+      {!unidadActiva && (
         <UnidadInactivaBanner
           tipoUnidad="patrulla"
           nombreUnidad={usuario?.unidadNombre}
         />
-      ) : null}
+      )}
 
       <div className={styles.titleArea}>
         <Heading variant="h1">
-          {tieneUnidadAsignada && !unidadActiva ? 'Historial' : 'Misiones'}
+          {!unidadActiva ? 'Historial' : 'Misiones'}
         </Heading>
       </div>
 
@@ -204,9 +198,7 @@ function PatrullaMisionesContenido() {
               Sin registros disponibles
             </p>
             <p style={{ fontSize: '0.875rem', margin: 0 }}>
-              {!tieneUnidadAsignada
-                ? 'El funcionario no posee una patrulla asignada. Solicite su asignación en el Centro de Mando.'
-                : !unidadActiva
+              {!unidadActiva
                 ? 'No se encontraron misiones históricas para esta patrulla.'
                 : 'La patrulla se encuentra disponible para despacho.'}
             </p>
