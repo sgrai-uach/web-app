@@ -35,6 +35,17 @@ vi.mock('@/services/misionesService', () => ({
       fechaDespacho: '2026-10-30T04:00:00Z',
       actualizadoEn: '2026-10-30T04:00:00Z',
     },
+    {
+      id: 'mis-next-02',
+      incidenteId: 'inc-02',
+      codigoIncidente: 'INC-2026-00316',
+      tipologia: 'Árbol sobre tendido eléctrico',
+      direccion: 'Av. Alemania 850',
+      prioridad: 'ALTA',
+      estado: 'EN_CURSO',
+      fechaDespacho: '2026-10-30T03:30:00Z',
+      actualizadoEn: '2026-10-30T03:45:00Z',
+    },
   ]),
   obtenerDetalleMision: vi.fn().mockResolvedValue(null),
 }));
@@ -132,12 +143,18 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
       '/patrulla/misiones?estado=en_curso'
     );
 
-    // Misiones en atención (tarjetas compactas)
+    // Misiones pendientes (sección destacada con borde mint y chip "Por confirmar")
     await waitFor(() => {
-      expect(screen.getByText(/misiones en atención/i)).toBeInTheDocument();
+      expect(screen.getByText(/misiones pendientes/i)).toBeInTheDocument();
       expect(screen.getByText('INC-2026-00315')).toBeInTheDocument();
       expect(screen.getByText('Anegamiento de calzada')).toBeInTheDocument();
+      expect(screen.getByText('Por confirmar')).toBeInTheDocument();
     });
+
+    // Misiones en atención (tarjetas compactas en curso con borde teal)
+    expect(screen.getByText(/misiones en atención/i)).toBeInTheDocument();
+    expect(screen.getByText('INC-2026-00316')).toBeInTheDocument();
+    expect(screen.getByText('Árbol sobre tendido eléctrico')).toBeInTheDocument();
 
     // Barra de navegación inferior con Inicio, Misiones y Perfil
     const navInferior = screen.getByRole('navigation', {

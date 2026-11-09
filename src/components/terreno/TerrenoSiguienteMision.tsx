@@ -29,25 +29,13 @@ export function TerrenoSiguienteMision() {
         });
         if (cancelado) return;
 
-        // 1. Misiones actualmente activas (en curso, en terreno o en ruta)
+        // Misiones actualmente activas (en curso, en terreno o en ruta)
         const enCurso = misiones.filter((m) => {
           const e = m.estado?.toUpperCase();
           return e === 'EN_CURSO' || e === 'EN_TERRENO' || e === 'EN_RUTA';
         });
 
-        if (enCurso.length > 0) {
-          setMisionesActivas(ordenarMisionesPorPrioridadYFecha(enCurso));
-          return;
-        }
-
-        // 2. Si no hay en curso, tomar la misión prioritaria despachada o asignada
-        const pendientes = misiones.filter((m) => {
-          const e = m.estado?.toUpperCase();
-          return e === 'ASIGNADA' || e === 'DESPACHADA' || e === 'PENDIENTE';
-        });
-
-        const ordenadas = ordenarMisionesPorPrioridadYFecha(pendientes);
-        setMisionesActivas(ordenadas.slice(0, 1));
+        setMisionesActivas(ordenarMisionesPorPrioridadYFecha(enCurso));
       } catch {
         // En caso de error, mantener neutro
       } finally {
@@ -97,7 +85,7 @@ export function TerrenoSiguienteMision() {
           <span>
             {!unidadActiva
               ? 'Unidad inactiva en modo de solo lectura.'
-              : 'Sin misiones activas ni pendientes. La unidad se encuentra disponible.'}
+              : 'Sin misiones en curso actualmente.'}
           </span>
         </div>
       </div>
