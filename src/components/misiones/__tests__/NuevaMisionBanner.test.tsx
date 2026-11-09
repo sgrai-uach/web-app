@@ -57,3 +57,4 @@ describe('NuevaMisionBanner (H35 — Alerta Visual de Asignación)', () => {
     expect(alCerrar).toHaveBeenCalledTimes(1);
   });
 });
+

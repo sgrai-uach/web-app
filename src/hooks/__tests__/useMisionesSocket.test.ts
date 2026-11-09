@@ -158,3 +158,4 @@ describe('useMisionesSocket (H35 — Tiempo Real y Refresco Automático de Misio
     expect(mockSocket.emit).toHaveBeenCalledWith('leave', 'patrulla:pat-100');
   });
 });
+

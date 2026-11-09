@@ -43,3 +43,4 @@ describe('Socket Client Singleton (Terreno PWA)', () => {
     expect(socketIoClient.io).toHaveBeenCalledTimes(2);
   });
 });
+

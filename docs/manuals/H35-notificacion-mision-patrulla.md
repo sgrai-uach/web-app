@@ -43,3 +43,4 @@ Debido a la geografía de la comuna de Valdivia y la posibilidad de sombras de c
    - Al desbloquear el dispositivo o volver a enfocar la aplicación en primer plano (`visibilitychange`), la PWA verifica si han transcurrido más de 15 segundos y realiza una sincronización en segundo plano con la base de datos local (IndexedDB) y la API central.
 3. **Polling de Respaldo Silencioso:**
    - Como mecanismo de contingencia ante bloqueos de puertos WebSocket en redes celulares restrictivas, la aplicación ejecuta una comprobación periódica en segundo plano cada 30 segundos mientras la pantalla permanezca activa.
+
