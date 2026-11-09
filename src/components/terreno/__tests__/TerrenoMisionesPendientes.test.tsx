@@ -57,7 +57,7 @@ describe('TerrenoMisionesPendientes — Sección Destacada de Despachos Pendient
     });
   });
 
-  it('renderiza despachos pendientes con código, prioridad, tipología y chip "Por confirmar"', async () => {
+  it('renderiza despachos pendientes con código, prioridad, tipología y badge en cabecera sin chips redundantes', async () => {
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
       usuario: {
         id: 'usr-1',
@@ -120,11 +120,14 @@ describe('TerrenoMisionesPendientes — Sección Destacada de Despachos Pendient
       // Debe incluir la misión despachada (pendiente)
       expect(screen.getByText('INC-2026-00450')).toBeInTheDocument();
       expect(screen.getByText('Anegamiento de paso bajo nivel')).toBeInTheDocument();
-      expect(screen.getByText('Por confirmar')).toBeInTheDocument();
-      expect(screen.getByText(/1 por confirmar/i)).toBeInTheDocument();
+      expect(screen.getByText('1 por confirmar')).toBeInTheDocument();
+
+      // No debe incluir chips redundantes como Despachada o Por confirmar en la tarjeta
+      expect(screen.queryByText(/^despachada$/i)).not.toBeInTheDocument();
 
       // No debe incluir la misión que ya está en curso
       expect(screen.queryByText('INC-2026-00400')).not.toBeInTheDocument();
     });
   });
 });
+

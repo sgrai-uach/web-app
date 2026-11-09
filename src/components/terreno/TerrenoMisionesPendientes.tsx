@@ -2,10 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, CheckCircle, Clock, Inbox } from 'lucide-react';
+import { ChevronRight, CheckCircle, Clock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
-import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import {
   formatearPrioridad,
   formatearFechaHora24h,
@@ -63,10 +62,7 @@ export function TerrenoMisionesPendientes() {
     return (
       <div className={styles.sectionWrapper}>
         <div className={styles.sectionHeader}>
-          <div className={styles.titleArea}>
-            <Inbox className={styles.sectionIcon} size={16} aria-hidden="true" />
-            <span className={styles.sectionTitle}>Misiones pendientes</span>
-          </div>
+          <span className={styles.sectionTitle}>Misiones pendientes</span>
         </div>
         <div className={styles.emptyCard}>
           <span>Buscando despachos pendientes...</span>
@@ -81,10 +77,7 @@ export function TerrenoMisionesPendientes() {
     return (
       <div className={styles.sectionWrapper}>
         <div className={styles.sectionHeader}>
-          <div className={styles.titleArea}>
-            <Inbox className={styles.sectionIcon} size={16} aria-hidden="true" />
-            <span className={styles.sectionTitle}>Misiones pendientes</span>
-          </div>
+          <span className={styles.sectionTitle}>Misiones pendientes</span>
         </div>
         <div className={styles.emptyCard}>
           <CheckCircle size={18} color="var(--color-success, #2E7D32)" aria-hidden="true" />
@@ -101,12 +94,11 @@ export function TerrenoMisionesPendientes() {
   return (
     <div className={styles.sectionWrapper}>
       <div className={styles.sectionHeader}>
-        <div className={styles.titleArea}>
-          <Inbox className={styles.sectionIcon} size={16} aria-hidden="true" />
-          <span className={styles.sectionTitle}>Misiones pendientes</span>
-        </div>
+        <span className={styles.sectionTitle}>Misiones pendientes</span>
         <span className={styles.badgeCount}>
-          {misionesPendientes.length} por confirmar
+          {misionesPendientes.length === 1
+            ? '1 por confirmar'
+            : `${misionesPendientes.length} por confirmar`}
         </span>
       </div>
 
@@ -133,8 +125,6 @@ export function TerrenoMisionesPendientes() {
                   <span className={`${styles.priorityChip} ${prioridadClase}`}>
                     {formatearPrioridad(mision.prioridad)}
                   </span>
-                  <EstadoBadge estado={mision.estado} />
-                  <span className={styles.actionPromptChip}>Por confirmar</span>
                 </div>
                 <div className={styles.typology}>{mision.tipologia}</div>
                 <div className={styles.timestampRow}>
@@ -157,3 +147,4 @@ export function TerrenoMisionesPendientes() {
 }
 
 export default TerrenoMisionesPendientes;
+

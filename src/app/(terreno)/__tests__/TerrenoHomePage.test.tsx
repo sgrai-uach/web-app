@@ -143,12 +143,12 @@ describe('TerrenoHomePage & TerrenoBottomNav — Hub Operativo de Terreno', () =
       '/patrulla/misiones?estado=en_curso'
     );
 
-    // Misiones pendientes (sección destacada con borde mint y chip "Por confirmar")
+    // Misiones pendientes (sección destacada con borde mint y badge contorneado "1 por confirmar")
     await waitFor(() => {
       expect(screen.getByText(/misiones pendientes/i)).toBeInTheDocument();
       expect(screen.getByText('INC-2026-00315')).toBeInTheDocument();
       expect(screen.getByText('Anegamiento de calzada')).toBeInTheDocument();
-      expect(screen.getByText('Por confirmar')).toBeInTheDocument();
+      expect(screen.getByText('1 por confirmar')).toBeInTheDocument();
     });
 
     // Misiones en atención (tarjetas compactas en curso con borde teal)
