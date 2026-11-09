@@ -8,7 +8,7 @@
 
 ## 1. Propósito
 
-Describir el comportamiento y la experiencia de usuario en la aplicación móvil de terreno (PWA) cuando una patrulla verificadora ha sido retirada del servicio activo mediante baja lógica por la Administración Central, permitiendo a los operadores acceder a la aplicación en **modo histórico de solo lectura** para consultar auditorías de evaluaciones previas, impidiendo la recepción de nuevos despachos o el ajuste de prioridades.
+Describir el comportamiento y la experiencia de usuario en la aplicación móvil de terreno (PWA) cuando una patrulla verificadora ha sido retirada del servicio activo por la Administración Central, permitiendo a los operadores acceder a la aplicación en **modo histórico de solo lectura** para consultar auditorías de evaluaciones previas, impidiendo la recepción de nuevos despachos o el ajuste de prioridades.
 
 ---
 
@@ -25,7 +25,7 @@ Describir el comportamiento y la experiencia de usuario en la aplicación móvil
    - El funcionario de la patrulla desactivada puede iniciar sesión en `/terreno/login` utilizando sus credenciales institucionales.
 2. **Banner Persistente de Advertencia:**
    - En la parte superior de la pantalla se despliega el banner de advertencia:
-     > **"Patrulla Desactivada — [Nombre Unidad]:** Esta unidad ha sido retirada del servicio activo (§3.7 de baja lógica). Se encuentra en modo histórico de solo lectura para consulta de faenas anteriores. No es posible recibir nuevos despachos ni ejecutar acciones operativas."
+     > **"Patrulla Desactivada — [Nombre Unidad]:** Esta unidad ha sido retirada del servicio activo. Se encuentra en modo histórico de solo lectura para consulta de faenas anteriores. No es posible recibir nuevos despachos ni ejecutar acciones operativas."
 3. **Restricciones Operativas:**
    - No se reciben alertas de emergencias despachadas (`mision:asignada`).
    - No es posible modificar tipologías ni reclasificar prioridades.

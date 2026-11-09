@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RechazoMisionModal } from '../RechazoMisionModal';
 
-describe('Componente RechazoMisionModal (H69 — Regla Crítica §3.3)', () => {
+describe('Componente RechazoMisionModal (H69 — Rechazo Motivado de Misión)', () => {
   const alConfirmarMock = vi.fn();
   const alCancelarMock = vi.fn();
 

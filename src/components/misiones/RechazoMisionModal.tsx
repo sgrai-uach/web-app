@@ -129,7 +129,7 @@ export function RechazoMisionModal({
 
         {/* Descripción normativa */}
         <p id="rechazo-modal-desc" className={styles.description}>
-          Conforme a la <strong>Regla Operativa §3.3</strong>, el rechazo de una misión
+          Por normativa de despacho de emergencia, el rechazo de una misión
           exige una justificación técnica obligatoria (desperfecto de vehículo, corte de
           ruta, emergencia crítica) para liberar la patrulla y permitir la reasignación
           inmediata en el Centro de Mando.

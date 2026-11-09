@@ -160,7 +160,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           </div>
           {mision.datosAdicionales?.justificacionRechazo && (
             <p className={styles.rejectedReason}>
-              <strong>Motivo documentado (§3.3):</strong>{' '}
+              <strong>Motivo documentado:</strong>{' '}
               {String(mision.datosAdicionales.justificacionRechazo)}
             </p>
           )}
@@ -230,7 +230,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           <h3 className={styles.tacticalActionTitle}>Acciones Operativas de Despacho</h3>
           <p className={styles.tacticalActionDesc}>
             Verifique los antecedentes del incidente antes de concurrir. Si la patrulla presenta
-            desperfectos o atiende una emergencia prioritaria, debe fundamentar el rechazo (§3.3).
+            desperfectos o atiende una emergencia prioritaria, debe fundamentar el rechazo con un motivo justificado.
           </p>
           <div className={styles.tacticalActionButtons}>
             <Button

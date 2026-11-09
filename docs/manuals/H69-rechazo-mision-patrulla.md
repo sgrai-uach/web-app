@@ -3,7 +3,7 @@
 **Historia de Usuario:** H69 — Rechazo motivado de asignación de misión de verificación  
 **Rol Operativo:** Patrulla Verificadora  
 **Aplicación:** SGRAI — Cliente Móvil de Terreno (PWA) — Municipalidad de Valdivia  
-**Regla de Negocio Crítica Asociada:** §3.3 — *Toda cuadrilla o patrulla que rechace una misión táctica debe ingresar una justificación obligatoria (mínimo 5 caracteres).*
+**Normativa Operativa Asociada:** *Toda cuadrilla o patrulla que rechace una misión táctica debe ingresar una justificación obligatoria (mínimo 5 caracteres).*
 
 ---
 
@@ -41,7 +41,7 @@ Para operar el módulo de rechazo en la PWA se requieren las siguientes condicio
    - Desplácese hasta la sección inferior **"Acciones Operativas de Despacho"**.
    - Presione el botón rojo de altura táctil adaptada: **"Rechazar Misión"** (diseñado con esquinas rectas y altura mínima de 48px para manipulación con una mano o guantes).
 5. Se desplegará el modal obligatorio **"Rechazar Misión de Verificación"**:
-   - Lea la advertencia normativa sobre la Regla Operativa §3.3.
+   - Lea la advertencia sobre la obligatoriedad de fundamentar técnicamente el rechazo.
    - En el campo **"Motivo del Rechazo"**, redacte la causa fundada (ejemplo: *Desperfecto mecánico en radiador de camioneta institucional*).
    - Observe el contador de caracteres en tiempo real:
      - Si ingresa menos de 5 caracteres útiles (después de remover espacios en blanco), el contador se mostrará en color de alerta y el botón de confirmación permanecerá **deshabilitado**.
