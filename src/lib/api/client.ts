@@ -2,9 +2,19 @@ import createClient from 'openapi-fetch';
 import type { paths } from '@/types/api-generated';
 import { getAuthCookie, removeAuthCookie } from '@/lib/utils/cookieUtils';
 
+export const DEV_CUADRILLA_TOKEN = 'dev-cuadrilla-token';
+export const DEV_CUADRILLA_USER_ID = '00000000-0000-4000-8000-000000000005';
+export const DEV_PATRULLA_TOKEN = 'dev-patrulla-token';
+export const DEV_PATRULLA_USER_ID = '00000000-0000-4000-8000-000000000004';
+
 export function handleUnauthorizedSession() {
   if (typeof window === 'undefined') return;
-  const hadToken = Boolean(getAuthCookie());
+  const currentToken = getAuthCookie();
+  if (currentToken === DEV_CUADRILLA_TOKEN || currentToken === DEV_PATRULLA_TOKEN) {
+    return;
+  }
+
+  const hadToken = Boolean(currentToken);
   removeAuthCookie();
 
   const pathname = window.location.pathname;
@@ -38,6 +48,17 @@ const apiClient = createClient<paths>({
 apiClient.use({
   async onRequest({ request }) {
     const token = getAuthCookie();
+    if (token === DEV_CUADRILLA_TOKEN) {
+      request.headers.set('x-user-id', DEV_CUADRILLA_USER_ID);
+      request.headers.delete('Authorization');
+      return request;
+    }
+    if (token === DEV_PATRULLA_TOKEN) {
+      request.headers.set('x-user-id', DEV_PATRULLA_USER_ID);
+      request.headers.delete('Authorization');
+      return request;
+    }
+
     if (token) {
       request.headers.set('Authorization', `Bearer ${token}`);
     }
