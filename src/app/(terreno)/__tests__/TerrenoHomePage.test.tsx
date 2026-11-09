@@ -79,7 +79,9 @@ function buildAuthMock(overrides?: Partial<AuthContextValue>): AuthContextValue 
     autenticado: true,
     esPatrulla,
     esCuadrilla,
-    unidadActiva: true,
+    unidadActiva: overrides?.unidadActiva ?? true,
+    tieneUnidadAsignada: overrides?.tieneUnidadAsignada ?? true,
+    estadoAsignacion: overrides?.estadoAsignacion ?? (overrides?.unidadActiva === false ? 'DESACTIVADA' : 'ACTIVA'),
     tienePermiso: (permiso: string) => {
       if (esPatrulla && permiso.startsWith('patrulla:')) return true;
       if (esCuadrilla && permiso.startsWith('cuadrilla:')) return true;

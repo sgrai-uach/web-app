@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { sincronizarMisiones, obtenerDetalleMision, rechazarMision } from '../misionesService';
+import {
+  sincronizarMisiones,
+  obtenerDetalleMision,
+  rechazarMision,
+  aceptarMisionPatrulla,
+  validarPayloadAceptarMision,
+  obtenerCoordenadasOpcionales,
+  MisionServiceError,
+} from '../misionesService';
 import apiClient from '@/lib/api/client';
 import * as offlineQueue from '@/services/offlineQueue';
 
@@ -21,6 +29,10 @@ vi.mock('@/services/offlineQueue', () => ({
 describe('misionesService — Sincronización remota y persistencia IndexedDB (Offline-First)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(navigator, 'onLine', {
+      value: true,
+      configurable: true,
+    });
   });
 
   describe('sincronizarMisiones', () => {
@@ -129,7 +141,7 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
             direccion: 'Costanera Arturo Prat 420, Valdivia',
             latitud: -39.8123,
             longitud: -73.2467,
-            estado: 'EN_PROCESO',
+            estado: 'VERIFICANDO',
             prioridad: 'CRITICA',
             requiereAsistenciaSocial: false,
             delegacionNombre: 'Norte',
@@ -326,6 +338,160 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
       );
 
       Object.defineProperty(navigator, 'onLine', { value: originalOnLine, configurable: true });
+    });
+  });
+
+  describe('aceptarMisionPatrulla — Confirmación de salida de Patrulla Verificadora (HU-36)', () => {
+    const misionDespachada = {
+      id: '60000000-0000-4000-8000-000000000001',
+      incidenteId: 'a0000000-0000-4000-8000-000000000001',
+      codigoIncidente: 'INC-2026-0001',
+      tipologia: 'Caída de árbol',
+      direccion: 'Av. Ramón Picarte 1200, Valdivia',
+      prioridad: 'ALTA',
+      estado: 'DESPACHADA',
+      fechaDespacho: '2026-11-01T20:45:00.000Z',
+      actualizadoEn: '2026-11-01T20:45:00.000Z',
+    };
+
+    it('invoca POST /api/misiones/{id}/aceptar y actualiza la misión local a EN_CURSO cuando responde 200 OK', async () => {
+      const mockRespuesta200 = {
+        message:
+          'Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación.',
+        data: {
+          mision: {
+            id: '60000000-0000-4000-8000-000000000001',
+            codigo: 'MIS-2026-0001',
+            titulo: 'Verificación de Incidente INC-2026-0001',
+            descripcion: 'Evaluar caída de árbol',
+            tipoMision: 'VERIFICACION',
+            estado: 'EN_CURSO',
+            prioridad: 'ALTA',
+            incidenteId: 'a0000000-0000-4000-8000-000000000001',
+            patrullaId: 'f1000000-0000-4000-8000-000000000001',
+            fechaInicio: '2026-11-01T21:00:00.000Z',
+            actualizadoEn: '2026-11-01T21:00:00.000Z',
+          },
+          patrulla: {
+            id: 'f1000000-0000-4000-8000-000000000001',
+            nombre: 'Patrulla Rápida Costa-1',
+            estado: 'EN_VERIFICACION',
+          },
+          incidente: {
+            id: 'a0000000-0000-4000-8000-000000000001',
+            codigo: 'INC-2026-0001',
+            estado: 'VERIFICANDO',
+          },
+          hito: {
+            id: '70000000-0000-4000-8000-000000000001',
+            misionId: '60000000-0000-4000-8000-000000000001',
+            hito: 'MISION_ACEPTADA',
+            descripcion: 'Misión Aceptada por Patrulla',
+            registradoPorId: '00000000-0000-4000-8000-000000000004',
+            latitud: -39.819588,
+            longitud: -73.245209,
+            creadoEn: '2026-11-01T21:00:00.000Z',
+          },
+        },
+      };
+
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: mockRespuesta200,
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
+
+      const resultado = await aceptarMisionPatrulla(misionDespachada.id, {
+        misionActual: misionDespachada,
+        coordenadas: { latitud: -39.819588, longitud: -73.245209 },
+      });
+
+      expect(apiClient.POST).toHaveBeenCalledWith('/api/misiones/{id}/aceptar', {
+        params: { path: { id: misionDespachada.id } },
+        body: { latitud: -39.819588, longitud: -73.245209 },
+      });
+      expect(resultado.enColaOffline).toBe(false);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.fechaInicio).toBe('2026-11-01T21:00:00.000Z');
+      expect(resultado.mision.sincronizacionPendiente).toBe(false);
+      expect(resultado.mision.datosAdicionales?.estadoPatrulla).toBe('EN_VERIFICACION');
+      expect(resultado.mision.datosAdicionales?.estadoIncidente).toBe('VERIFICANDO');
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(resultado.mision);
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('maneja 409 Conflict de forma idempotente dejando la misión en EN_CURSO sin encolar error', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: undefined,
+        error: { message: 'La misión ya se encuentra EN_CURSO' },
+        response: new Response(null, { status: 409 }),
+      } as never);
+
+      const resultado = await aceptarMisionPatrulla(misionDespachada.id, {
+        misionActual: misionDespachada,
+        coordenadas: {},
+      });
+
+      expect(resultado.enColaOffline).toBe(false);
+      expect(resultado.yaAceptadaPreviamente).toBe(true);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.sincronizacionPendiente).toBe(false);
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalled();
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('encola ACEPTAR_MISION en IndexedDB outbox y aplica actualización optimista cuando no hay conexión', async () => {
+      vi.mocked(apiClient.POST).mockRejectedValue(new TypeError('Failed to fetch'));
+
+      const resultado = await aceptarMisionPatrulla(misionDespachada.id, {
+        misionActual: misionDespachada,
+        coordenadas: { latitud: -39.814, longitud: -73.245 },
+      });
+
+      expect(resultado.enColaOffline).toBe(true);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.sincronizacionPendiente).toBe(true);
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: misionDespachada.id,
+          estado: 'EN_CURSO',
+          sincronizacionPendiente: true,
+        })
+      );
+      expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith({
+        tipo: 'ACEPTAR_MISION',
+        url: `/api/misiones/${misionDespachada.id}/aceptar`,
+        metodo: 'POST',
+        payload: { latitud: -39.814, longitud: -73.245 },
+      });
+    });
+
+    it('lanza MisionServiceError en 403 Forbidden sin encolar en outbox', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: undefined,
+        error: { message: 'No cuenta con el permiso misiones:terreno:verificar' },
+        response: new Response(null, { status: 403 }),
+      } as never);
+
+      await expect(
+        aceptarMisionPatrulla(misionDespachada.id, {
+          misionActual: misionDespachada,
+          coordenadas: {},
+        })
+      ).rejects.toThrow(MisionServiceError);
+
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('valida el payload contra rangos geográficos y envía {} si el GPS no responde a tiempo', async () => {
+      expect(validarPayloadAceptarMision({ latitud: -39.81, longitud: -73.24 })).toEqual({
+        latitud: -39.81,
+        longitud: -73.24,
+      });
+      expect(validarPayloadAceptarMision({ latitud: 999, longitud: -73.24 })).toEqual({});
+
+      const coordsSinGps = await obtenerCoordenadasOpcionales(10);
+      expect(coordsSinGps).toEqual({});
     });
   });
 });

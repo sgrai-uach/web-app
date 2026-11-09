@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
 import { guardarMisionesLocales } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
+import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { ordenarMisionesPorPrioridadYFecha } from '@/lib/utils/formatters';
 import {
   MisionFiltrosChips,
@@ -22,7 +23,7 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaMisionesPage.module.css';
 
 function PatrullaMisionesContenido() {
-  const { usuario, unidadActiva } = useAuth();
+  const { usuario, unidadActiva, tieneUnidadAsignada } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -73,6 +74,27 @@ function PatrullaMisionesContenido() {
         ];
         await guardarMisionesLocales(historicas);
         locales = historicas;
+      } else if (unidadActiva && locales.length === 0) {
+        const inicialesActivas: MisionLocal[] = [
+          {
+            id: '60000000-0000-4000-8000-000000000001',
+            incidenteId: 'a0000000-0000-4000-8000-000000000001',
+            codigoIncidente: 'INC-2026-0001',
+            tipologia: 'Caída de árbol',
+            direccion: 'Av. Ramón Picarte 1200, Valdivia',
+            coordenadas: { lat: -39.819588, lng: -73.245209 },
+            prioridad: 'ALTA',
+            estado: 'DESPACHADA',
+            fechaDespacho: '2026-11-01T20:30:00Z',
+            datosAdicionales: {
+              trabajo: 'Evaluar caída de árbol sobre calzada y riesgo de tendido eléctrico.',
+              titulo: 'Verificación de Incidente INC-2026-0001',
+            },
+            actualizadoEn: '2026-11-01T20:30:00Z',
+          },
+        ];
+        await guardarMisionesLocales(inicialesActivas);
+        locales = inicialesActivas;
       }
 
       setMisiones(locales);
@@ -166,16 +188,21 @@ function PatrullaMisionesContenido() {
         />
       )}
 
-      {!unidadActiva && (
+      {!tieneUnidadAsignada ? (
+        <SinUnidadBanner
+          tipoUnidad="patrulla"
+          nombreOperador={usuario?.nombre}
+        />
+      ) : !unidadActiva ? (
         <UnidadInactivaBanner
           tipoUnidad="patrulla"
           nombreUnidad={usuario?.unidadNombre}
         />
-      )}
+      ) : null}
 
       <div className={styles.titleArea}>
         <Heading variant="h1">
-          {!unidadActiva ? 'Historial' : 'Misiones'}
+          {tieneUnidadAsignada && !unidadActiva ? 'Historial' : 'Misiones'}
         </Heading>
       </div>
 
@@ -198,7 +225,9 @@ function PatrullaMisionesContenido() {
               Sin registros disponibles
             </p>
             <p style={{ fontSize: '0.875rem', margin: 0 }}>
-              {!unidadActiva
+              {!tieneUnidadAsignada
+                ? 'El funcionario no posee una patrulla asignada. Solicite su asignación en el Centro de Mando.'
+                : !unidadActiva
                 ? 'No se encontraron misiones históricas para esta patrulla.'
                 : 'La patrulla se encuentra disponible para despacho.'}
             </p>
