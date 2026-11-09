@@ -2,14 +2,29 @@
 
 import React, { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Calendar, Archive, Map } from 'lucide-react';
+import {
+  ArrowLeft,
+  MapPin,
+  Calendar,
+  Archive,
+  Map,
+  CheckCircle,
+  Navigation,
+  ClipboardCheck,
+  WifiOff,
+} from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
-import { obtenerDetalleMision } from '@/services/misionesService';
+import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
+import {
+  obtenerDetalleMision,
+  aceptarMisionPatrulla,
+} from '@/services/misionesService';
 import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaDetailPage.module.css';
@@ -20,10 +35,13 @@ interface PageProps {
 
 export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const { id: misionId } = use(params);
-  const { usuario, unidadActiva, tieneUnidadAsignada } = useAuth();
-
+  const { usuario, unidadActiva, tieneUnidadAsignada, tienePermiso } = useAuth();
+  const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
+  const [aceptando, setAceptando] = useState<boolean>(false);
+  const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
+  const [errorAceptacion, setErrorAceptacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
 
   const cargarDetalle = useCallback(async () => {
@@ -41,7 +59,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           direccion: 'Av. Alemania 600, Valdivia',
           coordenadas: { lat: -39.81, lng: -73.24 },
           prioridad: 'ALTA',
-          estado: 'FINALIZADA',
+          estado: unidadActiva ? 'DESPACHADA' : 'FINALIZADA',
           fechaDespacho: '2026-10-18T11:00:00Z',
           actualizadoEn: '2026-10-18T11:45:00Z',
         });
@@ -49,14 +67,53 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     } finally {
       setCargando(false);
     }
-  }, [misionId]);
+  }, [misionId, unidadActiva]);
 
   useEffect(() => {
-    cargarDetalle();
+    void cargarDetalle();
   }, [cargarDetalle]);
 
+  // Refrescar detalle local cuando la cola offline termine de sincronizarse al recuperar red
+  useEffect(() => {
+    const handleOutboxSynced = () => {
+      void cargarDetalle();
+    };
+    window.addEventListener('sgrai:outbox-synced', handleOutboxSynced);
+    return () => {
+      window.removeEventListener('sgrai:outbox-synced', handleOutboxSynced);
+    };
+  }, [cargarDetalle]);
+
+  const handleAceptarMision = async () => {
+    if (!mision || aceptando) return;
+    setAceptando(true);
+    setErrorAceptacion(null);
+    setMensajeConfirmacion(null);
+
+    try {
+      const resultado = await aceptarMisionPatrulla(mision.id, {
+        misionActual: mision,
+      });
+      setMision(resultado.mision);
+      setMensajeConfirmacion(resultado.mensaje);
+      await actualizarPendientes();
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'No se pudo confirmar la aceptación de la misión.';
+      setErrorAceptacion(msg);
+    } finally {
+      setAceptando(false);
+    }
+  };
+
   if (cargando || !mision) {
-    return <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>Cargando misión...</div>;
+    return (
+      <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
+        Cargando misión...
+      </div>
+    );
   }
 
   const normPrioridad = mision.prioridad?.toUpperCase() || '';
@@ -67,19 +124,42 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     prioridadClase = styles.priorityAlta;
   }
 
-  const trabajoTexto = (mision.datosAdicionales?.trabajo as string) || mision.direccion;
+  const estadoNormalizado = mision.estado?.toUpperCase() || '';
+  const esDespachada = estadoNormalizado === 'DESPACHADA';
+  const esEnCurso =
+    estadoNormalizado === 'EN_CURSO' ||
+    estadoNormalizado === 'EN_RUTA' ||
+    estadoNormalizado === 'EN_TERRENO';
+
+  const tienePermisoVerificar =
+    typeof tienePermiso === 'function'
+      ? tienePermiso('misiones:terreno:verificar')
+      : false;
+
+  const mostrarBotonAceptar =
+    unidadActiva && esDespachada && tienePermisoVerificar;
+
+  const trabajoTexto =
+    (mision.datosAdicionales?.trabajo as string) || mision.direccion;
   const esSoloLectura =
     !unidadActiva ||
-    mision.estado === 'FINALIZADA' ||
-    mision.estado === 'COMPLETADA' ||
-    mision.estado === 'CERRADA';
+    estadoNormalizado === 'FINALIZADA' ||
+    estadoNormalizado === 'COMPLETADA' ||
+    estadoNormalizado === 'CERRADA';
 
   return (
     <div className={styles.container}>
-      <Link href="/patrulla/misiones" className={styles.backLink}>
-        <ArrowLeft size={16} aria-hidden="true" />
-        <span>Historial</span>
-      </Link>
+      <div className={styles.topBar}>
+        <Link href="/patrulla/misiones" className={styles.backLink}>
+          <ArrowLeft size={16} aria-hidden="true" />
+          <span>{unidadActiva ? 'Misiones' : 'Historial'}</span>
+        </Link>
+        <ConnectionStatusBadge
+          status={status}
+          pendingCount={pendientes}
+          onRetry={sincronizar}
+        />
+      </div>
 
       {!tieneUnidadAsignada ? (
         <SinUnidadBanner
@@ -118,7 +198,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             <span className={styles.itemLabel}>Ubicación</span>
             <div className={styles.locationActionRow}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <MapPin size={16} color="var(--color-primary-teal)" aria-hidden="true" />
+                <MapPin
+                  size={16}
+                  color="var(--color-primary-teal)"
+                  aria-hidden="true"
+                />
                 <span className={styles.itemValue}>{mision.direccion}</span>
               </div>
               <Button
@@ -138,22 +222,147 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             <span className={styles.itemValue}>{trabajoTexto}</span>
           </div>
 
-          {/* Fecha Despachada */}
+          {/* Fecha Despachada / Inicio */}
           <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>Despachada</span>
+            <span className={styles.itemLabel}>
+              {esEnCurso && mision.fechaInicio ? 'Inicio de trayecto' : 'Despachada'}
+            </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Calendar size={15} color="var(--color-text-muted)" aria-hidden="true" />
+              <Calendar
+                size={15}
+                color="var(--color-text-muted)"
+                aria-hidden="true"
+              />
               <span className={styles.itemValue}>
-                {formatearFechaHora24h(mision.fechaDespacho)}
+                {formatearFechaHora24h(mision.fechaInicio || mision.fechaDespacho)}
               </span>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Acción principal: Confirmar y Aceptar Misión (HU-36) */}
+      {mostrarBotonAceptar && (
+        <section
+          className={styles.acceptCard}
+          aria-label="Confirmación de salida de patrulla"
+        >
+          <h2 className={styles.acceptTitle}>Confirmación de salida a terreno</h2>
+          <p className={styles.acceptDescription}>
+            Presione el botón para informar al Centro de Mando que la patrulla ha
+            tomado conocimiento de la emergencia y se dirige al lugar para iniciar
+            la evaluación.
+          </p>
+
+          {errorAceptacion && (
+            <div className={styles.errorAlert} role="alert">
+              {errorAceptacion}
+            </div>
+          )}
+
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={aceptando}
+            icon={<CheckCircle size={20} />}
+            onClick={handleAceptarMision}
+            className={styles.acceptButton}
+          >
+            Aceptar Misión
+          </Button>
+        </section>
+      )}
+
+      {/* Vista activa: En Trayecto / Evaluación (HU-36) */}
+      {unidadActiva && esEnCurso && (
+        <>
+          <section
+            className={styles.enTrayectoCard}
+            aria-label="Estado de traslado y evaluación"
+          >
+            <div className={styles.enTrayectoHeader}>
+              <div className={styles.enTrayectoTitleRow}>
+                <Navigation
+                  size={20}
+                  color="var(--color-primary-teal)"
+                  aria-hidden="true"
+                />
+                <h2 className={styles.enTrayectoTitle}>
+                  En Trayecto / Evaluación
+                </h2>
+              </div>
+              <span className={styles.activeStatusChip}>Misión activa</span>
+            </div>
+
+            {mision.sincronizacionPendiente ? (
+              <div className={styles.offlineQueueBanner} role="status">
+                <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+                <span>
+                  Pendiente de sincronizar: La aceptación fue guardada en la cola
+                  local del dispositivo y se enviará automáticamente al recuperar
+                  conexión.
+                </span>
+              </div>
+            ) : (
+              mensajeConfirmacion && (
+                <div className={styles.SyncedBanner} role="status">
+                  {mensajeConfirmacion}
+                </div>
+              )
+            )}
+
+            <div className={styles.canonicalStatesGrid}>
+              <div className={styles.canonicalStateItem}>
+                <span className={styles.canonicalStateLabel}>Misión</span>
+                <span className={styles.canonicalStateValue}>En curso</span>
+              </div>
+              <div className={styles.canonicalStateItem}>
+                <span className={styles.canonicalStateLabel}>Patrulla</span>
+                <span className={styles.canonicalStateValue}>En verificación</span>
+              </div>
+              <div className={styles.canonicalStateItem}>
+                <span className={styles.canonicalStateLabel}>Incidente</span>
+                <span className={styles.canonicalStateValue}>Verificando</span>
+              </div>
+            </div>
+          </section>
+
+          <section
+            className={styles.evaluationFormsSection}
+            data-testid="formularios-reporte-tecnico"
+            aria-label="Formularios de reporte técnico de terreno"
+          >
+            <div className={styles.evaluationHeader}>
+              <h3 className={styles.evaluationTitle}>
+                <ClipboardCheck
+                  size={18}
+                  color="var(--color-primary-teal)"
+                  aria-hidden="true"
+                />
+                <span>Formularios de Reporte Técnico</span>
+              </h3>
+              <span className={styles.activeStatusChip}>Habilitado</span>
+            </div>
+            <p className={styles.evaluationBody}>
+              La unidad se encuentra en trayecto / evaluación. Los formularios
+              operativos para categorizar el incidente, ajustar la prioridad y
+              enviar el reporte de situación están habilitados.
+            </p>
+          </section>
+        </>
+      )}
+
       {esSoloLectura && (
         <div className={styles.readOnlyNotice}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+            }}
+          >
             <Archive size={16} aria-hidden="true" />
             <span>Solo lectura</span>
           </div>

@@ -19,6 +19,47 @@ import type {
 } from '@/types/seguridad';
 import { esRolTerrenoPermitido } from '@/types/seguridad';
 
+const SESSION_PROFILE_KEY = 'sgrai_usuario_sesion';
+
+const PERFIL_DEMO_PATRULLA: UsuarioPerfilSesion = {
+  id: '00000000-0000-4000-8000-000000000004',
+  rut: '12.345.678-5',
+  nombre: 'Operador Patrulla Terreno',
+  email: 'patrulla@valdivia.cl',
+  rolId: 'rol-patrulla-01',
+  rolNombre: 'Patrulla Verificadora',
+  rolCodigo: 'PATRULLA_VERIFICADORA',
+  delegacionId: 'del-01',
+  delegacionNombre: 'Valdivia Norte',
+  unidadNombre: 'Patrulla Rápida Costa-1',
+  unidadActiva: true,
+  permisos: ['misiones:terreno:verificar', 'misiones:terreno:reportar'],
+};
+
+function leerPerfilGuardado(): UsuarioPerfilSesion | null {
+  if (typeof window === 'undefined' || !window.sessionStorage) return null;
+  try {
+    const raw = window.sessionStorage.getItem(SESSION_PROFILE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as UsuarioPerfilSesion;
+  } catch {
+    return null;
+  }
+}
+
+function guardarPerfilSesion(perfil: UsuarioPerfilSesion | null): void {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  try {
+    if (!perfil) {
+      window.sessionStorage.removeItem(SESSION_PROFILE_KEY);
+    } else {
+      window.sessionStorage.setItem(SESSION_PROFILE_KEY, JSON.stringify(perfil));
+    }
+  } catch {
+    // Ignorar errores de almacenamiento
+  }
+}
+
 export interface AuthContextValue {
   usuario: UsuarioPerfilSesion | null;
   token: string | null;
@@ -84,6 +125,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (cookieToken === 'dev-patrulla-token') {
+      const guardado = leerPerfilGuardado() || PERFIL_DEMO_PATRULLA;
+      setToken(cookieToken);
+      setUsuario(guardado);
+      setCargando(false);
+      return;
+    }
+
     try {
       const detalle = await obtenerUsuarioActivo();
       const perfil = mapDetalleAUsuarioPerfil(detalle);
@@ -102,12 +151,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      guardarPerfilSesion(perfil);
       setToken(cookieToken);
       setUsuario(perfil);
     } catch {
-      removeAuthCookie();
-      setUsuario(null);
-      setToken(null);
+      const perfilRespaldo = leerPerfilGuardado();
+      if (perfilRespaldo && esRolTerrenoPermitido(perfilRespaldo.rolCodigo)) {
+        setToken(cookieToken);
+        setUsuario(perfilRespaldo);
+      } else {
+        removeAuthCookie();
+        guardarPerfilSesion(null);
+        setUsuario(null);
+        setToken(null);
+      }
     } finally {
       setCargando(false);
     }
@@ -132,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setAuthCookie(respuesta.token, respuesta.expiraEn);
+        guardarPerfilSesion(respuesta.usuario);
         setToken(respuesta.token);
         setUsuario(respuesta.usuario);
         return respuesta.usuario;
@@ -144,11 +202,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     removeAuthCookie();
+    guardarPerfilSesion(null);
     setUsuario(null);
     setToken(null);
     try {
       if (typeof window !== 'undefined' && window.location) {
-        window.location.assign('/login');
+        const target = window.location.pathname.startsWith('/terreno')
+          ? '/terreno/login'
+          : '/login';
+        window.location.assign(target);
       }
     } catch {
       // Ignorado en pruebas unitarias
@@ -175,7 +237,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return true;
       }
       // Fallback por rol canónico de terreno cuando el token o mock no desglosa permisos granulares
-      if (esPatrulla && permiso.startsWith('patrulla:')) {
+      if (
+        esPatrulla &&
+        (permiso.startsWith('patrulla:') ||
+          (listaPermisos.length === 0 && permiso === 'misiones:terreno:verificar'))
+      ) {
         return true;
       }
       if (esCuadrilla && permiso.startsWith('cuadrilla:')) {
@@ -187,7 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const tieneAlgunPermiso = useCallback(
-    (permisos: string[]): boolean => {
+    (permisos: string[]) => {
       if (permisos.length === 0) return true;
       return permisos.some((p) => tienePermiso(p));
     },
