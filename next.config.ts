@@ -44,22 +44,6 @@ const nextConfig: NextConfig = {
   basePath: "/terreno",
   devIndicators: false,
   allowedDevOrigins: getLocalDevOrigins(),
-  async redirects() {
-    return [
-      {
-        source: "/",
-        destination: "/terreno",
-        basePath: false,
-        permanent: false,
-      },
-      {
-        source: "/login",
-        destination: "/terreno/login",
-        basePath: false,
-        permanent: false,
-      },
-    ];
-  },
   async rewrites() {
     return [
       {

@@ -16,11 +16,7 @@ export default function TerrenoHomePage() {
     if (cargando) return;
 
     if (!autenticado) {
-      const esRutaTerreno =
-        typeof window !== 'undefined' &&
-        window.location.pathname.startsWith('/terreno');
-      const baseLogin = esRutaTerreno ? '/terreno/login' : UNIFIED_LOGIN_PATH;
-      const destino = `${baseLogin}?returnUrl=${encodeURIComponent('/terreno')}`;
+      const destino = `${UNIFIED_LOGIN_PATH}?returnUrl=${encodeURIComponent('/terreno')}`;
       try {
         if (typeof window !== 'undefined' && window.location) {
           window.location.assign(destino);

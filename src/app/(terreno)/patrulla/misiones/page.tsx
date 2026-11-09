@@ -72,27 +72,6 @@ function PatrullaMisionesContenido() {
         ];
         await guardarMisionesLocales(historicas);
         locales = historicas;
-      } else if (unidadActiva && locales.length === 0) {
-        const inicialesActivas: MisionLocal[] = [
-          {
-            id: '60000000-0000-4000-8000-000000000001',
-            incidenteId: 'a0000000-0000-4000-8000-000000000001',
-            codigoIncidente: 'INC-2026-0001',
-            tipologia: 'Caída de árbol',
-            direccion: 'Av. Ramón Picarte 1200, Valdivia',
-            coordenadas: { lat: -39.819588, lng: -73.245209 },
-            prioridad: 'ALTA',
-            estado: 'DESPACHADA',
-            fechaDespacho: '2026-11-01T20:30:00Z',
-            datosAdicionales: {
-              trabajo: 'Evaluar caída de árbol sobre calzada y riesgo de tendido eléctrico.',
-              titulo: 'Verificación de Incidente INC-2026-0001',
-            },
-            actualizadoEn: '2026-11-01T20:30:00Z',
-          },
-        ];
-        await guardarMisionesLocales(inicialesActivas);
-        locales = inicialesActivas;
       }
 
       setMisiones(locales);

@@ -4,14 +4,6 @@
   gap: var(--space-4);
 }
 
-.topBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
 .backButtonArea {
   display: flex;
   align-self: flex-start;
@@ -24,7 +16,7 @@
   min-height: 48px;
   padding: 0 var(--space-4);
   background-color: var(--color-white);
-  border: 1px solid var(--border-color-neutral, #DFE3E8);
+  border: 1px solid var(--color-border);
   color: var(--color-primary-teal);
   text-decoration: none !important;
   font-weight: 700;
@@ -53,7 +45,7 @@
 
 .missionHeader {
   background-color: var(--color-white);
-  border: 1px solid var(--border-color-neutral, #DFE3E8);
+  border: 1px solid var(--color-border);
   border-left: 4px solid var(--color-primary-teal);
   padding: var(--space-4);
   display: flex;
@@ -111,7 +103,7 @@
 .priorityNeutro {
   background-color: var(--color-bg-light);
   color: var(--color-text-muted);
-  border-color: var(--border-color-neutral, #DFE3E8);
+  border-color: var(--color-border);
 }
 
 .detailGrid {
@@ -160,181 +152,9 @@
   margin-top: 4px;
 }
 
-/* ==========================================================================
-   Tarjeta de Acción Principal: Aceptar Misión (HU-36)
-   ========================================================================== */
-
-.acceptCard {
-  background-color: var(--color-white);
-  border: 1px solid var(--border-color-neutral, #DFE3E8);
-  border-left: 4px solid var(--color-accent-mint);
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.acceptTitle {
-  font-size: 1rem;
-  font-weight: 800;
-  color: var(--color-text-dark);
-}
-
-.acceptDescription {
-  font-size: 0.875rem;
-  color: var(--color-text-dark);
-  line-height: 1.45;
-}
-
-.acceptButton {
-  min-height: 56px;
-  font-size: 1.0625rem;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  border-radius: 0;
-}
-
-.errorAlert {
-  background-color: var(--color-danger-bg);
-  border: 1px solid var(--color-danger);
-  border-left: 4px solid var(--color-danger);
-  color: var(--color-danger-dark);
-  padding: var(--space-3);
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-/* ==========================================================================
-   Vista En Trayecto / Evaluación y Formularios Técnicos (HU-36)
-   ========================================================================== */
-
-.enTrayectoCard {
-  background-color: var(--color-white);
-  border: 1px solid var(--border-color-neutral, #DFE3E8);
-  border-left: 4px solid var(--color-primary-teal);
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.enTrayectoHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.enTrayectoTitleRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.enTrayectoTitle {
-  font-size: 1.0625rem;
-  font-weight: 800;
-  color: var(--color-primary-teal-dark);
-}
-
-.activeStatusChip {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  background-color: var(--color-sage);
-  color: var(--color-charcoal-dark);
-  font-size: 0.75rem;
-  font-weight: 800;
-  border-radius: 0;
-}
-
-.canonicalStatesGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: var(--space-2);
-  background-color: var(--color-bg-light);
-  padding: var(--space-3);
-  border: 1px solid var(--border-color-neutral, #DFE3E8);
-}
-
-.canonicalStateItem {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.canonicalStateLabel {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--color-text-muted);
-}
-
-.canonicalStateValue {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--color-text-dark);
-}
-
-.offlineQueueBanner {
-  background-color: var(--color-charcoal);
-  color: var(--color-white);
-  padding: var(--space-3);
-  border-left: 4px solid var(--color-warning);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 1.45;
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-
-.SyncedBanner {
-  background-color: var(--color-sage);
-  color: var(--color-charcoal-dark);
-  padding: var(--space-3);
-  border-left: 4px solid var(--color-primary-teal-dark);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.evaluationFormsSection {
-  background-color: var(--color-white);
-  border: 1px solid var(--border-color-neutral, #DFE3E8);
-  border-left: 4px solid var(--color-accent-mint);
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.evaluationHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.evaluationTitle {
-  font-size: 1rem;
-  font-weight: 800;
-  color: var(--color-text-dark);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.evaluationBody {
-  font-size: 0.875rem;
-  color: var(--color-text-dark);
-  line-height: 1.45;
-}
-
 .readOnlyNotice {
   background-color: var(--color-bg-light);
-  border: 1px solid var(--border-color-neutral, #DFE3E8);
+  border: 1px solid var(--color-border);
   padding: var(--space-3);
   text-align: center;
   font-weight: 600;

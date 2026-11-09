@@ -1,5 +1,3 @@
-import type { paths } from '@/types/api-generated';
-
 /**
  * Tipos para persistencia local e IndexedDB (Offline-First)
  */
@@ -14,13 +12,6 @@ export type AccionOutboxTipo =
   | 'SUBIR_EVIDENCIA'
   | 'SOLICITAR_APOYO'
   | 'CERRAR_FAENA';
-
-/**
- * Payload validado contra el contrato OpenAPI generado antes de encolarse en IndexedDB (GEMINI.md §5.3).
- */
-export type AceptarMisionPayload = NonNullable<
-  paths['/api/misiones/{id}/aceptar']['post']['requestBody']
->['content']['application/json'];
 
 export interface AccionOutbox {
   id: string;
@@ -46,8 +37,6 @@ export interface MisionLocal {
   prioridad: string;
   estado: string;
   fechaDespacho: string;
-  fechaInicio?: string | null;
-  sincronizacionPendiente?: boolean;
   datosAdicionales?: Record<string, unknown>;
   actualizadoEn: string;
 }
