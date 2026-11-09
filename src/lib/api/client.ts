@@ -8,11 +8,15 @@ export function handleUnauthorizedSession() {
   removeAuthCookie();
 
   const pathname = window.location.pathname;
-  if (!pathname.startsWith('/login')) {
+  if (!pathname.startsWith('/login') && !pathname.startsWith('/terreno/login')) {
     if (hadToken || pathname !== '/') {
       const returnUrl = encodeURIComponent(pathname + window.location.search);
+      let loginHost = '';
+      if (typeof window !== 'undefined' && window.location.port === '3002') {
+        loginHost = `${window.location.protocol}//${window.location.hostname}:3000`;
+      }
       try {
-        window.location.assign(`/login?motivo=sesion_expirada&returnUrl=${returnUrl}`);
+        window.location.assign(`${loginHost}/login?motivo=sesion_expirada&returnUrl=${returnUrl}`);
       } catch {
         // Ignorar excepciones en entornos jsdom
       }

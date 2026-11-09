@@ -62,3 +62,4 @@ Este manual describe el procedimiento operativo mediante el cual el **Delegado d
   * Emite el evento WebSocket `"mision:hito_registrado"` hacia las salas de monitoreo en tiempo real.
 * **`sgrai-web` (Centro de Mando / H23):**
   * Al recibir la notificación en tiempo real, agrega de inmediato el hito de arribo en la línea de tiempo vertical de la misión y actualiza el indicador general a **"EN_CURSO"**, permitiendo al Encargado auditar los tiempos de desplazamiento.
+
