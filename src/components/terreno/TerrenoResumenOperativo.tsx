@@ -61,8 +61,17 @@ export function TerrenoResumenOperativo() {
 
     void cargarResumenMisiones();
 
+    const handleActualizar = () => {
+      void cargarResumenMisiones();
+    };
+
+    window.addEventListener('sgrai:mision_asignada', handleActualizar);
+    window.addEventListener('sgrai:mision_actualizada', handleActualizar);
+
     return () => {
       cancelado = true;
+      window.removeEventListener('sgrai:mision_asignada', handleActualizar);
+      window.removeEventListener('sgrai:mision_actualizada', handleActualizar);
     };
   }, []);
 
