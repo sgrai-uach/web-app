@@ -28,10 +28,11 @@ describe('labels — Mapeo estricto a lenguaje natural y respaldo seguro', () =>
     expect(formatearEtiquetaSegura('CAMION_ALJIBE_DESCONOCIDO')).toBe('Camion aljibe desconocido');
   });
 
-  it('limpia prefijos de títulos de misión (Triage, Evaluación de)', () => {
+  it('limpia prefijos de títulos de misión (Triage, Evaluación de, Verificación)', () => {
     expect(limpiarTituloMision('Triage Caída de árbol en tendido')).toBe('Caída de árbol en tendido');
     expect(limpiarTituloMision('Triage: Deslizamiento')).toBe('Deslizamiento');
     expect(limpiarTituloMision('Evaluación de anegamiento en calzada')).toBe('anegamiento en calzada');
+    expect(limpiarTituloMision('Verificación: Anegamiento - INC-592395-562')).toBe('Anegamiento');
     expect(limpiarTituloMision('Despeje regular')).toBe('Despeje regular');
   });
 });

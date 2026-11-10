@@ -8,10 +8,12 @@ import {
   Calendar,
   Archive,
   Map,
+  Tag,
   CheckCircle,
   Navigation,
   ClipboardCheck,
   WifiOff,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
@@ -21,11 +23,13 @@ import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
+import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
+import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
 } from '@/services/misionesService';
-import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
+import { formatearPrioridad, formatearFechaHora24h, formatearTipologia } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaDetailPage.module.css';
 
@@ -176,6 +180,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
           <div className={styles.codeArea}>
+            <AlertCircle
+              size={20}
+              color="var(--color-primary-teal, #1B6F7D)"
+              aria-hidden="true"
+            />
             <span className={styles.code}>{mision.codigoIncidente}</span>
             <span className={`${styles.priorityChip} ${prioridadClase}`}>
               {formatearPrioridad(mision.prioridad)}
@@ -189,7 +198,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Tipo</span>
             <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
-              {mision.tipologia}
+              {formatearTipologia(mision.tipologia)}
             </span>
           </div>
 
@@ -285,7 +294,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               <div className={styles.enTrayectoTitleRow}>
                 <Navigation
                   size={20}
-                  color="var(--color-primary-teal)"
+                  color="var(--color-primary-teal, #1B6F7D)"
                   aria-hidden="true"
                 />
                 <h2 className={styles.enTrayectoTitle}>
@@ -295,35 +304,37 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               <span className={styles.activeStatusChip}>Misión activa</span>
             </div>
 
-            {mision.sincronizacionPendiente ? (
-              <div className={styles.offlineQueueBanner} role="status">
-                <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
-                <span>
-                  Pendiente de sincronizar: La aceptación fue guardada en la cola
-                  local del dispositivo y se enviará automáticamente al recuperar
-                  conexión.
-                </span>
-              </div>
-            ) : (
-              mensajeConfirmacion && (
-                <div className={styles.SyncedBanner} role="status">
-                  {mensajeConfirmacion}
+            <div className={styles.enTrayectoContent}>
+              {mision.sincronizacionPendiente ? (
+                <div className={styles.offlineQueueBanner} role="status">
+                  <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+                  <span>
+                    Pendiente de sincronizar: La aceptación fue guardada en la cola
+                    local del dispositivo y se enviará automáticamente al recuperar
+                    conexión.
+                  </span>
                 </div>
-              )
-            )}
+              ) : (
+                mensajeConfirmacion && (
+                  <div className={styles.SyncedBanner} role="status">
+                    {mensajeConfirmacion}
+                  </div>
+                )
+              )}
 
-            <div className={styles.canonicalStatesGrid}>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Misión</span>
-                <span className={styles.canonicalStateValue}>En curso</span>
-              </div>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Patrulla</span>
-                <span className={styles.canonicalStateValue}>En verificación</span>
-              </div>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Incidente</span>
-                <span className={styles.canonicalStateValue}>Verificando</span>
+              <div className={styles.canonicalStatesGrid}>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Misión</span>
+                  <span className={styles.canonicalStateValue}>En curso</span>
+                </div>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Patrulla</span>
+                  <span className={styles.canonicalStateValue}>En verificación</span>
+                </div>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Incidente</span>
+                  <span className={styles.canonicalStateValue}>Verificando</span>
+                </div>
               </div>
             </div>
           </section>
@@ -336,19 +347,36 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             <div className={styles.evaluationHeader}>
               <h3 className={styles.evaluationTitle}>
                 <ClipboardCheck
-                  size={18}
-                  color="var(--color-primary-teal)"
+                  size={20}
+                  color="var(--color-primary-teal, #1B6F7D)"
                   aria-hidden="true"
                 />
                 <span>Formularios de Reporte Técnico</span>
               </h3>
-              <span className={styles.activeStatusChip}>Habilitado</span>
             </div>
-            <p className={styles.evaluationBody}>
-              La unidad se encuentra en trayecto / evaluación. Los formularios
-              operativos para categorizar el incidente, ajustar la prioridad y
-              enviar el reporte de situación están habilitados.
-            </p>
+
+            <div className={styles.evaluationContent}>
+              <SeccionDesplegable
+                titulo="Categorización del incidente"
+                icono={<Tag size={18} />}
+                abiertoPorDefecto
+                indicador={
+                  mision.sincronizacionPendiente ? (
+                    <span className={styles.syncPendingBadge}>Pendiente</span>
+                  ) : null
+                }
+              >
+                <EvaluacionTipologiaCard
+                  incidenteId={mision.incidenteId}
+                  misionActual={mision}
+                  onTipologiaActualizada={(resultado) => {
+                    if (resultado.mision) {
+                      setMision(resultado.mision);
+                    }
+                  }}
+                />
+              </SeccionDesplegable>
+            </div>
           </section>
         </>
       )}

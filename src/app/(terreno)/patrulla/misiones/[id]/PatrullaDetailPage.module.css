@@ -1,43 +1,57 @@
+/* ==========================================================================
+   Estilos Vista Detallada de Misión (Patrulla) — SGRAI PWA
+   Directrices: Flat UI, bordes rectos (0px), alto contraste y ergonomía móvil.
+   El contenido ocupa el ancho completo en dispositivos móviles.
+   ========================================================================== */
+
 .container {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3, 12px);
+  width: 100%;
 }
 
+@media (min-width: 640px) {
+  .container {
+    max-width: 1024px;
+    margin: 0 auto;
+    padding: var(--space-4, 16px);
+  }
+}
+
+/* --- Barra Superior con Retorno y Conectividad --- */
 .topBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--space-2, 8px);
   flex-wrap: wrap;
-}
-
-.backButtonArea {
-  display: flex;
-  align-self: flex-start;
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  background-color: var(--color-primary-teal-dark, #14505A);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .backLink {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-2, 8px);
   min-height: 48px;
-  padding: 0 var(--space-4);
-  background-color: var(--color-white);
+  padding: 0 var(--space-3, 12px);
+  background-color: var(--color-white, #FFFFFF);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
-  color: var(--color-primary-teal);
+  color: var(--color-primary-teal-dark, #14505A);
   text-decoration: none !important;
   font-weight: 700;
   font-size: 0.875rem;
-  border-radius: 0;
+  border-radius: var(--radius-none, 0px);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  transition: background-color var(--transition-fast, 0.15s ease), border-color var(--transition-fast, 0.15s ease);
 }
 
 .backLink:hover {
-  background-color: var(--color-bg-light);
-  border-color: var(--color-primary-teal);
+  background-color: var(--color-bg-light, #ECEFF3);
+  border-color: var(--color-white, #FFFFFF);
   text-decoration: none !important;
 }
 
@@ -47,85 +61,93 @@
 }
 
 .backLink:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: var(--focus-ring-offset);
+  outline: 2px solid var(--color-white, #FFFFFF);
+  outline-offset: var(--focus-ring-offset, 2px);
 }
 
+/* --- Encabezado y Ficha de Misión --- */
 .missionHeader {
-  background-color: var(--color-white);
+  background-color: var(--color-white, #FFFFFF);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
-  border-left: 4px solid var(--color-primary-teal);
-  padding: var(--space-4);
+  border-top: 4px solid var(--color-accent-mint, #4FAE9B);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .missionHeader {
+    border: 1px solid var(--border-color-neutral, #DFE3E8);
+    border-top: 4px solid var(--color-accent-mint, #4FAE9B);
+  }
 }
 
 .headerRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-2, 8px);
   flex-wrap: wrap;
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  background-color: var(--color-white, #FFFFFF);
+  color: var(--color-primary-teal-dark, #14505A);
+  border-bottom: 1px solid var(--border-color-neutral, #DFE3E8);
 }
 
 .codeArea {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-2, 8px);
 }
 
 .code {
-  font-size: 1.125rem;
+  font-size: 1.0625rem;
   font-weight: 800;
-  color: var(--color-primary-teal);
+  color: var(--color-primary-teal-dark, #14505A);
+  letter-spacing: 0.02em;
 }
 
 .priorityChip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-family-base);
+  font-family: var(--font-family-base, inherit);
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 800;
   padding: 4px 8px;
-  border-radius: 0;
-  border: 1px solid transparent;
+  border-radius: var(--radius-none, 0px);
   line-height: 1;
   white-space: nowrap;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
 }
 
 .priorityCritica {
-  background-color: var(--color-danger-bg);
-  color: var(--color-danger);
-  border-color: var(--color-danger);
+  background-color: var(--color-danger, #D32F2F);
+  color: #FFFFFF;
 }
 
 .priorityAlta {
-  background-color: var(--color-warning-bg);
-  color: var(--color-warning);
-  border-color: var(--color-warning);
+  background-color: var(--color-warning, #E65100);
+  color: #FFFFFF;
 }
 
 .priorityNeutro {
-  background-color: var(--color-bg-light);
-  color: var(--color-text-muted);
-  border-color: var(--border-color-neutral, #DFE3E8);
+  background-color: var(--color-bg-light, #ECEFF3);
+  color: var(--color-text-dark, #2B2B2B);
 }
 
 .detailGrid {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
 }
 
 .sectionBlock {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--color-bg-light);
+  gap: var(--space-1, 4px);
+  padding: var(--space-2, 8px) 0;
+  border-bottom: 1px solid var(--color-bg-light, #ECEFF3);
 }
 
 .sectionBlock:last-child {
@@ -136,54 +158,63 @@
 .itemLabel {
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--color-text-muted);
+  color: var(--color-text-muted, #5F676E);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .itemValue {
   font-size: 0.9375rem;
-  color: var(--color-text-dark);
-  font-weight: 400;
+  color: var(--color-text-dark, #2B2B2B);
+  font-weight: 500;
   line-height: 1.4;
 }
 
 .itemValueBold {
   font-weight: 700;
-  color: var(--color-text-dark);
+  color: var(--color-text-dark, #2B2B2B);
 }
 
 .locationActionRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--space-2, 8px);
   flex-wrap: wrap;
   margin-top: 4px;
 }
 
-/* ==========================================================================
-   Tarjeta de Acción Principal: Aceptar Misión (HU-36)
-   ========================================================================== */
-
+/* --- Tarjeta de Acción: Aceptar Misión --- */
 .acceptCard {
-  background-color: var(--color-white);
+  background-color: var(--color-white, #FFFFFF);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
-  border-left: 4px solid var(--color-accent-mint);
-  padding: var(--space-4);
+  border-top: 4px solid var(--color-accent-mint, #4FAE9B);
+  padding: var(--space-4, 16px);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-3, 12px);
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .acceptCard {
+    border: 1px solid var(--border-color-neutral, #DFE3E8);
+    border-top: 4px solid var(--color-accent-mint, #4FAE9B);
+  }
 }
 
 .acceptTitle {
   font-size: 1rem;
   font-weight: 800;
-  color: var(--color-text-dark);
+  color: var(--color-text-dark, #2B2B2B);
+  margin: 0;
 }
 
 .acceptDescription {
   font-size: 0.875rem;
-  color: var(--color-text-dark);
+  color: var(--color-text-dark, #2B2B2B);
   line-height: 1.45;
+  margin: 0;
 }
 
 .acceptButton {
@@ -191,70 +222,84 @@
   font-size: 1.0625rem;
   font-weight: 800;
   letter-spacing: 0.01em;
-  border-radius: 0;
+  border-radius: var(--radius-none, 0px);
 }
 
 .errorAlert {
-  background-color: var(--color-danger-bg);
-  border: 1px solid var(--color-danger);
-  border-left: 4px solid var(--color-danger);
-  color: var(--color-danger-dark);
-  padding: var(--space-3);
+  background-color: var(--color-danger-bg, #FFEBEE);
+  border-left: 4px solid var(--color-danger, #D32F2F);
+  color: var(--color-danger, #D32F2F);
+  padding: var(--space-3, 12px);
   font-size: 0.875rem;
   font-weight: 600;
 }
 
-/* ==========================================================================
-   Vista En Trayecto / Evaluación y Formularios Técnicos (HU-36)
-   ========================================================================== */
-
+/* --- Estado de Traslado y Misión Activa --- */
 .enTrayectoCard {
-  background-color: var(--color-white);
+  background-color: var(--color-white, #FFFFFF);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
-  border-left: 4px solid var(--color-primary-teal);
-  padding: var(--space-4);
+  border-top: 4px solid var(--color-accent-mint, #4FAE9B);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .enTrayectoCard {
+    border: 1px solid var(--border-color-neutral, #DFE3E8);
+    border-top: 4px solid var(--color-accent-mint, #4FAE9B);
+  }
 }
 
 .enTrayectoHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--space-2, 8px);
   flex-wrap: wrap;
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  background-color: var(--color-white, #FFFFFF);
+  color: var(--color-primary-teal-dark, #14505A);
+  border-bottom: 1px solid var(--border-color-neutral, #DFE3E8);
 }
 
 .enTrayectoTitleRow {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-2, 8px);
 }
 
 .enTrayectoTitle {
-  font-size: 1.0625rem;
+  font-size: 1rem;
   font-weight: 800;
-  color: var(--color-primary-teal-dark);
+  color: var(--color-primary-teal-dark, #14505A);
+  margin: 0;
+}
+
+.enTrayectoContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
 }
 
 .activeStatusChip {
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
-  background-color: var(--color-sage);
-  color: var(--color-charcoal-dark);
+  background-color: var(--color-sage, #A9CBA4);
+  color: var(--color-charcoal-dark, #24272B);
   font-size: 0.75rem;
   font-weight: 800;
-  border-radius: 0;
+  border-radius: var(--radius-none, 0px);
 }
 
 .canonicalStatesGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: var(--space-2);
-  background-color: var(--color-bg-light);
-  padding: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-2, 8px);
+  background-color: var(--color-bg-light, #ECEFF3);
+  padding: var(--space-3, 12px);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
 }
 
@@ -267,77 +312,100 @@
 .canonicalStateLabel {
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--color-text-muted);
+  color: var(--color-text-muted, #5F676E);
 }
 
 .canonicalStateValue {
   font-size: 0.875rem;
   font-weight: 700;
-  color: var(--color-text-dark);
+  color: var(--color-text-dark, #2B2B2B);
 }
 
 .offlineQueueBanner {
-  background-color: var(--color-charcoal);
-  color: var(--color-white);
-  padding: var(--space-3);
-  border-left: 4px solid var(--color-warning);
+  background-color: var(--color-charcoal, #3B3F45);
+  color: var(--color-white, #FFFFFF);
+  padding: var(--space-3, 12px);
+  border-left: 4px solid var(--color-warning, #E65100);
   font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.45;
   display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
+  gap: var(--space-2, 8px);
 }
 
 .SyncedBanner {
-  background-color: var(--color-sage);
-  color: var(--color-charcoal-dark);
-  padding: var(--space-3);
-  border-left: 4px solid var(--color-primary-teal-dark);
+  background-color: var(--color-sage, #A9CBA4);
+  color: var(--color-charcoal-dark, #24272B);
+  padding: var(--space-3, 12px);
+  border-left: 4px solid var(--color-primary-teal-dark, #14505A);
   font-size: 0.8125rem;
   font-weight: 700;
   line-height: 1.4;
 }
 
+/* --- Formularios de Reporte Técnico (Cabecera y Desplegables de Ancho Completo) --- */
 .evaluationFormsSection {
-  background-color: var(--color-white);
+  background-color: var(--color-white, #FFFFFF);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
-  border-left: 4px solid var(--color-accent-mint);
-  padding: var(--space-4);
+  border-top: 4px solid var(--color-accent-mint, #4FAE9B);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .evaluationFormsSection {
+    border: 1px solid var(--border-color-neutral, #DFE3E8);
+    border-top: 4px solid var(--color-accent-mint, #4FAE9B);
+  }
 }
 
 .evaluationHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
+  gap: var(--space-2, 8px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  background-color: var(--color-white, #FFFFFF);
+  color: var(--color-primary-teal-dark, #14505A);
+  border-bottom: 1px solid var(--border-color-neutral, #DFE3E8);
 }
 
 .evaluationTitle {
   font-size: 1rem;
   font-weight: 800;
-  color: var(--color-text-dark);
+  color: var(--color-primary-teal-dark, #14505A);
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-2, 8px);
+  margin: 0;
 }
 
-.evaluationBody {
-  font-size: 0.875rem;
-  color: var(--color-text-dark);
-  line-height: 1.45;
+.evaluationContent {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.syncPendingBadge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  background-color: var(--color-warning-bg, #FFF3E0);
+  color: var(--color-warning, #E65100);
+  border: 1px solid var(--color-warning, #E65100);
+  border-radius: var(--radius-none, 0px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .readOnlyNotice {
-  background-color: var(--color-bg-light);
+  background-color: var(--color-bg-light, #ECEFF3);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
-  padding: var(--space-3);
+  padding: var(--space-3, 12px);
   text-align: center;
   font-weight: 600;
   font-size: 0.8125rem;
-  color: var(--color-text-muted);
+  color: var(--color-text-muted, #5F676E);
 }

@@ -106,6 +106,8 @@ export function limpiarTituloMision(titulo?: string | null): string {
   if (!titulo) return '';
   return titulo
     .replace(/^triage\s*[:\-–]?\s*/i, '')
-    .replace(/^evaluaci[oó]n\s+de\s+/i, '')
+    .replace(/^evaluaci[oó]n\s+(?:de\s+)?[:\-–]?\s*/i, '')
+    .replace(/^verificaci[oó]n\s*[:\-–]?\s*/i, '')
+    .replace(/\s*-\s*INC-[A-Z0-9-]+$/i, '')
     .trim();
 }
