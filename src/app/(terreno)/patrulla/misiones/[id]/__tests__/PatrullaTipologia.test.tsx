@@ -113,10 +113,10 @@ describe('PatrullaMisionDetailPage — Categorización de Tipología en Terreno 
     });
 
     // La sección de categorización debe estar oculta hasta que la patrulla acepte la misión
-    expect(screen.queryByText('Categorización en Terreno')).not.toBeInTheDocument();
+    expect(screen.queryByText('Categorización del incidente')).not.toBeInTheDocument();
   });
 
-  it('muestra la tarjeta de categorización cuando la misión está en curso (aceptada)', async () => {
+  it('muestra la sección de categorización cuando la misión está en curso (aceptada)', async () => {
     configurarAuth(true, true);
     vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(misionEnCursoMock);
 
@@ -131,7 +131,7 @@ describe('PatrullaMisionDetailPage — Categorización de Tipología en Terreno 
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Categorización en Terreno')).toBeInTheDocument();
+      expect(screen.getByText('Categorización del incidente')).toBeInTheDocument();
     });
 
     expect(screen.getByText('Misión activa')).toBeInTheDocument();

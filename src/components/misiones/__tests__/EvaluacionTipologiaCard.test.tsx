@@ -46,7 +46,9 @@ describe('EvaluacionTipologiaCard (H37)', () => {
       />
     );
 
-    expect(screen.getByText('Categorización en Terreno')).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: /Categorización del incidente/i })
+    ).toBeInTheDocument();
     expect(screen.getByText('Caída de árbol')).toBeInTheDocument();
 
     await waitFor(() => {
