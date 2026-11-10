@@ -15,7 +15,7 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './TerrenoSiguienteMision.module.css';
 
 export function TerrenoSiguienteMision() {
-  const { esCuadrilla, unidadActiva } = useAuth();
+  const { usuario, esCuadrilla, unidadActiva } = useAuth();
   const [misionesActivas, setMisionesActivas] = useState<MisionLocal[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
 
@@ -26,6 +26,8 @@ export function TerrenoSiguienteMision() {
       try {
         const misiones = await sincronizarMisiones({
           tipoMision: esCuadrilla ? 'ATENCION_CUADRILLA' : 'VERIFICACION',
+          patrullaId: !esCuadrilla ? usuario?.unidadId || undefined : undefined,
+          cuadrillaId: esCuadrilla ? usuario?.unidadId || undefined : undefined,
         });
         if (cancelado) return;
 
@@ -60,7 +62,7 @@ export function TerrenoSiguienteMision() {
     return () => {
       cancelado = true;
     };
-  }, [esCuadrilla]);
+  }, [esCuadrilla, usuario?.unidadId]);
 
   if (cargando) {
     return (
