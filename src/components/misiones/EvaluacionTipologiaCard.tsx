@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useId } from 'react';
-import { Tag, CheckCircle, AlertTriangle, WifiOff, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useId, useRef, useLayoutEffect } from 'react';
+import { CheckCircle, AlertTriangle, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
@@ -13,6 +13,10 @@ import {
 import type { TipoIncidenteCatalogoItem, MisionLocal } from '@/types/offline';
 import styles from './EvaluacionTipologiaCard.module.css';
 
+const JUSTIFICACION_MIN = 5;
+const JUSTIFICACION_MAX = 1000;
+const TEXTAREA_ALTURA_MAX_PX = 240;
+
 export interface EvaluacionTipologiaCardProps {
   incidenteId: string;
   misionActual: MisionLocal;
@@ -20,6 +24,10 @@ export interface EvaluacionTipologiaCardProps {
   deshabilitado?: boolean;
 }
 
+/**
+ * Formulario de categorización del incidente en terreno.
+ * Se renderiza sin contenedor propio para integrarse dentro de una `SeccionDesplegable`.
+ */
 export function EvaluacionTipologiaCard({
   incidenteId,
   misionActual,
@@ -28,6 +36,7 @@ export function EvaluacionTipologiaCard({
 }: EvaluacionTipologiaCardProps) {
   const selectId = useId();
   const textareaId = useId();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [catalogo, setCatalogo] = useState<TipoIncidenteCatalogoItem[]>([]);
   const [cargandoCatalogo, setCargandoCatalogo] = useState<boolean>(true);
@@ -79,10 +88,19 @@ export function EvaluacionTipologiaCard({
     };
   }, [misionActual?.tipologia]);
 
+  // Ajuste automático de altura del campo de justificación (sin asa de redimensionado)
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, TEXTAREA_ALTURA_MAX_PX)}px`;
+  }, [justificacion]);
+
   const tipoActualSeleccionado = catalogo.find((t) => t.id === tipoSeleccionadoId);
   const justificacionLimpia = justificacion.trim();
   const longitudJustificacion = justificacionLimpia.length;
-  const esJustificacionValida = longitudJustificacion >= 5 && longitudJustificacion <= 1000;
+  const esJustificacionValida =
+    longitudJustificacion >= JUSTIFICACION_MIN && longitudJustificacion <= JUSTIFICACION_MAX;
 
   const handleGuardar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +108,7 @@ export function EvaluacionTipologiaCard({
     setFeedback(null);
 
     if (!tipoSeleccionadoId) {
-      setErrorValidacion('Debe seleccionar un tipo de incidente del catálogo oficial.');
+      setErrorValidacion('Seleccione un tipo de incidente.');
       return;
     }
 
@@ -115,6 +133,7 @@ export function EvaluacionTipologiaCard({
         tipo: resultado.offline ? 'offline' : 'success',
         texto: resultado.mensaje,
       });
+      setJustificacion('');
 
       if (onTipologiaActualizada) {
         onTipologiaActualizada(resultado);
@@ -133,22 +152,18 @@ export function EvaluacionTipologiaCard({
     }
   };
 
-  return (
-    <section
-      className={styles.container}
-      aria-label="Evaluación y categorización de tipología en terreno"
-    >
-      <div className={styles.header}>
-        <div className={styles.titleRow}>
-          <Tag size={18} color="var(--color-primary-teal)" aria-hidden="true" />
-          <h3 className={styles.title}>Categorización en Terreno</h3>
-        </div>
-        <span className={styles.badge}>H37</span>
-      </div>
+  const contadorClase =
+    longitudJustificacion === 0
+      ? ''
+      : esJustificacionValida
+        ? styles.counterValid
+        : styles.counterInvalid;
 
-      <div className={styles.tipologiaActualBox}>
-        <span className={styles.tipologiaActualLabel}>Tipología constatada</span>
-        <span className={styles.tipologiaActualValor}>
+  return (
+    <div className={styles.container} role="group" aria-label="Categorización del incidente">
+      <div className={styles.infoRow}>
+        <span className={styles.infoLabel}>Tipo registrado</span>
+        <span className={styles.infoValue}>
           {misionActual.tipologia || 'Sin clasificación'}
         </span>
       </div>
@@ -165,13 +180,13 @@ export function EvaluacionTipologiaCard({
           role="status"
         >
           {feedback.tipo === 'success' && (
-            <CheckCircle size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+            <CheckCircle size={18} aria-hidden="true" className={styles.alertIcon} />
           )}
           {feedback.tipo === 'offline' && (
-            <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+            <WifiOff size={18} aria-hidden="true" className={styles.alertIcon} />
           )}
           {feedback.tipo === 'error' && (
-            <AlertTriangle size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+            <AlertTriangle size={18} aria-hidden="true" className={styles.alertIcon} />
           )}
           <span>{feedback.texto}</span>
         </div>
@@ -179,15 +194,15 @@ export function EvaluacionTipologiaCard({
 
       {errorValidacion && (
         <div className={`${styles.alertBox} ${styles.alertError}`} role="alert">
-          <AlertTriangle size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+          <AlertTriangle size={18} aria-hidden="true" className={styles.alertIcon} />
           <span>{errorValidacion}</span>
         </div>
       )}
 
-      <form onSubmit={handleGuardar} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <form onSubmit={handleGuardar} className={styles.form} noValidate>
         <Select
           id={selectId}
-          label="Tipo de Incidente (Catálogo Oficial)"
+          label="Tipo de incidente"
           requiredIndicator
           value={tipoSeleccionadoId}
           onChange={(e) => {
@@ -195,45 +210,35 @@ export function EvaluacionTipologiaCard({
             setErrorValidacion(null);
           }}
           disabled={deshabilitado || guardando || cargandoCatalogo}
+          helperText={tipoActualSeleccionado?.descripcion || undefined}
           options={catalogo.map((t) => ({
             value: t.id,
             label: t.nombre,
           }))}
         />
 
-        {tipoActualSeleccionado?.descripcion && (
-          <div className={styles.tipoDescripcionBox}>
-            <strong>Alcance técnico:</strong> {tipoActualSeleccionado.descripcion}
-          </div>
-        )}
-
-        <div>
+        <div className={styles.fieldGroup}>
           <Textarea
+            ref={textareaRef}
             id={textareaId}
-            label="Justificación técnica de la evaluación"
+            label="Justificación"
             requiredIndicator
-            rows={3}
+            rows={4}
+            maxLength={JUSTIFICACION_MAX}
             value={justificacion}
             onChange={(e) => {
               setJustificacion(e.target.value);
               setErrorValidacion(null);
             }}
-            placeholder="Fundamente las causas constatadas en terreno para validar o corregir la tipología..."
+            placeholder="Describa lo constatado en terreno"
             disabled={deshabilitado || guardando}
             aria-describedby={`${textareaId}-counter`}
+            className={styles.justificacion}
           />
           <div id={`${textareaId}-counter`} className={styles.counterRow}>
-            <span>Mínimo 5 caracteres</span>
-            <span
-              className={
-                longitudJustificacion === 0
-                  ? undefined
-                  : esJustificacionValida
-                    ? styles.counterValid
-                    : styles.counterInvalid
-              }
-            >
-              {longitudJustificacion} / 1000
+            <span>Mínimo {JUSTIFICACION_MIN} caracteres</span>
+            <span className={contadorClase || undefined}>
+              {longitudJustificacion} / {JUSTIFICACION_MAX}
             </span>
           </div>
         </div>
@@ -245,13 +250,13 @@ export function EvaluacionTipologiaCard({
           fullWidth
           loading={guardando}
           disabled={deshabilitado || cargandoCatalogo || !tipoSeleccionadoId}
-          icon={guardando ? <RefreshCw size={18} /> : <CheckCircle size={18} />}
+          icon={<CheckCircle size={18} />}
           className={styles.submitBtn}
         >
-          {guardando ? 'Guardando...' : 'Confirmar Tipología'}
+          {guardando ? 'Guardando...' : 'Confirmar tipología'}
         </Button>
       </form>
-    </section>
+    </div>
   );
 }
 

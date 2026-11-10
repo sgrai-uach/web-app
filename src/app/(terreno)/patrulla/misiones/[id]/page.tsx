@@ -8,6 +8,7 @@ import {
   Calendar,
   Archive,
   Map,
+  Tag,
   CheckCircle,
   Navigation,
   ClipboardCheck,
@@ -20,12 +21,13 @@ import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
+import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
 import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
 } from '@/services/misionesService';
-import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
+import { formatearPrioridad, formatearFechaHora24h, formatearTipologia } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaDetailPage.module.css';
 
@@ -185,7 +187,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Tipo</span>
             <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
-              {mision.tipologia}
+              {formatearTipologia(mision.tipologia)}
             </span>
           </div>
 
@@ -332,29 +334,35 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             <div className={styles.evaluationHeader}>
               <h3 className={styles.evaluationTitle}>
                 <ClipboardCheck
-                  size={18}
-                  color="var(--color-primary-teal)"
+                  size={20}
                   aria-hidden="true"
                 />
                 <span>Formularios de Reporte Técnico</span>
               </h3>
-              <span className={styles.activeStatusChip}>Habilitado</span>
             </div>
-            <p className={styles.evaluationBody}>
-              La unidad se encuentra en trayecto / evaluación. Los formularios
-              operativos para categorizar el incidente, ajustar la prioridad y
-              enviar el reporte de situación están habilitados.
-            </p>
 
-            <EvaluacionTipologiaCard
-              incidenteId={mision.incidenteId}
-              misionActual={mision}
-              onTipologiaActualizada={(resultado) => {
-                if (resultado.mision) {
-                  setMision(resultado.mision);
+            <div className={styles.evaluationContent}>
+              <SeccionDesplegable
+                titulo="Categorización del incidente"
+                icono={<Tag size={18} />}
+                abiertoPorDefecto
+                indicador={
+                  mision.sincronizacionPendiente ? (
+                    <span className={styles.syncPendingBadge}>Pendiente</span>
+                  ) : null
                 }
-              }}
-            />
+              >
+                <EvaluacionTipologiaCard
+                  incidenteId={mision.incidenteId}
+                  misionActual={mision}
+                  onTipologiaActualizada={(resultado) => {
+                    if (resultado.mision) {
+                      setMision(resultado.mision);
+                    }
+                  }}
+                />
+              </SeccionDesplegable>
+            </div>
           </section>
         </>
       )}
