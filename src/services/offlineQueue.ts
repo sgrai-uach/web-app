@@ -102,6 +102,21 @@ export async function encolarAccionOutbox(
   accion: Omit<AccionOutbox, 'id' | 'timestamp' | 'intentos'>
 ): Promise<AccionOutbox> {
   const db = await getDB();
+  const existentes = await obtenerAccionesOutbox();
+  const duplicada = existentes.find(
+    (item) => item.tipo === accion.tipo && item.url === accion.url
+  );
+
+  if (duplicada) {
+    const actualizada: AccionOutbox = {
+      ...duplicada,
+      payload: accion.payload,
+      timestamp: new Date().toISOString(),
+    };
+    await db.put('outbox', actualizada);
+    return actualizada;
+  }
+
   const nuevaAccion: AccionOutbox = {
     ...accion,
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `outbox-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
