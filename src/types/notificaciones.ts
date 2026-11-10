@@ -40,3 +40,4 @@ export type ActualizarEstadoNotificacionInput = NonNullable<
 export type MisionPendienteTerreno = NonNullable<
   paths['/api/terreno/misiones/pendientes']['get']['responses'][200]['content']['application/json']['data']
 >[number];
+

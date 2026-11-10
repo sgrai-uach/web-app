@@ -85,3 +85,4 @@ export function activarAlertaSensorialMision(): { audioEmitido: boolean; vibraci
   const vibracionDisparada = dispararVibracionHaptica();
   return { audioEmitido, vibracionDisparada };
 }
+

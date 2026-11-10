@@ -167,3 +167,4 @@ export function onSocketConnect(callback: () => void): () => void {
 export function isSocketConnected(): boolean {
   return Boolean(socketInstance && socketInstance.connected);
 }
+
