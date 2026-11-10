@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/Button';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
+import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
 import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
 import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
@@ -38,9 +39,8 @@ interface PageProps {
 
 export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const { id: misionId } = use(params);
-  const { usuario, unidadActiva, tienePermiso } = useAuth();
+  const { usuario, unidadActiva, tieneUnidadAsignada, tienePermiso } = useAuth();
   const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
-
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
   const [aceptando, setAceptando] = useState<boolean>(false);
@@ -165,12 +165,17 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         />
       </div>
 
-      {!unidadActiva && (
+      {!tieneUnidadAsignada ? (
+        <SinUnidadBanner
+          tipoUnidad="patrulla"
+          nombreOperador={usuario?.nombre}
+        />
+      ) : !unidadActiva ? (
         <UnidadInactivaBanner
           tipoUnidad="patrulla"
           nombreUnidad={usuario?.unidadNombre}
         />
-      )}
+      ) : null}
 
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
