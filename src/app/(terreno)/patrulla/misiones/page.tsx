@@ -21,7 +21,7 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaMisionesPage.module.css';
 
 function PatrullaMisionesContenido() {
-  const { usuario, unidadActiva, tieneUnidadAsignada } = useAuth();
+  const { usuario, unidadActiva, tieneUnidadAsignada, actualizarUnidadAsignada } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -44,6 +44,19 @@ function PatrullaMisionesContenido() {
       let locales = await sincronizarMisiones({
         tipoMision: 'VERIFICACION',
       });
+
+      if (!tieneUnidadAsignada && actualizarUnidadAsignada && locales.length > 0) {
+        const conUnidad = locales.find(
+          (m) => m.datosAdicionales?.patrullaId || m.datosAdicionales?.patrullaNombre
+        );
+        if (conUnidad) {
+          const uId = conUnidad.datosAdicionales?.patrullaId as string | undefined;
+          const uNombre = conUnidad.datosAdicionales?.patrullaNombre as string | undefined;
+          if (uId || uNombre) {
+            actualizarUnidadAsignada(uId || uNombre || '', uNombre || uId || '', true);
+          }
+        }
+      }
 
       if (!unidadActiva && locales.length === 0) {
         const historicas: MisionLocal[] = [
@@ -99,7 +112,7 @@ function PatrullaMisionesContenido() {
     } finally {
       setCargando(false);
     }
-  }, [unidadActiva]);
+  }, [unidadActiva, tieneUnidadAsignada, actualizarUnidadAsignada]);
 
   useEffect(() => {
     cargarMisiones();

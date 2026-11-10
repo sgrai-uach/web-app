@@ -21,7 +21,7 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaMisionesPage.module.css';
 
 function CuadrillaMisionesContenido() {
-  const { usuario, unidadActiva, tieneUnidadAsignada } = useAuth();
+  const { usuario, unidadActiva, tieneUnidadAsignada, actualizarUnidadAsignada } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -44,6 +44,19 @@ function CuadrillaMisionesContenido() {
       let locales = await sincronizarMisiones({
         tipoMision: 'ATENCION_CUADRILLA',
       });
+
+      if (!tieneUnidadAsignada && actualizarUnidadAsignada && locales.length > 0) {
+        const conUnidad = locales.find(
+          (m) => m.datosAdicionales?.cuadrillaId || m.datosAdicionales?.cuadrillaNombre
+        );
+        if (conUnidad) {
+          const uId = conUnidad.datosAdicionales?.cuadrillaId as string | undefined;
+          const uNombre = conUnidad.datosAdicionales?.cuadrillaNombre as string | undefined;
+          if (uId || uNombre) {
+            actualizarUnidadAsignada(uId || uNombre || '', uNombre || uId || '', true);
+          }
+        }
+      }
 
       if (!unidadActiva && locales.length === 0) {
         const historicas: MisionLocal[] = [
@@ -78,7 +91,7 @@ function CuadrillaMisionesContenido() {
     } finally {
       setCargando(false);
     }
-  }, [unidadActiva]);
+  }, [unidadActiva, tieneUnidadAsignada, actualizarUnidadAsignada]);
 
   useEffect(() => {
     cargarMisiones();

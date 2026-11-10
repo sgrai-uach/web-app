@@ -173,6 +173,10 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
         datosAdicionales: {
           trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
           titulo: item.titulo,
+          patrullaId: (item as Record<string, unknown>).patrullaId as string | null | undefined,
+          patrullaNombre: (item as Record<string, unknown>).patrullaNombre as string | null | undefined,
+          cuadrillaId: (item as Record<string, unknown>).cuadrillaId as string | null | undefined,
+          cuadrillaNombre: (item as Record<string, unknown>).cuadrillaNombre as string | null | undefined,
         },
         actualizadoEn: item.actualizadoEn,
       }));
