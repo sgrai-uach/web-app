@@ -92,3 +92,4 @@ En situaciones de emergencia en sectores rurales o quebradas sin cobertura de re
 - **`sgrai-api`:** Valida la existencia y vigencia del tipo en base de datos, corrobora que la misión esté `EN_CURSO`, actualiza `incidente.tipo_incidente_id` y registra en `mision_hito` el evento:  
   *`"Tipología reclasificada en terreno a: [Nombre del Tipo]. Justificación: [Texto]"`*.
 - **`sgrai-web` (Centro de Mando / Encargado):** Al ejecutarse la reclasificación, el backend emite a la sala `sala:encargados` el evento WebSocket `incidente:actualizado`. La tarjeta del incidente en el tablero Kanban del Encargado actualiza de inmediato su etiqueta de tipología sin necesidad de refrescar la página.
+

@@ -194,3 +194,4 @@ describe('PatrullaMisionDetailPage — Categorización de Tipología en Terreno 
     );
   });
 });
+

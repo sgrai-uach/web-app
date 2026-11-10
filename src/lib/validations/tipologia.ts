@@ -16,3 +16,4 @@ export const reclasificarTipologiaSchema = z.object({
 });
 
 export type ReclasificarTipologiaInput = z.infer<typeof reclasificarTipologiaSchema>;
+
