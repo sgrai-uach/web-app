@@ -4,7 +4,6 @@ import {
   emitirAckLectura,
   consultarMisionesPendientes,
   limpiarCacheNotificacionesMemoria,
-  esNotificacionDuplicada,
 } from '../notificacionesService';
 import * as socketClient from '@/lib/socket/socketClient';
 import apiClient from '@/lib/api/client';
@@ -122,9 +121,22 @@ describe('notificacionesService (HU-35)', () => {
     });
     vi.mocked(apiClient.PATCH).mockResolvedValue({
       response: { ok: true } as Response,
-      data: { message: 'Actualizado' },
+      data: {
+        message: 'Actualizado',
+        data: {
+          id: 'notif-uuid-1234',
+          misionId: 'mision-uuid-5678',
+          patrullaId: 'pat-001',
+          estado: 'RECIBIDA',
+          intentosEnvio: 1,
+          creadaAt: '2026-11-10T15:00:00Z',
+          enviadaAt: '2026-11-10T15:00:00Z',
+          recibidaAt: '2026-11-10T15:00:01Z',
+          leidaAt: null,
+        },
+      },
       error: undefined,
-    });
+    } as unknown as Awaited<ReturnType<typeof apiClient.PATCH>>);
 
     const resultado = await procesarMisionAsignada(alerta);
 

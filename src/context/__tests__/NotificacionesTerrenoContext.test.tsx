@@ -234,9 +234,10 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
       </NotificacionesTerrenoProvider>
     );
 
-    // Simula evento 'online' o reconexión
+    // Simula evento 'online' o reconexión de socket
     await act(async () => {
       window.dispatchEvent(new Event('online'));
+      connectHandler();
     });
 
     await waitFor(() => {
