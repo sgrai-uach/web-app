@@ -161,34 +161,43 @@
 }
 
 /* ==========================================================================
-   Tarjeta de Acción Principal: Aceptar Misión (HU-36)
+   Tarjeta Unificada de Acciones de Despacho (HU-36 / HU-69)
    ========================================================================== */
 
-.acceptCard {
+.dispatchActionsCard {
   background-color: var(--color-white);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
-  border-left: 4px solid var(--color-accent-mint);
+  border-top: 3px solid var(--color-primary-teal);
+  border-radius: 0;
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
 
-.acceptTitle {
+.dispatchActionsTitle {
   font-size: 1rem;
   font-weight: 800;
   color: var(--color-text-dark);
+  margin: 0;
 }
 
-.acceptDescription {
-  font-size: 0.875rem;
-  color: var(--color-text-dark);
-  line-height: 1.45;
+.dispatchActionsDesc {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.dispatchButtonsGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .acceptButton {
-  min-height: 56px;
-  font-size: 1.0625rem;
+  min-height: 52px;
+  font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0.01em;
   border-radius: 0;
@@ -342,36 +351,6 @@
   color: var(--color-text-muted);
 }
 
-.tacticalActionCard {
-  background-color: var(--color-white);
-  border: 1px solid var(--color-border);
-  border-top: 3px solid var(--color-danger);
-  border-radius: 0;
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.tacticalActionTitle {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--color-text-dark);
-  margin: 0;
-}
-
-.tacticalActionDesc {
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-  margin: 0;
-  line-height: 1.4;
-}
-
-.tacticalActionButtons {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
 
 .rejectedBanner {
   background-color: var(--color-danger-bg);

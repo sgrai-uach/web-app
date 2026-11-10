@@ -316,12 +316,17 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
     });
   });
 
-  it('muestra el botón "Rechazar Misión" cuando la misión está DESPACHADA y la unidad está activa', async () => {
+  it('muestra el botón "Rechazar Misión" y el recuadro unificado de acciones de despacho cuando la misión está DESPACHADA', async () => {
     render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' }} />);
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-00100')).toBeInTheDocument();
     });
+
+    expect(screen.getByRole('heading', { name: /acciones de despacho/i })).toBeInTheDocument();
+    expect(
+      screen.getByText(/confirme la salida a terreno para evaluar o fundamente el rechazo/i)
+    ).toBeInTheDocument();
 
     const botonRechazar = screen.getByRole('button', { name: /rechazar misión/i });
     expect(botonRechazar).toBeInTheDocument();

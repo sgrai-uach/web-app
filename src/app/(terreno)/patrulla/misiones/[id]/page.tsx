@@ -323,17 +323,15 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-{/* Acción principal: Confirmar y Aceptar Misión (HU-36) */}
-      {mostrarBotonAceptar && (
+      {/* Acciones Operativas de Despacho (H36 / H69) */}
+      {(mostrarBotonAceptar || esRechazable) && (
         <section
-          className={styles.acceptCard}
-          aria-label="Confirmación de salida de patrulla"
+          className={styles.dispatchActionsCard}
+          aria-label="Acciones operativas de despacho"
         >
-          <h2 className={styles.acceptTitle}>Confirmación de salida a terreno</h2>
-          <p className={styles.acceptDescription}>
-            Presione el botón para informar al Centro de Mando que la patrulla ha
-            tomado conocimiento de la emergencia y se dirige al lugar para iniciar
-            la evaluación.
+          <h2 className={styles.dispatchActionsTitle}>Acciones de Despacho</h2>
+          <p className={styles.dispatchActionsDesc}>
+            Confirme la salida a terreno para evaluar o fundamente el rechazo si no es posible concurrir.
           </p>
 
           {errorAceptacion && (
@@ -342,39 +340,35 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             </div>
           )}
 
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={aceptando}
-            icon={<CheckCircle size={20} />}
-            onClick={handleAceptarMision}
-            className={styles.acceptButton}
-          >
-            Aceptar Misión
-          </Button>
-        </section>
-      )}
+          <div className={styles.dispatchButtonsGroup}>
+            {mostrarBotonAceptar && (
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={aceptando}
+                icon={<CheckCircle size={20} />}
+                onClick={handleAceptarMision}
+                className={styles.acceptButton}
+              >
+                Aceptar Misión
+              </Button>
+            )}
 
-      {esRechazable && (
-        <div className={styles.tacticalActionCard}>
-          <h3 className={styles.tacticalActionTitle}>Acciones Operativas de Despacho</h3>
-          <p className={styles.tacticalActionDesc}>
-            Verifique los antecedentes del incidente antes de concurrir. Si la patrulla presenta
-            desperfectos o atiende una emergencia prioritaria, debe fundamentar el rechazo con un motivo justificado.
-          </p>
-          <div className={styles.tacticalActionButtons}>
-            <Button
-              variant="destructive"
-              size="md"
-              fullWidth
-              icon={<XCircle size={18} />}
-              onClick={() => setModalRechazoAbierto(true)}
-            >
-              Rechazar Misión
-            </Button>
+            {esRechazable && (
+              <Button
+                variant="destructive"
+                size="md"
+                fullWidth
+                icon={<XCircle size={18} />}
+                onClick={() => setModalRechazoAbierto(true)}
+                disabled={aceptando}
+              >
+                Rechazar Misión
+              </Button>
+            )}
           </div>
-        </div>
+        </section>
       )}
 
 {/* Vista activa: En Trayecto / Evaluación (HU-36) */}

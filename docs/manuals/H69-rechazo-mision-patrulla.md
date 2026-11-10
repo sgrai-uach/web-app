@@ -38,7 +38,7 @@ Para operar el módulo de rechazo en la PWA se requieren las siguientes condicio
 2. Seleccione la misión táctica asignada para abrir el detalle operativo (`/patrulla/misiones/[id]`).
 3. Revise la dirección, tipo de incidente e instrucciones de trabajo.
 4. Si la patrulla no puede acudir al lugar:
-   - Desplácese hasta la sección inferior **"Acciones Operativas de Despacho"**.
+   - Desplácese hasta el recuadro **"Acciones de Despacho"**.
    - Presione el botón rojo de altura táctil adaptada: **"Rechazar Misión"** (diseñado con esquinas rectas y altura mínima de 48px para manipulación con una mano o guantes).
 5. Se desplegará el modal obligatorio **"Rechazar Misión de Verificación"**:
    - Lea la advertencia sobre la obligatoriedad de fundamentar técnicamente el rechazo.
