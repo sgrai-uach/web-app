@@ -31,6 +31,7 @@ const PERFIL_DEMO_PATRULLA: UsuarioPerfilSesion = {
   rolCodigo: 'PATRULLA_VERIFICADORA',
   delegacionId: 'del-01',
   delegacionNombre: 'Valdivia Norte',
+  unidadId: 'patrulla-demo-01',
   unidadNombre: 'Patrulla Rápida Costa-1',
   unidadActiva: true,
   permisos: ['misiones:terreno:verificar', 'misiones:terreno:reportar'],

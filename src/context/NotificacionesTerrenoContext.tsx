@@ -186,10 +186,50 @@ export function NotificacionesTerrenoProvider({
     // Reconciliación inicial al montar
     void reconciliarMisiones();
 
+    // Listener para simulación de eventos en entorno de desarrollo / pruebas
+    const handleSimularMision = (e: Event) => {
+      const customEvent = e as CustomEvent<Partial<MisionAsignadaPayload>>;
+      const payload: MisionAsignadaPayload = {
+        notificacionId: crypto.randomUUID(),
+        misionId: '60000000-0000-4000-8000-000000000001',
+        codigo: 'MIS-2026-0042',
+        tipoMision: 'VERIFICACION',
+        patrullaId: usuario?.unidadId || 'patrulla-demo-01',
+        cuadrillaId: null,
+        incidenteId: 'a0000000-0000-4000-8000-000000000001',
+        incidenteCodigo: 'INC-2026-0089',
+        incidenteFolio: 'FOL-1042',
+        tipoAfectacion: 'Inundación por desborde de estero',
+        direccion: 'Av. Costanera Arturo Prat 1200, Valdivia',
+        prioridad: 'ALTA',
+        asignadoEn: new Date().toISOString(),
+        ...(customEvent.detail || {}),
+      };
+      void handleMisionAsignada(payload);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('sgrai:simular-mision', handleSimularMision);
+      (
+        window as unknown as {
+          __SGRAI_SIMULAR_MISION_ASIGNADA__?: (
+            datos?: Partial<MisionAsignadaPayload>
+          ) => void;
+        }
+      ).__SGRAI_SIMULAR_MISION_ASIGNADA__ = (datos) => {
+        window.dispatchEvent(
+          new CustomEvent('sgrai:simular-mision', { detail: datos })
+        );
+      };
+    }
+
     return () => {
       unsuscribeMision();
       unsubscribeConnect();
       window.removeEventListener('online', handleOnline);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('sgrai:simular-mision', handleSimularMision);
+      }
       salirDeSalaPatrulla(patrullaId);
     };
   }, [esPatrulla, usuario?.unidadId, token, handleMisionAsignada, reconciliarMisiones]);
