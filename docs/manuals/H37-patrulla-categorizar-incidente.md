@@ -43,16 +43,16 @@ El selector de tipología se alimenta directamente del catálogo oficial activo 
 
 1. Ingrese al detalle de la misión asignada activa (`/terreno/patrulla/misiones/[id]`).
 2. Verifique que la misión se encuentre en estado **En curso** (`EN_CURSO`) bajo el panel **En Trayecto / Evaluación**.
-3. Desplácese a la sección **Formularios de Reporte Técnico** $\rightarrow$ **Categorización en Terreno (H37)**.
-4. Revise el recuadro **Tipología constatada**, que exhibe la categoría asignada actualmente al incidente.
-5. En el menú desplegable **Tipo de Incidente (Catálogo Oficial)**:
+3. Desplácese a la cabecera **Formularios de Reporte Técnico** y despliegue la sección **Categorización del incidente**.
+4. Revise el campo **Tipo registrado**, que exhibe la categoría asignada actualmente al incidente.
+5. En el menú desplegable **Tipo de incidente**:
    - Seleccione la categoría oficial que mejor describe la situación real evaluada en terreno.
-   - Debajo del selector se mostrará automáticamente el **Alcance técnico** de la opción elegida para respaldar su decisión.
-6. En el campo **Justificación técnica de la evaluación**:
+   - Debajo del selector se mostrará automáticamente el alcance técnico de la opción elegida para respaldar su decisión.
+6. En el campo **Justificación**:
    - Ingrese una descripción fundada explicando las razones operativas y evidencias observadas en terreno para el dictamen o reclasificación.
    - **Regla de validación estricta:** La justificación es de carácter **obligatorio** y debe contener un mínimo de **5 caracteres** (hasta un máximo de 1000 caracteres).
    - El contador dinámico (`X / 1000`) indicará en color verde cuando el texto cumpla la longitud reglamentaria.
-7. Presione el botón **"Confirmar Tipología"** (área táctil ergonómica $\ge$ 48px).
+7. Presione el botón **"Confirmar tipología"** (área táctil ergonómica $\ge$ 48px).
 8. Tras procesarse la acción:
    - La pantalla mostrará una alerta de confirmación: *"Tipología del incidente reclasificada exitosamente en terreno."*
    - La ficha superior de la misión actualizará de inmediato el campo **Tipo** con la nueva categoría técnica.
