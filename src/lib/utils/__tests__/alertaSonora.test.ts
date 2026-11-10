@@ -112,3 +112,4 @@ describe('alertaSonora — Señalética Auditiva y Háptica (HU-35 CP-H35-PWA-03
     expect(resultado.vibracionDisparada).toBe(true);
   });
 });
+

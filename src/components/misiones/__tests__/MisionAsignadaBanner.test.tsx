@@ -114,3 +114,4 @@ describe('MisionAsignadaBanner (HU-35)', () => {
     expect(onCerrarMock).toHaveBeenCalled();
   });
 });
+
