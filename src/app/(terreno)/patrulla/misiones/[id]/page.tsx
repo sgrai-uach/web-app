@@ -13,6 +13,7 @@ import {
   Navigation,
   ClipboardCheck,
   WifiOff,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
@@ -174,6 +175,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
           <div className={styles.codeArea}>
+            <AlertCircle
+              size={20}
+              color="var(--color-primary-teal, #1B6F7D)"
+              aria-hidden="true"
+            />
             <span className={styles.code}>{mision.codigoIncidente}</span>
             <span className={`${styles.priorityChip} ${prioridadClase}`}>
               {formatearPrioridad(mision.prioridad)}
@@ -283,7 +289,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               <div className={styles.enTrayectoTitleRow}>
                 <Navigation
                   size={20}
-                  color="var(--color-primary-teal)"
+                  color="var(--color-primary-teal, #1B6F7D)"
                   aria-hidden="true"
                 />
                 <h2 className={styles.enTrayectoTitle}>
@@ -293,35 +299,37 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               <span className={styles.activeStatusChip}>Misión activa</span>
             </div>
 
-            {mision.sincronizacionPendiente ? (
-              <div className={styles.offlineQueueBanner} role="status">
-                <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
-                <span>
-                  Pendiente de sincronizar: La aceptación fue guardada en la cola
-                  local del dispositivo y se enviará automáticamente al recuperar
-                  conexión.
-                </span>
-              </div>
-            ) : (
-              mensajeConfirmacion && (
-                <div className={styles.SyncedBanner} role="status">
-                  {mensajeConfirmacion}
+            <div className={styles.enTrayectoContent}>
+              {mision.sincronizacionPendiente ? (
+                <div className={styles.offlineQueueBanner} role="status">
+                  <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+                  <span>
+                    Pendiente de sincronizar: La aceptación fue guardada en la cola
+                    local del dispositivo y se enviará automáticamente al recuperar
+                    conexión.
+                  </span>
                 </div>
-              )
-            )}
+              ) : (
+                mensajeConfirmacion && (
+                  <div className={styles.SyncedBanner} role="status">
+                    {mensajeConfirmacion}
+                  </div>
+                )
+              )}
 
-            <div className={styles.canonicalStatesGrid}>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Misión</span>
-                <span className={styles.canonicalStateValue}>En curso</span>
-              </div>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Patrulla</span>
-                <span className={styles.canonicalStateValue}>En verificación</span>
-              </div>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Incidente</span>
-                <span className={styles.canonicalStateValue}>Verificando</span>
+              <div className={styles.canonicalStatesGrid}>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Misión</span>
+                  <span className={styles.canonicalStateValue}>En curso</span>
+                </div>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Patrulla</span>
+                  <span className={styles.canonicalStateValue}>En verificación</span>
+                </div>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Incidente</span>
+                  <span className={styles.canonicalStateValue}>Verificando</span>
+                </div>
               </div>
             </div>
           </section>

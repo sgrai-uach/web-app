@@ -68,8 +68,8 @@
 /* --- Encabezado y Ficha de Misión --- */
 .missionHeader {
   background-color: var(--color-white, #FFFFFF);
-  border-top: 1px solid var(--border-color-neutral, #DFE3E8);
-  border-bottom: 1px solid var(--border-color-neutral, #DFE3E8);
+  border: 1px solid var(--border-color-neutral, #DFE3E8);
+  border-top: 4px solid var(--color-accent-mint, #4FAE9B);
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -78,6 +78,7 @@
 @media (min-width: 640px) {
   .missionHeader {
     border: 1px solid var(--border-color-neutral, #DFE3E8);
+    border-top: 4px solid var(--color-accent-mint, #4FAE9B);
   }
 }
 
@@ -88,8 +89,9 @@
   gap: var(--space-2, 8px);
   flex-wrap: wrap;
   padding: var(--space-3, 12px) var(--space-4, 16px);
-  background-color: var(--color-primary-teal-dark, #14505A);
-  color: var(--color-white, #FFFFFF);
+  background-color: var(--color-white, #FFFFFF);
+  color: var(--color-primary-teal-dark, #14505A);
+  border-bottom: 1px solid var(--border-color-neutral, #DFE3E8);
 }
 
 .codeArea {
@@ -99,9 +101,9 @@
 }
 
 .code {
-  font-size: 1.125rem;
+  font-size: 1.0625rem;
   font-weight: 800;
-  color: var(--color-white, #FFFFFF);
+  color: var(--color-primary-teal-dark, #14505A);
   letter-spacing: 0.02em;
 }
 
@@ -236,18 +238,16 @@
 .enTrayectoCard {
   background-color: var(--color-white, #FFFFFF);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
-  border-top: 4px solid var(--color-primary-teal, #1B6F7D);
-  padding: var(--space-4, 16px);
+  border-top: 4px solid var(--color-accent-mint, #4FAE9B);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3, 12px);
   width: 100%;
 }
 
 @media (min-width: 640px) {
   .enTrayectoCard {
     border: 1px solid var(--border-color-neutral, #DFE3E8);
-    border-top: 4px solid var(--color-primary-teal, #1B6F7D);
+    border-top: 4px solid var(--color-accent-mint, #4FAE9B);
   }
 }
 
@@ -257,6 +257,10 @@
   justify-content: space-between;
   gap: var(--space-2, 8px);
   flex-wrap: wrap;
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  background-color: var(--color-white, #FFFFFF);
+  color: var(--color-primary-teal-dark, #14505A);
+  border-bottom: 1px solid var(--border-color-neutral, #DFE3E8);
 }
 
 .enTrayectoTitleRow {
@@ -266,10 +270,17 @@
 }
 
 .enTrayectoTitle {
-  font-size: 1.0625rem;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--color-primary-teal-dark, #14505A);
   margin: 0;
+}
+
+.enTrayectoContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
 }
 
 .activeStatusChip {
