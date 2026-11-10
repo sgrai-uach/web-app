@@ -6688,6 +6688,283 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/terreno/notificaciones/{id}/estado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Confirmar acuse de recibo o lectura de notificación de misión (HU-35)
+         * @description Registra de forma idempotente la confirmación técnica automática ('RECIBIDA') o la interacción operativa ('LEIDA') emitida por sgrai-pwa. Emite el evento WebSocket 'notificacion:trazabilidad_actualizada' hacia la Central de Operaciones. Requiere permiso 'misiones:terreno:verificar' y pertenencia a la patrulla destinataria (salvo rol Administrador).
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identificador único UUID de la notificación de despacho */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Nuevo estado de confirmación reportado por el cliente de terreno
+                         * @example RECIBIDA
+                         * @enum {string}
+                         */
+                        estado: "RECIBIDA" | "LEIDA";
+                    };
+                };
+            };
+            responses: {
+                /** @description Estado de notificación actualizado exitosamente de forma idempotente */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Estado de notificación actualizado exitosamente. */
+                            message: string;
+                            /**
+                             * NotificacionMisionDetalle
+                             * @description Trazabilidad completa de la notificación de misión despachada
+                             */
+                            data: {
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador único de la notificación
+                                 */
+                                id: string;
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador de la misión asociada
+                                 */
+                                misionId: string;
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador de la patrulla destinataria
+                                 */
+                                patrullaId: string;
+                                /**
+                                 * @description Estado actual del ciclo de vida de la notificación
+                                 * @enum {string}
+                                 */
+                                estado: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
+                                /**
+                                 * @description Contador de emisiones hacia la patrulla
+                                 * @example 1
+                                 */
+                                intentosEnvio: number;
+                                /** @description Marca temporal UTC de registro en base de datos */
+                                creadaAt: string;
+                                /** @description Marca temporal UTC de emisión hacia la sala de la patrulla */
+                                enviadaAt: string | null;
+                                /** @description Marca temporal UTC del acuse de recibo técnico automático */
+                                recibidaAt: string | null;
+                                /** @description Marca temporal UTC del acuse de lectura operativa */
+                                leidaAt: string | null;
+                            };
+                        };
+                    };
+                };
+                /** @description Identificador no es UUID válido o cuerpo con estado distinto a 'RECIBIDA' o 'LEIDA' */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token ausente */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'misiones:terreno:verificar' y pertenecer a la patrulla asignada */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Notificación no encontrada */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor al actualizar acuse de notificación */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/terreno/misiones/pendientes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Consultar órdenes de misión pendientes de acuse para terreno (HU-35)
+         * @description Consulta las misiones asignadas a la patrulla del usuario autenticado cuyas notificaciones se encuentran en 'PENDIENTE_ENVIO' o 'ENVIADA'. Utilizado por sgrai-pwa al recuperar conectividad tras operar fuera de cobertura (Arquitectura Offline-First). Requiere permiso 'misiones:terreno:verificar'.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    patrullaId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Listado de misiones pendientes obtenido exitosamente */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Misiones pendientes obtenidas exitosamente. */
+                            message: string;
+                            data: {
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador de la notificación para envío de ACK
+                                 */
+                                notificacionId: string;
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador único de la misión
+                                 */
+                                misionId: string;
+                                /**
+                                 * @description Código oficial de la orden táctica
+                                 * @example MIS-2026-0001
+                                 */
+                                codigoMision: string;
+                                /** @description Título descriptivo de la misión */
+                                titulo: string;
+                                /** @description Instrucciones de trabajo en terreno */
+                                descripcion: string | null;
+                                /**
+                                 * @description Tipo de misión (ej. VERIFICACION)
+                                 * @example VERIFICACION
+                                 */
+                                tipoMision: string;
+                                /**
+                                 * @description Prioridad operativa (BAJA, MEDIA, ALTA, CRITICA)
+                                 * @example ALTA
+                                 */
+                                prioridad: string;
+                                /**
+                                 * @description Estado actual de la misión en el sistema
+                                 * @example DESPACHADA
+                                 */
+                                estadoMision: string;
+                                /**
+                                 * @description Estado de entrega de la notificación
+                                 * @example PENDIENTE_ENVIO
+                                 * @enum {string}
+                                 */
+                                estadoNotificacion: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador de la patrulla asignada
+                                 */
+                                patrullaId: string;
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador del incidente asociado si aplica
+                                 */
+                                incidenteId: string | null;
+                                /**
+                                 * @description Código del incidente atendido
+                                 * @example INC-2026-8869
+                                 */
+                                incidenteCodigo: string | null;
+                                /**
+                                 * @description Folio correlativo institucional
+                                 * @example FOL-8869
+                                 */
+                                incidenteFolio: string | null;
+                                /**
+                                 * @description Tipología de afectación preliminar
+                                 * @example Inundación
+                                 */
+                                tipoAfectacion: string | null;
+                                /**
+                                 * @description Dirección o punto de referencia en la comuna
+                                 * @example Av. Ramón Picarte 1500
+                                 */
+                                direccion: string | null;
+                                /** @description Latitud WGS84 del punto a atender */
+                                latitud: number | null;
+                                /** @description Longitud WGS84 del punto a atender */
+                                longitud: number | null;
+                                /** @description Fecha de generación de la orden */
+                                creadaAt: string;
+                                /** @description Fecha de emisión al canal */
+                                enviadaAt: string | null;
+                            }[];
+                            /** @example 1 */
+                            total: number;
+                        };
+                    };
+                };
+                /** @description No autenticado o token ausente */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'misiones:terreno:verificar' y pertenecer a una patrulla activa */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor al consultar misiones pendientes */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {

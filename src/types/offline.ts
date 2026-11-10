@@ -13,7 +13,8 @@ export type AccionOutboxTipo =
   | 'ENVIAR_REPORTE'
   | 'SUBIR_EVIDENCIA'
   | 'SOLICITAR_APOYO'
-  | 'CERRAR_FAENA';
+  | 'CERRAR_FAENA'
+  | 'ACK_NOTIFICACION';
 
 /**
  * Payload validado contra el contrato OpenAPI generado antes de encolarse en IndexedDB (GEMINI.md §5.3).
