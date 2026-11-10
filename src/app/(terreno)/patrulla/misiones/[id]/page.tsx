@@ -20,6 +20,7 @@ import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
+import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
@@ -344,6 +345,16 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               operativos para categorizar el incidente, ajustar la prioridad y
               enviar el reporte de situación están habilitados.
             </p>
+
+            <EvaluacionTipologiaCard
+              incidenteId={mision.incidenteId}
+              misionActual={mision}
+              onTipologiaActualizada={(resultado) => {
+                if (resultado.mision) {
+                  setMision(resultado.mision);
+                }
+              }}
+            />
           </section>
         </>
       )}

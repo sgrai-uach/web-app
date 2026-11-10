@@ -57,3 +57,17 @@ export interface CatalogoLocal {
   datos: unknown[];
   actualizadoEn: string;
 }
+
+export interface TipoIncidenteCatalogoItem {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  activo: boolean;
+}
+
+export interface ReclasificarTipologiaPayload {
+  tipoIncidenteId: string;
+  justificacion: string;
+  misionId?: string;
+}
+
