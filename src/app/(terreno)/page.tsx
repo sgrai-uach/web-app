@@ -23,7 +23,8 @@ export default function TerrenoHomePage() {
       const destino = `${baseLogin}?returnUrl=${encodeURIComponent('/terreno')}`;
       try {
         if (typeof window !== 'undefined' && window.location) {
-          window.location.assign(destino);
+          const destinoUrl = new URL(destino, window.location.origin).toString();
+          window.location.assign(destinoUrl);
         }
       } catch {
         // Ignorado en pruebas unitarias
