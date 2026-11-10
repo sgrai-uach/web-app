@@ -9,7 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
 import { guardarMisionesLocales } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
-import { ordenarMisionesPorPrioridadYFecha } from '@/lib/utils/formatters';
+import { ordenarMisionesPorActualizacion } from '@/lib/utils/formatters';
 import {
   MisionFiltrosChips,
   type FiltroEstado,
@@ -140,7 +140,7 @@ function CuadrillaMisionesContenido() {
       });
     }
 
-    return ordenarMisionesPorPrioridadYFecha(filtradas);
+    return ordenarMisionesPorActualizacion(filtradas);
   }, [misiones, filtroActual]);
 
   return (
