@@ -113,3 +113,4 @@ Si durante la emisión del acuse de recibo técnico o de lectura la señal celul
 
 - **`sgrai-api`:** Administra el ciclo de vida de la notificación en base de datos (`PENDIENTE_ENVIO` $\to$ `ENVIADA` $\to$ `RECIBIDA` $\to$ `LEIDA`), emite los eventos `mision:asignada` a la sala `patrulla:{patrullaId}` y procesa los acuses mediante el handler de WebSocket `notificacion:ack` o el endpoint REST `PATCH /api/terreno/notificaciones/[id]/estado`.
 - **`sgrai-web`:** En el Centro de Mando del Encargado y en el tablero Kanban operativo, escucha el evento en tiempo real `notificacion:trazabilidad_actualizada` para desplegar el badge de trazabilidad del despacho correspondiente (`PENDIENTE_ENVIO`, `ENVIADA`, `RECIBIDA`, `LEIDA`), asegurando que la Central sepa en todo momento si la patrulla cuenta con señal y si leyó la orden de servicio.
+
