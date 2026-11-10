@@ -260,5 +260,28 @@ describe('PatrullaMisionDetailPage — Confirmar y aceptar misión asignada (HU-
       ).not.toBeInTheDocument();
     });
   });
+
+  it('muestra estado de misión no encontrada cuando obtenerDetalleMision retorna null (sin fabricar datos ficticios)', async () => {
+    configurarAuthMock({ unidadActiva: true, permisoVerificar: true });
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(null);
+
+    await act(async () => {
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <PatrullaMisionDetailPage
+            params={Promise.resolve({ id: 'uuid-inexistente-9999' })}
+          />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/misi[oó]n no encontrada/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/av\. alemania 600/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /aceptar misi[oó]n/i })
+    ).not.toBeInTheDocument();
+  });
 });
 

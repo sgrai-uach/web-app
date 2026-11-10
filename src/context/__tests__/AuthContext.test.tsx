@@ -136,6 +136,44 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
     });
 
     expect(result.current.autenticado).toBe(false);
+    expect(result.current.unidadActiva).toBe(false);
     expect(cookieUtils.removeAuthCookie).not.toHaveBeenCalled();
+  });
+
+  it('valida estrictamente misiones:terreno:verificar sin fallback permisivo y mapea datos de unidad', async () => {
+    vi.mocked(cookieUtils.getAuthCookie).mockReturnValue('token-patrulla-activo');
+    vi.mocked(seguridadService.obtenerUsuarioActivo).mockResolvedValue({
+      id: 'user-pat-2',
+      rut: '11.222.333-4',
+      nombre: 'Patrullero Sin Permiso',
+      email: 'pat2@valdivia.cl',
+      activo: true,
+      rol: {
+        id: 'rol-pat',
+        nombre: 'Patrulla Verificadora',
+        codigo: 'PATRULLA_VERIFICADORA',
+        permisos: [],
+      },
+      permisos: [],
+      delegacionId: 'del-1',
+      delegacion: { id: 'del-1', nombre: 'Norte' },
+      unidadId: 'pat-09',
+      unidadNombre: 'Patrulla Costa-9',
+      unidadActiva: false,
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await act(async () => {
+      await result.current.recargarSesion();
+    });
+
+    expect(result.current.autenticado).toBe(true);
+    expect(result.current.tienePermiso('misiones:terreno:verificar')).toBe(false);
+    expect(result.current.usuario?.unidadId).toBe('pat-09');
+    expect(result.current.usuario?.unidadNombre).toBe('Patrulla Costa-9');
+    expect(result.current.unidadActiva).toBe(false);
   });
 });
