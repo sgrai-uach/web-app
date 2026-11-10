@@ -34,7 +34,7 @@ Este manual describe el procedimiento operativo mediante el cual el personal de 
    - **Tipo** de incidente reportado inicialmente.
    - **Ubicación** (con botón **Ver mapa** para consultar el punto exacto en el visor cartográfico).
    - **Trabajo** o instrucciones tácticas de verificación.
-5. En la tarjeta inferior **Confirmación de salida a terreno**, presione el botón táctil de alto contraste **"Aceptar Misión"**.
+5. En el recuadro operativo **Acciones de Despacho**, presione el botón táctil principal de alto contraste **"Aceptar Misión"**.
 6. Al completarse la confirmación:
    - El estado de la misión cambia automáticamente de **Despachada** a **En curso** y se registra la hora de **Inicio de trayecto**.
    - La patrulla mantiene su estado canónico **En verificación** (`EN_VERIFICACION`) y el incidente permanece en **Verificando** (`VERIFICANDO`).

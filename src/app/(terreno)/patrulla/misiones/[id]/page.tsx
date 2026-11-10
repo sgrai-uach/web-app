@@ -8,7 +8,9 @@ import {
   Calendar,
   Archive,
   Map,
+  XCircle,
   CheckCircle,
+  AlertCircle,
   Navigation,
   ClipboardCheck,
   WifiOff,
@@ -21,20 +23,26 @@ import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
+import { RechazoMisionModal, type CoordenadasGPS } from '@/components/misiones/RechazoMisionModal';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
+  rechazarMision,
 } from '@/services/misionesService';
 import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaDetailPage.module.css';
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string }> | { id: string };
 }
 
 export default function PatrullaMisionDetailPage({ params }: PageProps) {
-  const { id: misionId } = use(params);
+  const resolvedParams =
+    params && typeof (params as { then?: unknown }).then === 'function'
+      ? use(params as Promise<{ id: string }>)
+      : (params as { id: string });
+  const misionId = resolvedParams?.id;
   const { usuario, unidadActiva, tieneUnidadAsignada, tienePermiso } = useAuth();
   const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
   const [mision, setMision] = useState<MisionLocal | null>(null);
@@ -43,6 +51,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
   const [errorAceptacion, setErrorAceptacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
+  const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
+  const [feedbackMensaje, setFeedbackMensaje] = useState<{
+    tipo: 'success' | 'offline';
+    texto: string;
+  } | null>(null);
 
   const cargarDetalle = useCallback(async () => {
     setCargando(true);
@@ -145,7 +158,43 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     !unidadActiva ||
     estadoNormalizado === 'FINALIZADA' ||
     estadoNormalizado === 'COMPLETADA' ||
-    estadoNormalizado === 'CERRADA';
+    estadoNormalizado === 'CERRADA' ||
+    estadoNormalizado === 'RECHAZADA';
+
+  const esRechazable =
+    unidadActiva &&
+    (estadoNormalizado === 'DESPACHADA' || estadoNormalizado === 'ASIGNADA' || estadoNormalizado === 'PENDIENTE');
+
+  const handleConfirmarRechazo = async (
+    motivo: string,
+    coordenadas?: CoordenadasGPS
+  ) => {
+    const res = await rechazarMision(mision.id, {
+      justificacion_rechazo: motivo,
+      latitud: coordenadas?.lat,
+      longitud: coordenadas?.lng,
+    });
+
+    setMision((prev) =>
+      prev
+        ? {
+            ...prev,
+            estado: 'RECHAZADA',
+            actualizadoEn: res.mision?.actualizadoEn || new Date().toISOString(),
+            datosAdicionales: {
+              ...prev.datosAdicionales,
+              justificacionRechazo: motivo,
+            },
+          }
+        : prev
+    );
+
+    setModalRechazoAbierto(false);
+    setFeedbackMensaje({
+      tipo: res.modoOffline ? 'offline' : 'success',
+      texto: res.mensaje,
+    });
+  };
 
   return (
     <div className={styles.container}>
@@ -172,6 +221,39 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           nombreUnidad={usuario?.unidadNombre}
         />
       ) : null}
+
+      {feedbackMensaje && (
+        <div
+          className={`${styles.feedbackBanner} ${
+            feedbackMensaje.tipo === 'offline'
+              ? styles.feedbackOffline
+              : styles.feedbackSuccess
+          }`}
+          role="status"
+        >
+          {feedbackMensaje.tipo === 'offline' ? (
+            <AlertCircle size={18} aria-hidden="true" />
+          ) : (
+            <CheckCircle size={18} aria-hidden="true" />
+          )}
+          <span>{feedbackMensaje.texto}</span>
+        </div>
+      )}
+
+      {estadoNormalizado === 'RECHAZADA' && (
+        <div className={styles.rejectedBanner} role="status">
+          <div className={styles.rejectedHeader}>
+            <XCircle size={18} aria-hidden="true" />
+            <span>Misión Rechazada por Patrulla Verificadora</span>
+          </div>
+          {mision.datosAdicionales?.justificacionRechazo && (
+            <p className={styles.rejectedReason}>
+              <strong>Motivo documentado:</strong>{' '}
+              {String(mision.datosAdicionales.justificacionRechazo)}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
@@ -241,17 +323,15 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Acción principal: Confirmar y Aceptar Misión (HU-36) */}
-      {mostrarBotonAceptar && (
+      {/* Acciones Operativas de Despacho (H36 / H69) */}
+      {(mostrarBotonAceptar || esRechazable) && (
         <section
-          className={styles.acceptCard}
-          aria-label="Confirmación de salida de patrulla"
+          className={styles.dispatchActionsCard}
+          aria-label="Acciones operativas de despacho"
         >
-          <h2 className={styles.acceptTitle}>Confirmación de salida a terreno</h2>
-          <p className={styles.acceptDescription}>
-            Presione el botón para informar al Centro de Mando que la patrulla ha
-            tomado conocimiento de la emergencia y se dirige al lugar para iniciar
-            la evaluación.
+          <h2 className={styles.dispatchActionsTitle}>Acciones de Despacho</h2>
+          <p className={styles.dispatchActionsDesc}>
+            Confirme la salida a terreno para evaluar o fundamente el rechazo si no es posible concurrir.
           </p>
 
           {errorAceptacion && (
@@ -260,21 +340,38 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             </div>
           )}
 
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={aceptando}
-            icon={<CheckCircle size={20} />}
-            onClick={handleAceptarMision}
-            className={styles.acceptButton}
-          >
-            Aceptar Misión
-          </Button>
+          <div className={styles.dispatchButtonsGroup}>
+            {mostrarBotonAceptar && (
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={aceptando}
+                icon={<CheckCircle size={20} />}
+                onClick={handleAceptarMision}
+                className={styles.acceptButton}
+              >
+                Aceptar Misión
+              </Button>
+            )}
+
+            {esRechazable && (
+              <Button
+                variant="destructive"
+                size="md"
+                fullWidth
+                icon={<XCircle size={18} />}
+                onClick={() => setModalRechazoAbierto(true)}
+                disabled={aceptando}
+              >
+                Rechazar Misión
+              </Button>
+            )}
+          </div>
         </section>
       )}
 
-      {/* Vista activa: En Trayecto / Evaluación (HU-36) */}
+{/* Vista activa: En Trayecto / Evaluación (HU-36) */}
       {unidadActiva && esEnCurso && (
         <>
           <section
@@ -376,6 +473,13 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         longitud={mision.coordenadas?.lng}
         titulo={mision.tipologia || mision.codigoIncidente}
         direccion={mision.direccion}
+      />
+
+      <RechazoMisionModal
+        abierto={modalRechazoAbierto}
+        codigoMision={mision.codigoIncidente}
+        alConfirmar={handleConfirmarRechazo}
+        alCancelar={() => setModalRechazoAbierto(false)}
       />
     </div>
   );

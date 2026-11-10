@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   sincronizarMisiones,
   obtenerDetalleMision,
+  rechazarMision,
   aceptarMisionPatrulla,
   validarPayloadAceptarMision,
   obtenerCoordenadasOpcionales,
@@ -188,6 +189,155 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
 
       expect(detalle).toEqual(mockLocal);
       expect(offlineQueue.obtenerMisionLocalPorId).toHaveBeenCalledWith('mis-fallback');
+    });
+  });
+
+  describe('rechazarMision (H41, H69 — Regla Crítica §3.3)', () => {
+    it('debe arrojar error de validación si la justificación tiene menos de 5 caracteres', async () => {
+      await expect(
+        rechazarMision('mis-001', {
+          justificacion_rechazo: '   ', // vacío tras trim
+        })
+      ).rejects.toThrow('al menos 5 caracteres');
+
+      await expect(
+        rechazarMision('mis-001', {
+          justificacion_rechazo: ' abc ', // 3 caracteres tras trim
+        })
+      ).rejects.toThrow('al menos 5 caracteres');
+    });
+
+    it('debe enviar POST a /api/misiones/{id}/rechazar cuando hay conexión', async () => {
+      const mockApiResponse = {
+        data: {
+          message: 'Misión rechazada exitosamente.',
+          data: {
+            mision: {
+              id: 'mis-001',
+              codigo: 'MIS-2026-8341',
+              estado: 'RECHAZADA',
+              justificacionRechazo: 'Desperfecto mecánico en vehículo',
+              actualizadoEn: '2026-11-03T18:45:00.000Z',
+            },
+            patrulla: {
+              id: 'pat-001',
+              nombre: 'Patrulla 1',
+              estado: 'DISPONIBLE',
+            },
+            incidente: {
+              id: 'inc-001',
+              codigo: 'INC-2026-1042',
+              estado: 'REPORTADO',
+            },
+            hito: {
+              id: 'hit-001',
+              hito: 'RECHAZADA',
+              descripcion: 'Misión rechazada por patrulla',
+              creadoEn: '2026-11-03T18:45:00.000Z',
+            },
+          },
+        },
+        error: null,
+        response: { ok: true, status: 200 } as Response,
+      };
+
+      vi.mocked(apiClient.POST).mockResolvedValue(mockApiResponse as never);
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: 'mis-001',
+        incidenteId: 'inc-001',
+        codigoIncidente: 'INC-2026-1042',
+        tipologia: 'Caída de árbol',
+        direccion: 'Av. Ramón Picarte',
+        prioridad: 'ALTA',
+        estado: 'DESPACHADA',
+        fechaDespacho: '2026-11-03T18:00:00.000Z',
+        actualizadoEn: '2026-11-03T18:00:00.000Z',
+      });
+
+      const res = await rechazarMision('mis-001', {
+        justificacion_rechazo: 'Desperfecto mecánico en vehículo',
+        latitud: -39.8142,
+        longitud: -73.2458,
+      });
+
+      expect(res.exito).toBe(true);
+      expect(apiClient.POST).toHaveBeenCalledWith(
+        '/api/misiones/{id}/rechazar',
+        expect.objectContaining({
+          params: expect.objectContaining({
+            path: { id: 'mis-001' },
+          }),
+          body: {
+            justificacion_rechazo: 'Desperfecto mecánico en vehículo',
+            latitud: -39.8142,
+            longitud: -73.2458,
+          },
+        })
+      );
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'mis-001',
+          estado: 'RECHAZADA',
+        })
+      );
+    });
+
+    it('debe arrojar error cuando el backend retorna 400 Bad Request o 409 Conflict', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: null,
+        error: { message: 'La misión no se encuentra en estado DESPACHADA.' },
+        response: { ok: false, status: 409 } as Response,
+      } as never);
+
+      await expect(
+        rechazarMision('mis-001', {
+          justificacion_rechazo: 'Emergencia prioritaria en otro sector',
+        })
+      ).rejects.toThrow('La misión no se encuentra en estado DESPACHADA.');
+    });
+
+    it('debe encolar en outbox y actualizar estado local cuando el dispositivo está offline', async () => {
+      const originalOnLine = navigator.onLine;
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: 'mis-001',
+        incidenteId: 'inc-001',
+        codigoIncidente: 'INC-2026-1042',
+        tipologia: 'Caída de árbol',
+        direccion: 'Av. Ramón Picarte',
+        prioridad: 'ALTA',
+        estado: 'DESPACHADA',
+        fechaDespacho: '2026-11-03T18:00:00.000Z',
+        actualizadoEn: '2026-11-03T18:00:00.000Z',
+      });
+
+      const res = await rechazarMision('mis-001', {
+        justificacion_rechazo: 'Corte de ruta total por derrumbe',
+      });
+
+      expect(res.exito).toBe(true);
+      expect(res.modoOffline).toBe(true);
+      expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tipo: 'RECHAZAR_MISION',
+          url: '/api/misiones/mis-001/rechazar',
+          metodo: 'POST',
+          payload: {
+            justificacion_rechazo: 'Corte de ruta total por derrumbe',
+            latitud: undefined,
+            longitud: undefined,
+          },
+        })
+      );
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'mis-001',
+          estado: 'RECHAZADA',
+        })
+      );
+
+      Object.defineProperty(navigator, 'onLine', { value: originalOnLine, configurable: true });
     });
   });
 

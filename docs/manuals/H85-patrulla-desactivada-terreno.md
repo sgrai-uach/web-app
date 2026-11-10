@@ -10,7 +10,7 @@
 
 Describir el comportamiento y la experiencia de usuario en la aplicación móvil de terreno (PWA) ante dos escenarios operacionales clave vinculados al estado de las unidades:
 
-1. **Patrulla Desactivada (Baja Lógica §3.7):** La unidad vehicular o patrulla ha sido dada de baja del servicio activo por la Administración Central, permitiendo a los operadores acceder a la aplicación en **modo histórico de solo lectura** para consultar auditorías de evaluaciones previas, impidiendo la recepción de nuevos despachos o el ajuste de prioridades.
+1. **Patrulla Desactivada (Baja Lógica):** La unidad vehicular o patrulla ha sido dada de baja del servicio activo por la Administración Central, permitiendo a los operadores acceder a la aplicación en **modo histórico de solo lectura** para consultar auditorías de evaluaciones previas, impidiendo la recepción de nuevos despachos o el ajuste de prioridades.
 2. **Operador Sin Unidad Asignada:** El funcionario cuenta con sesión iniciada pero no tiene una patrulla o cuadrilla asignada en el turno actual, alertándole de manera discreta e informativa sin confundirlo con una baja lógica de unidad.
 3. **Historial de Patrullas Asignadas:** Registro persistente en el perfil del operador (`/terreno/perfil`) que preserva la trazabilidad de todas las patrullas en las que ha prestado servicio.
 
@@ -36,7 +36,7 @@ Para evitar confusiones entre personal no asignado y unidades retiradas del serv
 | Situación | Componente / Banner | Mensaje Desplegado | Comportamiento |
 |---|---|---|---|
 | **Sin Patrulla Asignada** | `<SinUnidadBanner />` | *"Sin patrulla asignada: No tienes una patrulla verificadora asignada actualmente. Comunícate con el Centro de Mando o tu supervisor para que te asignen a un móvil operativo."* | Modo neutral informativo, no bloquea navegación, orienta al operador. |
-| **Patrulla Desactivada** | `<UnidadInactivaBanner />` | *"Patrulla Desactivada — [Nombre Unidad]: Esta unidad ha sido retirada del servicio activo (§3.7 de baja lógica). Se encuentra en modo histórico de solo lectura para consulta de faenas anteriores. No es posible recibir nuevos despachos ni ejecutar acciones operativas."* | Modo histórico de solo lectura, desactiva recepción de nuevas alertas y formularios de acción. |
+| **Patrulla Desactivada** | `<UnidadInactivaBanner />` | *"Patrulla Desactivada — [Nombre Unidad]: Esta unidad ha sido retirada del servicio activo (baja lógica). Se encuentra en modo histórico de solo lectura para consulta de faenas anteriores. No es posible recibir nuevos despachos ni ejecutar acciones operativas."* | Modo histórico de solo lectura, desactiva recepción de nuevas alertas y formularios de acción. |
 
 ### 3.2. Historial de Unidades en el Perfil (`/terreno/perfil`)
 
