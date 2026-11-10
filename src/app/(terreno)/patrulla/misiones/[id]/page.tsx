@@ -335,6 +335,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               <h3 className={styles.evaluationTitle}>
                 <ClipboardCheck
                   size={20}
+                  color="var(--color-primary-teal, #1B6F7D)"
                   aria-hidden="true"
                 />
                 <span>Formularios de Reporte Técnico</span>
