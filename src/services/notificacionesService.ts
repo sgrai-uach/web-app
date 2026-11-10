@@ -131,8 +131,8 @@ export async function procesarMisionAsignada(
     // Si IndexedDB falla, continuar con emisión de ACK
   }
 
-  // Emitir acuse técnico automático 'RECIBIDA' en segundo plano
-  void emitirAckRecibida(alerta.notificacionId);
+  // Emitir acuse técnico automático 'RECIBIDA' (WebSocket -> REST -> Outbox)
+  await emitirAckRecibida(alerta.notificacionId);
 
   return { esDuplicado: false, mision };
 }
