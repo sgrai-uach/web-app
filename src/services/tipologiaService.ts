@@ -157,6 +157,11 @@ export async function reclasificarTipologiaEnTerreno(
     // Usar nombre genérico si no se resuelve
   }
 
+  const justificacionFinal =
+    validado.justificacion && validado.justificacion.trim().length >= 5
+      ? validado.justificacion.trim()
+      : 'Tipología constatada y ratificada en terreno sin variaciones.';
+
   const misionUuidValido =
     validado.misionId ||
     (misionActual?.id && /^[0-9a-fA-F-]{36}$/.test(misionActual.id)
@@ -165,7 +170,7 @@ export async function reclasificarTipologiaEnTerreno(
 
   const payloadMutacion = {
     tipoIncidenteId: validado.tipoIncidenteId,
-    justificacion: validado.justificacion,
+    justificacion: justificacionFinal,
     misionId: misionUuidValido,
   };
 
@@ -187,8 +192,11 @@ export async function reclasificarTipologiaEnTerreno(
         actualizadoEn: new Date().toISOString(),
         datosAdicionales: {
           ...misionActual.datosAdicionales,
+          tipologiaEvaluada: true,
           tipoIncidenteId: validado.tipoIncidenteId,
-          justificacionTipologia: validado.justificacion,
+          justificacionTipologia: justificacionFinal,
+          fechaEvaluacionTipologia: new Date().toISOString(),
+          esReclasificacion: Boolean(validado.esCambio),
         },
       };
       await guardarMisionLocal(misionActualizada);
@@ -230,8 +238,11 @@ export async function reclasificarTipologiaEnTerreno(
           actualizadoEn: body?.data?.incidente?.actualizadoEn || new Date().toISOString(),
           datosAdicionales: {
             ...misionActual.datosAdicionales,
+            tipologiaEvaluada: true,
             tipoIncidenteId: validado.tipoIncidenteId,
-            justificacionTipologia: validado.justificacion,
+            justificacionTipologia: justificacionFinal,
+            fechaEvaluacionTipologia: new Date().toISOString(),
+            esReclasificacion: Boolean(validado.esCambio),
             hitoReclasificacion: body?.data?.hito,
           },
         };
@@ -286,8 +297,11 @@ export async function reclasificarTipologiaEnTerreno(
           actualizadoEn: new Date().toISOString(),
           datosAdicionales: {
             ...misionActual.datosAdicionales,
+            tipologiaEvaluada: true,
             tipoIncidenteId: validado.tipoIncidenteId,
-            justificacionTipologia: validado.justificacion,
+            justificacionTipologia: justificacionFinal,
+            fechaEvaluacionTipologia: new Date().toISOString(),
+            esReclasificacion: Boolean(validado.esCambio),
           },
         };
         await guardarMisionLocal(misionActualizada);

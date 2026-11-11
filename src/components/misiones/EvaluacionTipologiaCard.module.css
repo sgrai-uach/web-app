@@ -100,3 +100,88 @@
   border-radius: var(--radius-none, 0px);
   font-weight: 700;
 }
+
+.ratificacionNotice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: var(--space-3, 12px);
+  background-color: var(--color-info-bg, #e0f2f1);
+  color: var(--color-primary-teal, #1b6f7d);
+  border-left: 4px solid var(--color-primary-teal, #1b6f7d);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.resumenCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  background-color: var(--color-bg-light, #eceff3);
+  border: 1px solid var(--color-border, #d1d5db);
+  padding: var(--space-4, 16px);
+}
+
+.resumenHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+  padding-bottom: var(--space-2, 8px);
+  border-bottom: 1px solid var(--color-border, #d1d5db);
+}
+
+.resumenTitulo {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-primary-teal-dark, #14505a);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.resumenGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.resumenItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.resumenLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-muted, #5f676e);
+}
+
+.resumenValor {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text-dark, #2b2b2b);
+}
+
+.resumenJustificacion {
+  margin-top: 4px;
+  padding: var(--space-2, 8px);
+  background-color: var(--color-white, #ffffff);
+  border-left: 3px solid var(--color-primary-teal, #1b6f7d);
+  font-size: 0.8125rem;
+  color: var(--color-text-dark, #2b2b2b);
+  word-break: break-word;
+}
+
+.btnModificar {
+  min-height: 48px;
+  border-radius: var(--radius-none, 0px);
+  font-weight: 700;
+  align-self: flex-start;
+  margin-top: var(--space-1, 4px);
+}
+

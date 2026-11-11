@@ -10,6 +10,7 @@ import {
   Map,
   Tag,
   CheckCircle,
+  CheckCircle2,
   Navigation,
   ClipboardCheck,
   WifiOff,
@@ -47,6 +48,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
   const [errorAceptacion, setErrorAceptacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
+  const [seccionCategorizacionAbierta, setSeccionCategorizacionAbierta] = useState<boolean>(true);
 
   const cargarDetalle = useCallback(async () => {
     setCargando(true);
@@ -54,6 +56,9 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       const encontrada = await obtenerDetalleMision(misionId);
       if (encontrada) {
         setMision(encontrada);
+        if (encontrada.datosAdicionales?.tipologiaEvaluada) {
+          setSeccionCategorizacionAbierta(false);
+        }
       } else {
         setMision({
           id: misionId,
@@ -359,9 +364,15 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               <SeccionDesplegable
                 titulo="Categorización del incidente"
                 icono={<Tag size={18} />}
-                abiertoPorDefecto
+                abierto={seccionCategorizacionAbierta}
+                onToggle={(abierto) => setSeccionCategorizacionAbierta(abierto)}
                 indicador={
-                  mision.sincronizacionPendiente ? (
+                  mision.datosAdicionales?.tipologiaEvaluada ? (
+                    <span className={styles.badgeCompletado}>
+                      <CheckCircle2 size={14} aria-hidden="true" />
+                      <span>Completado</span>
+                    </span>
+                  ) : mision.sincronizacionPendiente ? (
                     <span className={styles.syncPendingBadge}>Pendiente</span>
                   ) : null
                 }
@@ -373,6 +384,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                     if (resultado.mision) {
                       setMision(resultado.mision);
                     }
+                    setSeccionCategorizacionAbierta(false);
                   }}
                 />
               </SeccionDesplegable>

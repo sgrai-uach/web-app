@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SeccionDesplegable } from '../SeccionDesplegable';
 
@@ -55,6 +55,29 @@ describe('SeccionDesplegable', () => {
     const summary = screen.getByText('Con indicador').closest('summary');
     expect(summary).not.toBeNull();
     expect(summary).toHaveTextContent('Pendiente');
+  });
+
+  it('opera en modo controlado respetando la prop abierto y disparando onToggle', () => {
+    const onToggleMock = vi.fn();
+    const { container, rerender } = render(
+      <SeccionDesplegable titulo="Controlada" abierto={true} onToggle={onToggleMock}>
+        <p>Visible controlada</p>
+      </SeccionDesplegable>
+    );
+
+    const details = container.querySelector('details') as HTMLDetailsElement;
+    expect(details.open).toBe(true);
+
+    details.open = false;
+    fireEvent(details, new Event('toggle'));
+    expect(onToggleMock).toHaveBeenCalledWith(false);
+
+    rerender(
+      <SeccionDesplegable titulo="Controlada" abierto={false} onToggle={onToggleMock}>
+        <p>Visible controlada</p>
+      </SeccionDesplegable>
+    );
+    expect(details.open).toBe(false);
   });
 });
 

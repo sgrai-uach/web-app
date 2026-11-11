@@ -400,6 +400,21 @@
   letter-spacing: 0.04em;
 }
 
+.badgeCompletado {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  background-color: var(--color-success-bg, #E8F5E9);
+  color: var(--color-success, #2E7D32);
+  border: 1px solid var(--color-success, #2E7D32);
+  border-radius: var(--radius-none, 0px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .readOnlyNotice {
   background-color: var(--color-bg-light, #ECEFF3);
   border: 1px solid var(--border-color-neutral, #DFE3E8);

@@ -60,7 +60,58 @@ describe('EvaluacionTipologiaCard (H37)', () => {
     expect(select.value).toBe('40000000-0000-4000-8000-000000000003');
   });
 
-  it('muestra la descripción técnica del tipo de incidente seleccionado', async () => {
+  it('permite ratificar la tipología original sin exigir justificación', async () => {
+    const onActualizada = vi.fn();
+    vi.spyOn(tipologiaService, 'reclasificarTipologiaEnTerreno').mockResolvedValue({
+      ok: true,
+      offline: false,
+      mensaje: 'Tipología ratificada exitosamente.',
+      mision: { ...misionMock, datosAdicionales: { tipologiaEvaluada: true } },
+    });
+
+    render(
+      <EvaluacionTipologiaCard
+        incidenteId={misionMock.incidenteId}
+        misionActual={misionMock}
+        onTipologiaActualizada={onActualizada}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toBeInTheDocument();
+    });
+
+    // Al coincidir con la original, debe mostrar la nota de ratificación sin textarea
+    expect(
+      screen.getByText(/Tipología original constatada. No se requiere justificación adicional para ratificar/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+
+    // Clic en Confirmar tipología abre el modal de confirmación
+    const submitBtn = screen.getByRole('button', { name: /Confirmar Tipología/i });
+    fireEvent.click(submitBtn);
+
+    // Verifica que el modal se despliega
+    expect(screen.getByText('Confirmar Evaluación de Tipología')).toBeInTheDocument();
+    expect(screen.getByText(/¿Desea ratificar la tipología del incidente/i)).toBeInTheDocument();
+
+    // Confirmar en el modal
+    const confirmBtn = screen.getByRole('button', { name: /Confirmar y Enviar/i });
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(tipologiaService.reclasificarTipologiaEnTerreno).toHaveBeenCalledWith(
+        misionMock.incidenteId,
+        expect.objectContaining({
+          tipoIncidenteId: '40000000-0000-4000-8000-000000000003',
+          esCambio: false,
+        }),
+        expect.anything()
+      );
+    });
+  });
+
+  it('muestra la descripción técnica del tipo seleccionado y activa justificación obligatoria al cambiar tipología', async () => {
     render(
       <EvaluacionTipologiaCard
         incidenteId={misionMock.incidenteId}
@@ -78,9 +129,12 @@ describe('EvaluacionTipologiaCard (H37)', () => {
     await waitFor(() => {
       expect(screen.getByText(/Acumulación desmedida de agua/i)).toBeInTheDocument();
     });
+
+    // Al cambiar la tipología, el campo de justificación se hace visible
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 
-  it('muestra error de validación si la justificación tiene menos de 5 caracteres al enviar', async () => {
+  it('muestra error de validación si al reclasificar la justificación tiene menos de 5 caracteres', async () => {
     render(
       <EvaluacionTipologiaCard
         incidenteId={misionMock.incidenteId}
@@ -90,6 +144,14 @@ describe('EvaluacionTipologiaCard (H37)', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('combobox')).toBeInTheDocument();
+    });
+
+    // Cambiar a tipo diferente
+    const select = screen.getByRole('combobox');
+    fireEvent.change(select, { target: { value: '40000000-0000-4000-8000-000000000001' } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('textbox')).toBeInTheDocument();
     });
 
     const textarea = screen.getByRole('textbox');
@@ -101,9 +163,12 @@ describe('EvaluacionTipologiaCard (H37)', () => {
     expect(
       screen.getByText(/La justificación es obligatoria y debe contener al menos 5 caracteres/i)
     ).toBeInTheDocument();
+
+    // No debe abrirse el modal si hay error de validación
+    expect(screen.queryByText('Confirmar Evaluación de Tipología')).not.toBeInTheDocument();
   });
 
-  it('actualiza el contador de caracteres en tiempo real', async () => {
+  it('actualiza el contador de caracteres en tiempo real al ingresar justificación', async () => {
     render(
       <EvaluacionTipologiaCard
         incidenteId={misionMock.incidenteId}
@@ -115,6 +180,13 @@ describe('EvaluacionTipologiaCard (H37)', () => {
       expect(screen.getByRole('combobox')).toBeInTheDocument();
     });
 
+    const select = screen.getByRole('combobox');
+    fireEvent.change(select, { target: { value: '40000000-0000-4000-8000-000000000001' } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('textbox')).toBeInTheDocument();
+    });
+
     const textarea = screen.getByRole('textbox');
     fireEvent.change(textarea, { target: { value: 'Evaluación técnica en terreno' } });
 
@@ -123,7 +195,33 @@ describe('EvaluacionTipologiaCard (H37)', () => {
     });
   });
 
-  it('ejecuta reclasificación con éxito online y dispara callback', async () => {
+  it('permite cancelar el modal de confirmación sin ejecutar la mutación', async () => {
+    const spyService = vi.spyOn(tipologiaService, 'reclasificarTipologiaEnTerreno');
+
+    render(
+      <EvaluacionTipologiaCard
+        incidenteId={misionMock.incidenteId}
+        misionActual={misionMock}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toBeInTheDocument();
+    });
+
+    const submitBtn = screen.getByRole('button', { name: /Confirmar Tipología/i });
+    fireEvent.click(submitBtn);
+
+    expect(screen.getByText('Confirmar Evaluación de Tipología')).toBeInTheDocument();
+
+    const cancelBtn = screen.getByRole('button', { name: /Cancelar/i });
+    fireEvent.click(cancelBtn);
+
+    expect(screen.queryByText('Confirmar Evaluación de Tipología')).not.toBeInTheDocument();
+    expect(spyService).not.toHaveBeenCalled();
+  });
+
+  it('ejecuta reclasificación con éxito online tras confirmar en modal y dispara callback', async () => {
     const onActualizada = vi.fn();
     vi.spyOn(tipologiaService, 'reclasificarTipologiaEnTerreno').mockResolvedValue({
       ok: true,
@@ -147,6 +245,10 @@ describe('EvaluacionTipologiaCard (H37)', () => {
     const select = screen.getByRole('combobox');
     fireEvent.change(select, { target: { value: '40000000-0000-4000-8000-000000000001' } });
 
+    await waitFor(() => {
+      expect(screen.getByRole('textbox')).toBeInTheDocument();
+    });
+
     const textarea = screen.getByRole('textbox');
     fireEvent.change(textarea, {
       target: { value: 'Constatación presencial de desborde de río e inundación de calle.' },
@@ -154,6 +256,11 @@ describe('EvaluacionTipologiaCard (H37)', () => {
 
     const submitBtn = screen.getByRole('button', { name: /Confirmar Tipología/i });
     fireEvent.click(submitBtn);
+
+    expect(screen.getByText('Confirmar Evaluación de Tipología')).toBeInTheDocument();
+
+    const confirmModalBtn = screen.getByRole('button', { name: /Confirmar y Enviar/i });
+    fireEvent.click(confirmModalBtn);
 
     await waitFor(() => {
       expect(
@@ -169,7 +276,7 @@ describe('EvaluacionTipologiaCard (H37)', () => {
     );
   });
 
-  it('muestra mensaje informativo cuando la reclasificación se guarda offline', async () => {
+  it('muestra mensaje informativo cuando la reclasificación se guarda offline tras confirmar en modal', async () => {
     vi.spyOn(tipologiaService, 'reclasificarTipologiaEnTerreno').mockResolvedValue({
       ok: true,
       offline: true,
@@ -188,17 +295,64 @@ describe('EvaluacionTipologiaCard (H37)', () => {
       expect(screen.getByRole('combobox')).toBeInTheDocument();
     });
 
+    const select = screen.getByRole('combobox');
+    fireEvent.change(select, { target: { value: '40000000-0000-4000-8000-000000000001' } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('textbox')).toBeInTheDocument();
+    });
+
     const textarea = screen.getByRole('textbox');
     fireEvent.change(textarea, { target: { value: 'Sin señal de datos móviles en ruta.' } });
 
     const submitBtn = screen.getByRole('button', { name: /Confirmar Tipología/i });
     fireEvent.click(submitBtn);
 
+    const confirmModalBtn = screen.getByRole('button', { name: /Confirmar y Enviar/i });
+    fireEvent.click(confirmModalBtn);
+
     await waitFor(() => {
       expect(
         screen.getByText(/Tipología guardada localmente/i)
       ).toBeInTheDocument();
     });
+  });
+
+  it('renderiza resumen de evaluación cuando ya fue evaluada y permite modificar', async () => {
+    const misionEvaluadaMock: MisionLocal = {
+      ...misionMock,
+      tipologia: 'Inundación',
+      datosAdicionales: {
+        tipologiaEvaluada: true,
+        esReclasificacion: true,
+        justificacionTipologia: 'Crecida histórica del río Calle-Calle.',
+        fechaEvaluacionTipologia: '2026-11-10T12:00:00Z',
+      },
+    };
+
+    render(
+      <EvaluacionTipologiaCard
+        incidenteId={misionEvaluadaMock.incidenteId}
+        misionActual={misionEvaluadaMock}
+      />
+    );
+
+    // Debe mostrar la tarjeta de resumen
+    expect(screen.getByTestId('resumen-tipologia')).toBeInTheDocument();
+    expect(screen.getByText('Resumen de Evaluación en Terreno')).toBeInTheDocument();
+    expect(screen.getByText('Reclasificación en terreno')).toBeInTheDocument();
+    expect(screen.getByText('Crecida histórica del río Calle-Calle.')).toBeInTheDocument();
+
+    // Botón para volver a editar
+    const modBtn = screen.getByRole('button', { name: /Modificar categorización/i });
+    expect(modBtn).toBeInTheDocument();
+    fireEvent.click(modBtn);
+
+    // Al hacer clic, se abre el formulario de modificación
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /Cancelar modificación/i })).toBeInTheDocument();
   });
 
   it('deshabilita los controles cuando la prop deshabilitado es true', async () => {
@@ -214,7 +368,6 @@ describe('EvaluacionTipologiaCard (H37)', () => {
       expect(screen.getByRole('combobox')).toBeDisabled();
     });
 
-    expect(screen.getByRole('textbox')).toBeDisabled();
     expect(screen.getByRole('button', { name: /Confirmar Tipología/i })).toBeDisabled();
   });
 });

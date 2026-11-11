@@ -70,6 +70,9 @@ function configurarAuth(unidadActiva = true, permisoVerificar = true) {
     esPatrulla: true,
     esCuadrilla: false,
     unidadActiva,
+    tieneUnidadAsignada: true,
+    estadoAsignacion: unidadActiva ? 'ACTIVA' : 'DESACTIVADA',
+    actualizarUnidadAsignada: vi.fn(),
     tienePermiso: vi
       .fn()
       .mockImplementation((p: string) => permisoVerificar && p === 'misiones:terreno:verificar'),
@@ -178,6 +181,14 @@ describe('PatrullaMisionDetailPage — Categorización de Tipología en Terreno 
     const submitBtn = screen.getByRole('button', { name: /Confirmar Tipología/i });
     fireEvent.click(submitBtn);
 
+    // Modal de confirmación previa
+    await waitFor(() => {
+      expect(screen.getByText('Confirmar Evaluación de Tipología')).toBeInTheDocument();
+    });
+
+    const confirmModalBtn = screen.getByRole('button', { name: /Confirmar y Enviar/i });
+    fireEvent.click(confirmModalBtn);
+
     await waitFor(() => {
       expect(
         screen.getByText(/Tipología del incidente reclasificada exitosamente en terreno/i)
@@ -192,6 +203,55 @@ describe('PatrullaMisionDetailPage — Categorización de Tipología en Terreno 
       }),
       expect.anything()
     );
+  });
+
+  it('permite ratificar la tipología en terreno sin ingresar descripción y marcando completado', async () => {
+    configurarAuth(true, true);
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(misionEnCursoMock);
+    vi.mocked(tipologiaService.reclasificarTipologiaEnTerreno).mockResolvedValue({
+      ok: true,
+      offline: false,
+      mensaje: 'Tipología del incidente ratificada exitosamente.',
+      mision: {
+        ...misionEnCursoMock,
+        datosAdicionales: {
+          tipologiaEvaluada: true,
+          esReclasificacion: false,
+        },
+      },
+    });
+
+    await act(async () => {
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <PatrullaMisionDetailPage
+            params={Promise.resolve({ id: misionEnCursoMock.id })}
+          />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(/Tipología original constatada. No se requiere justificación adicional para ratificar/i)
+    ).toBeInTheDocument();
+
+    const submitBtn = screen.getByRole('button', { name: /Confirmar Tipología/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Confirmar Evaluación de Tipología')).toBeInTheDocument();
+    });
+
+    const confirmModalBtn = screen.getByRole('button', { name: /Confirmar y Enviar/i });
+    fireEvent.click(confirmModalBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Completado')).toBeInTheDocument();
+    });
   });
 });
 

@@ -73,5 +73,14 @@ describe('reclasificarTipologiaSchema (H37)', () => {
       expect(resultado.error.issues[0].message).toContain('1000 caracteres');
     }
   });
+
+  it('permite justificación vacía u omitida si esCambio es false (ratificación presencial)', () => {
+    const input = {
+      tipoIncidenteId: validUuid,
+      esCambio: false,
+    };
+    const resultado = reclasificarTipologiaSchema.safeParse(input);
+    expect(resultado.success).toBe(true);
+  });
 });
 
