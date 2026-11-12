@@ -60,7 +60,7 @@ export const evaluacionTerrenoSchema = z.object({
   aislamientoVial: z.boolean(),
   requiereEvacuacion: z.boolean(),
   requiereAsistenciaSocial: z.boolean(),
-  requiereApoyoAdicional: z.boolean(),
+  requiereApoyoAdicional: z.boolean().optional().default(false),
   detallesAdicionales: z
     .string()
     .trim()
@@ -198,9 +198,6 @@ export function calcularPrioridadSugerida(
   }
   if (evaluacion.requiereAsistenciaSocial) {
     factoresMedios.push('Requiere levantamiento social (FIBE)');
-  }
-  if (evaluacion.requiereApoyoAdicional) {
-    factoresMedios.push('Requiere apoyo operativo adicional');
   }
 
   const todosLosFactores = [

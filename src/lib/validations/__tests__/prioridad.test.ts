@@ -76,6 +76,17 @@ describe('Validaciones y cálculo de prioridad en terreno (H38)', () => {
         ])
       );
     });
+    it('no considera requiereApoyoAdicional en el cálculo de prioridad sugerida', () => {
+      const resultado = calcularPrioridadSugerida({
+        ...VALORES_INICIALES_EVALUACION_PRIORIDAD,
+        requiereApoyoAdicional: true,
+      });
+
+      expect(resultado.prioridadSugerida).toBe('BAJA');
+      expect(resultado.factoresGatillantes).not.toContain(
+        'Requiere apoyo operativo adicional'
+      );
+    });
   });
 
   describe('asignarPrioridadSchema', () => {

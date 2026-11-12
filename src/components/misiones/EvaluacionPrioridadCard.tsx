@@ -21,7 +21,9 @@ import {
   History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { Textarea } from '@/components/ui/Textarea';
+import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { ModalConfirmacionPrioridad } from './ModalConfirmacionPrioridad';
 import {
   VALORES_INICIALES_EVALUACION_PRIORIDAD,
@@ -118,7 +120,6 @@ interface SwitchPeligroConfig {
     | 'aislamientoVial'
     | 'requiereEvacuacion'
     | 'requiereAsistenciaSocial'
-    | 'requiereApoyoAdicional'
   >;
   etiqueta: string;
   esCritico?: boolean;
@@ -153,24 +154,7 @@ const SWITCHES_PELIGRO: SwitchPeligroConfig[] = [
     campo: 'requiereAsistenciaSocial',
     etiqueta: 'Requiere asistencia social (FIBE)',
   },
-  {
-    campo: 'requiereApoyoAdicional',
-    etiqueta: 'Requiere apoyo táctico adicional',
-  },
 ];
-
-function obtenerClaseBadgePrioridad(prioridad: PrioridadIncidente): string {
-  switch (prioridad) {
-    case 'CRITICA':
-      return styles.badgeCritica;
-    case 'ALTA':
-      return styles.badgeAlta;
-    case 'MEDIA':
-      return styles.badgeMedia;
-    default:
-      return styles.badgeBaja;
-  }
-}
 
 function obtenerClaseBotonPrioridadSeleccionada(
   prioridad: PrioridadIncidente
@@ -430,9 +414,9 @@ export function EvaluacionPrioridadCard({
           </span>
         </div>
         {ultimoReporte && (
-          <span className={styles.versionBadge}>
+          <Chip variant="teal" size="sm">
             Reporte #{ultimoReporte.versionReporte}
-          </span>
+          </Chip>
         )}
       </div>
 
@@ -475,9 +459,9 @@ export function EvaluacionPrioridadCard({
               <ClipboardCheck size={16} aria-hidden="true" />
               <span>Resumen de Evaluación y Prioridad</span>
             </span>
-            <span className={styles.versionBadge}>
+            <Chip variant="teal" size="sm">
               Reporte #{ultimoReporte.versionReporte}
-            </span>
+            </Chip>
           </div>
 
           <div className={styles.resumenGrid}>
@@ -707,15 +691,14 @@ export function EvaluacionPrioridadCard({
               <span className={styles.sugeridaTitle}>
                 Prioridad Sugerida por el Sistema
               </span>
-              <span
-                className={`${styles.badgePrioridad} ${obtenerClaseBadgePrioridad(
-                  prioridadSugerida
-                )}`}
+              <Chip
+                variant={obtenerVarianteChipPrioridad(prioridadSugerida)}
+                size="md"
+                icon={<ShieldAlert size={14} />}
                 data-testid="badge-prioridad-sugerida"
               >
-                <ShieldAlert size={15} aria-hidden="true" />
-                <span>{formatearPrioridad(prioridadSugerida)}</span>
-              </span>
+                {formatearPrioridad(prioridadSugerida)}
+              </Chip>
             </div>
 
             <ul className={styles.factoresList} aria-label="Factores gatillantes">

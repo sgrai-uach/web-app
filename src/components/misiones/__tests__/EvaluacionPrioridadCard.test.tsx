@@ -247,5 +247,20 @@ describe('EvaluacionPrioridadCard (H38)', () => {
       })
     ).toBeInTheDocument();
   });
+
+  it('no renderiza la opción eliminada "Requiere apoyo táctico adicional"', () => {
+    render(
+      <EvaluacionPrioridadCard
+        incidenteId={misionMock.incidenteId}
+        misionActual={misionMock}
+      />
+    );
+
+    expect(
+      screen.queryByRole('switch', {
+        name: /Requiere apoyo táctico adicional/i,
+      })
+    ).not.toBeInTheDocument();
+  });
 });
 

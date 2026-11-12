@@ -82,17 +82,22 @@ describe('PatrullaMisionDetailPage — Evaluación en Terreno y Prioridad (H38)'
       token: 'jwt-valido',
       autenticado: true,
       cargando: false,
+      esPatrulla: true,
+      esCuadrilla: false,
       unidadActiva: true,
       tieneUnidadAsignada: true,
-      iniciarSesion: vi.fn(),
-      cerrarSesion: vi.fn(),
-      refrescarPerfil: vi.fn(),
+      estadoAsignacion: 'ACTIVA',
+      actualizarUnidadAsignada: vi.fn(),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
       tienePermiso: (p: string) => p === 'misiones:terreno:verificar',
+      tieneAlgunPermiso: () => true,
     });
 
     vi.mocked(useConnectivity).mockReturnValue({
       status: 'connected',
-      isOnline: true,
+      online: true,
       pendientes: 0,
       sincronizando: false,
       sincronizar: vi.fn(),
@@ -195,6 +200,38 @@ describe('PatrullaMisionDetailPage — Evaluación en Terreno y Prioridad (H38)'
     await waitFor(() => {
       expect(screen.getByText('Completado (#1)')).toBeInTheDocument();
     });
+  });
+
+  it('contrae ambas secciones de reporte e indica "Completado" cuando ya fueron realizadas previamente', async () => {
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue({
+      ...misionTipologiaCompletadaMock,
+      datosAdicionales: {
+        tipologiaEvaluada: true,
+        esReclasificacion: true,
+        prioridadEvaluada: true,
+        versionReportePrioridad: 2,
+      },
+    });
+
+    const { container } = await act(async () =>
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <PatrullaMisionDetailPage
+            params={Promise.resolve({ id: misionTipologiaCompletadaMock.id })}
+          />
+        </Suspense>
+      )
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Completado')).toBeInTheDocument();
+      expect(screen.getByText('Completado (#2)')).toBeInTheDocument();
+    });
+
+    const detailsElements = container.querySelectorAll('details');
+    expect(detailsElements.length).toBe(2);
+    expect(detailsElements[0]?.hasAttribute('open')).toBe(false);
+    expect(detailsElements[1]?.hasAttribute('open')).toBe(false);
   });
 });
 

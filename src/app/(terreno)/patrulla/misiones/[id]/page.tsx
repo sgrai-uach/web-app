@@ -20,7 +20,9 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
+import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
@@ -59,15 +61,17 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       const encontrada = await obtenerDetalleMision(misionId);
       if (encontrada) {
         setMision(encontrada);
-        if (encontrada.datosAdicionales?.tipologiaEvaluada) {
-          setSeccionCategorizacionAbierta(false);
-          if (!encontrada.datosAdicionales?.prioridadEvaluada) {
-            setSeccionPrioridadAbierta(true);
-          }
-        }
-        if (encontrada.datosAdicionales?.prioridadEvaluada) {
-          setSeccionPrioridadAbierta(false);
-        }
+        const reportesCount = Array.isArray(encontrada.datosAdicionales?.reportesPrioridad)
+          ? encontrada.datosAdicionales.reportesPrioridad.length
+          : Array.isArray(encontrada.datosAdicionales?.reportesTerreno)
+            ? encontrada.datosAdicionales.reportesTerreno.length
+            : 0;
+        const tipologiaYaEvaluada = Boolean(encontrada.datosAdicionales?.tipologiaEvaluada);
+        const prioridadYaEvaluada =
+          Boolean(encontrada.datosAdicionales?.prioridadEvaluada) || reportesCount > 0;
+
+        setSeccionCategorizacionAbierta(!tipologiaYaEvaluada);
+        setSeccionPrioridadAbierta(tipologiaYaEvaluada && !prioridadYaEvaluada);
       } else {
         setMision({
           id: misionId,
@@ -134,14 +138,6 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     );
   }
 
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
-  }
-
   const estadoNormalizado = mision.estado?.toUpperCase() || '';
   const esDespachada = estadoNormalizado === 'DESPACHADA';
   const esEnCurso =
@@ -200,11 +196,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               aria-hidden="true"
             />
             <span className={styles.code}>{mision.codigoIncidente}</span>
-            <span className={`${styles.priorityChip} ${prioridadClase}`}>
+            <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
               {formatearPrioridad(mision.prioridad)}
-            </span>
+            </Chip>
           </div>
-          <EstadoBadge estado={mision.estado} />
+          <EstadoBadge estado={mision.estado} size="md" />
         </div>
 
         <div className={styles.detailGrid}>
@@ -315,7 +311,9 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                   En Trayecto / Evaluación
                 </h2>
               </div>
-              <span className={styles.activeStatusChip}>Misión activa</span>
+              <Chip variant="success" size="sm">
+                Misión activa
+              </Chip>
             </div>
 
             <div className={styles.enTrayectoContent}>
@@ -370,69 +368,106 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             </div>
 
             <div className={styles.evaluationContent}>
-              <SeccionDesplegable
-                titulo="Categorización del incidente"
-                icono={<Tag size={18} />}
-                abierto={seccionCategorizacionAbierta}
-                onToggle={(abierto) => setSeccionCategorizacionAbierta(abierto)}
-                indicador={
-                  mision.datosAdicionales?.tipologiaEvaluada ? (
-                    <span className={styles.badgeCompletado}>
-                      <CheckCircle2 size={14} aria-hidden="true" />
-                      <span>Completado</span>
-                    </span>
-                  ) : mision.sincronizacionPendiente ? (
-                    <span className={styles.syncPendingBadge}>Pendiente</span>
-                  ) : null
-                }
-              >
-                <EvaluacionTipologiaCard
-                  incidenteId={mision.incidenteId}
-                  misionActual={mision}
-                  onTipologiaActualizada={(resultado) => {
-                    if (resultado.mision) {
-                      setMision(resultado.mision);
-                    }
-                    setSeccionCategorizacionAbierta(false);
-                  }}
-                />
-              </SeccionDesplegable>
+              {(() => {
+                const reportesPrioridadCount = Array.isArray(
+                  mision.datosAdicionales?.reportesPrioridad
+                )
+                  ? mision.datosAdicionales.reportesPrioridad.length
+                  : Array.isArray(mision.datosAdicionales?.reportesTerreno)
+                    ? mision.datosAdicionales.reportesTerreno.length
+                    : 0;
+                const tipologiaCompletada = Boolean(
+                  mision.datosAdicionales?.tipologiaEvaluada
+                );
+                const prioridadCompletada =
+                  Boolean(mision.datosAdicionales?.prioridadEvaluada) ||
+                  reportesPrioridadCount > 0;
+                const versionPrioridad =
+                  typeof mision.datosAdicionales?.versionReportePrioridad === 'number'
+                    ? mision.datosAdicionales.versionReportePrioridad
+                    : reportesPrioridadCount > 0
+                      ? reportesPrioridadCount
+                      : undefined;
 
-              <SeccionDesplegable
-                titulo="Evaluación en terreno y prioridad"
-                icono={<ShieldAlert size={18} />}
-                abierto={seccionPrioridadAbierta}
-                onToggle={(abierto) => setSeccionPrioridadAbierta(abierto)}
-                indicador={
-                  mision.datosAdicionales?.prioridadEvaluada ? (
-                    <span className={styles.badgeCompletado}>
-                      <CheckCircle2 size={14} aria-hidden="true" />
-                      <span>
-                        Completado
-                        {typeof mision.datosAdicionales?.versionReportePrioridad === 'number'
-                          ? ` (#${mision.datosAdicionales.versionReportePrioridad})`
-                          : ''}
-                      </span>
-                    </span>
-                  ) : mision.sincronizacionPendiente ? (
-                    <span className={styles.syncPendingBadge}>Pendiente</span>
-                  ) : null
-                }
-              >
-                {seccionPrioridadAbierta && (
-                  <EvaluacionPrioridadCard
-                    incidenteId={mision.incidenteId}
-                    misionActual={mision}
-                    onPrioridadActualizada={(resultado) => {
-                      if (resultado.mision) {
-                        setMision(resultado.mision);
+                return (
+                  <>
+                    <SeccionDesplegable
+                      titulo="Categorización del incidente"
+                      icono={<Tag size={18} />}
+                      abierto={seccionCategorizacionAbierta}
+                      onToggle={(abierto) => setSeccionCategorizacionAbierta(abierto)}
+                      indicador={
+                        tipologiaCompletada ? (
+                          <Chip
+                            variant="success"
+                            size="sm"
+                            icon={<CheckCircle2 size={12} />}
+                          >
+                            Completado
+                          </Chip>
+                        ) : mision.sincronizacionPendiente ? (
+                          <Chip variant="warning" size="sm">
+                            Pendiente
+                          </Chip>
+                        ) : null
                       }
-                      setSeccionPrioridadAbierta(false);
-                      void actualizarPendientes();
-                    }}
-                  />
-                )}
-              </SeccionDesplegable>
+                    >
+                      <EvaluacionTipologiaCard
+                        incidenteId={mision.incidenteId}
+                        misionActual={mision}
+                        onTipologiaActualizada={(resultado) => {
+                          if (resultado.mision) {
+                            setMision(resultado.mision);
+                          }
+                          setSeccionCategorizacionAbierta(false);
+                          if (!prioridadCompletada) {
+                            setSeccionPrioridadAbierta(true);
+                          }
+                        }}
+                      />
+                    </SeccionDesplegable>
+
+                    <SeccionDesplegable
+                      titulo="Evaluación en terreno y prioridad"
+                      icono={<ShieldAlert size={18} />}
+                      abierto={seccionPrioridadAbierta}
+                      onToggle={(abierto) => setSeccionPrioridadAbierta(abierto)}
+                      indicador={
+                        prioridadCompletada ? (
+                          <Chip
+                            variant="success"
+                            size="sm"
+                            icon={<CheckCircle2 size={12} />}
+                          >
+                            Completado
+                            {typeof versionPrioridad === 'number'
+                              ? ` (#${versionPrioridad})`
+                              : ''}
+                          </Chip>
+                        ) : mision.sincronizacionPendiente ? (
+                          <Chip variant="warning" size="sm">
+                            Pendiente
+                          </Chip>
+                        ) : null
+                      }
+                    >
+                      {seccionPrioridadAbierta && (
+                        <EvaluacionPrioridadCard
+                          incidenteId={mision.incidenteId}
+                          misionActual={mision}
+                          onPrioridadActualizada={(resultado) => {
+                            if (resultado.mision) {
+                              setMision(resultado.mision);
+                            }
+                            setSeccionPrioridadAbierta(false);
+                            void actualizarPendientes();
+                          }}
+                        />
+                      )}
+                    </SeccionDesplegable>
+                  </>
+                );
+              })()}
             </div>
           </section>
         </>
