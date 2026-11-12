@@ -15,8 +15,11 @@ import type {
   LoginRequest,
   UsuarioPerfilSesion,
   UsuarioActivoDetalle,
+  EstadoAsignacionUnidad,
 } from '@/types/seguridad';
 import { esRolTerrenoPermitido } from '@/types/seguridad';
+import { limpiarAlmacenamientoOffline } from '@/services/offlineQueue';
+import { registrarPatrullaEnHistorial } from '@/services/perfilTerrenoService';
 
 const SESSION_PROFILE_KEY = 'sgrai_usuario_sesion';
 
@@ -52,6 +55,8 @@ export interface AuthContextValue {
   esPatrulla: boolean;
   esCuadrilla: boolean;
   unidadActiva: boolean;
+  tieneUnidadAsignada: boolean;
+  estadoAsignacion: EstadoAsignacionUnidad;
   tienePermiso: (permiso: string) => boolean;
   tieneAlgunPermiso: (permisos: string[]) => boolean;
   login: (credenciales: LoginRequest) => Promise<UsuarioPerfilSesion>;
@@ -84,14 +89,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         rolId: detalle.rol?.id || '',
         rolNombre: detalle.rol?.nombre || '',
         rolCodigo: detalle.rol?.codigo || '',
-        delegacionId: detalle.delegacionId || detalle.delegacion?.id || null,
-        delegacionNombre: detalle.delegacion?.nombre || null,
-        unidadId: detalle.unidadId ?? null,
-        unidadNombre: detalle.unidadNombre ?? null,
-        unidadActiva: detalle.unidadActiva ?? true,
+        delegacionId: detalle.delegacionId ?? (detalle as unknown as { delegacion?: { id?: string } })?.delegacion?.id ?? null,
+        delegacionNombre: detalle.delegacionNombre ?? (detalle as unknown as { delegacion?: { nombre?: string } })?.delegacion?.nombre ?? null,
         permisos: Array.isArray(detalle.permisos)
           ? detalle.permisos
-          : detalle.rol?.permisos || [],
+          : (detalle.rol as unknown as { permisos?: string[] } | undefined)?.permisos || [],
+        unidadId: detalle.unidadId ?? null,
+        unidadNombre: detalle.unidadNombre ?? null,
+        unidadActiva: detalle.unidadActiva,
       };
     },
     []
@@ -129,16 +134,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       guardarPerfilSesion(perfil);
       setToken(cookieToken);
       setUsuario(perfil);
-    } catch {
-      const perfilRespaldo = leerPerfilGuardado();
-      if (perfilRespaldo && esRolTerrenoPermitido(perfilRespaldo.rolCodigo)) {
-        setToken(cookieToken);
-        setUsuario(perfilRespaldo);
-      } else {
+      if (perfil.unidadId) {
+        void registrarPatrullaEnHistorial(perfil);
+      }
+    } catch (error) {
+      if (
+        error instanceof SeguridadServiceError &&
+        (error.status === 401 || error.status === 403)
+      ) {
         removeAuthCookie();
         guardarPerfilSesion(null);
+        void limpiarAlmacenamientoOffline();
         setUsuario(null);
         setToken(null);
+      } else {
+        const perfilRespaldo = leerPerfilGuardado();
+        if (perfilRespaldo && esRolTerrenoPermitido(perfilRespaldo.rolCodigo)) {
+          setToken(cookieToken);
+          setUsuario(perfilRespaldo);
+        } else {
+          removeAuthCookie();
+          guardarPerfilSesion(null);
+          void limpiarAlmacenamientoOffline();
+          setUsuario(null);
+          setToken(null);
+        }
       }
     } finally {
       setCargando(false);
@@ -167,6 +187,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         guardarPerfilSesion(respuesta.usuario);
         setToken(respuesta.token);
         setUsuario(respuesta.usuario);
+        if (respuesta.usuario.unidadId) {
+          void registrarPatrullaEnHistorial(respuesta.usuario);
+        }
         return respuesta.usuario;
       } finally {
         setCargando(false);
@@ -178,6 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     removeAuthCookie();
     guardarPerfilSesion(null);
+    void limpiarAlmacenamientoOffline();
     setUsuario(null);
     setToken(null);
     try {
@@ -196,7 +220,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const rolCodigoActual = usuario?.rolCodigo?.toUpperCase() || '';
   const esPatrulla = rolCodigoActual === 'PATRULLA_VERIFICADORA';
   const esCuadrilla = rolCodigoActual === 'DELEGADO_CUADRILLA';
-  const unidadActiva = Boolean(usuario && usuario.unidadActiva !== false);
+  const tieneUnidadAsignada = Boolean(usuario?.unidadId || usuario?.unidadNombre);
+  const unidadActiva = tieneUnidadAsignada && usuario?.unidadActiva === true;
+  const estadoAsignacion: EstadoAsignacionUnidad = !tieneUnidadAsignada
+    ? 'SIN_ASIGNACION'
+    : usuario?.unidadActiva === true
+    ? 'ACTIVA'
+    : 'DESACTIVADA';
   const autenticado = Boolean(token && usuario);
 
   const tienePermiso = useCallback(
@@ -235,6 +265,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         esPatrulla,
         esCuadrilla,
         unidadActiva,
+        tieneUnidadAsignada,
+        estadoAsignacion,
         tienePermiso,
         tieneAlgunPermiso,
         login,

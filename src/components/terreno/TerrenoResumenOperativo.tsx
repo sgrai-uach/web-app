@@ -6,6 +6,7 @@ import { Compass, HardHat } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
+import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import styles from './TerrenoResumenOperativo.module.css';
 
 interface MetricasTerreno {
@@ -15,7 +16,7 @@ interface MetricasTerreno {
 }
 
 export function TerrenoResumenOperativo() {
-  const { usuario, esCuadrilla, unidadActiva } = useAuth();
+  const { usuario, esCuadrilla, unidadActiva, tieneUnidadAsignada } = useAuth();
   const [metricas, setMetricas] = useState<MetricasTerreno>({
     pendientes: 0,
     enCurso: 0,
@@ -27,7 +28,17 @@ export function TerrenoResumenOperativo() {
 
     async function cargarResumenMisiones() {
       try {
-        const misiones = await sincronizarMisiones();
+        if (!tieneUnidadAsignada || !usuario?.unidadId) {
+          if (!cancelado) {
+            setMetricas({ pendientes: 0, enCurso: 0, finalizadas: 0 });
+          }
+          return;
+        }
+
+        const misiones = await sincronizarMisiones({
+          patrullaId: !esCuadrilla ? usuario.unidadId : undefined,
+          cuadrillaId: esCuadrilla ? usuario.unidadId : undefined,
+        });
         if (cancelado) return;
 
         const misionesPendientes = misiones.filter(
@@ -64,7 +75,7 @@ export function TerrenoResumenOperativo() {
     return () => {
       cancelado = true;
     };
-  }, []);
+  }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId]);
 
   const UnidadIcon = esCuadrilla ? HardHat : Compass;
 
@@ -73,18 +84,23 @@ export function TerrenoResumenOperativo() {
       className={styles.wrapper}
       aria-labelledby="resumen-operativo-terreno-heading"
     >
-      {!unidadActiva && (
+      {!tieneUnidadAsignada ? (
+        <SinUnidadBanner
+          tipoUnidad={esCuadrilla ? 'cuadrilla' : 'patrulla'}
+          nombreOperador={usuario?.nombre}
+        />
+      ) : !unidadActiva ? (
         <UnidadInactivaBanner
           tipoUnidad={esCuadrilla ? 'cuadrilla' : 'patrulla'}
           nombreUnidad={usuario?.unidadNombre}
         />
-      )}
+      ) : null}
 
       <div className={styles.grid}>
         {/* Tarjeta 1: Resumen Operativo de Misiones / Faenas */}
         <div
           className={`${styles.kpiCard} ${
-            !unidadActiva ? styles.kpiCardWarning : ''
+            tieneUnidadAsignada && !unidadActiva ? styles.kpiCardWarning : ''
           }`.trim()}
         >
           <div className={styles.kpiHeader}>

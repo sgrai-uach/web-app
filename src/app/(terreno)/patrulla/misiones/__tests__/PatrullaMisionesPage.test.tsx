@@ -37,6 +37,8 @@ describe('PatrullaMisionesPage — Modo Histórico y Filtro por Patrulla (H85 / 
       esPatrulla: true,
       esCuadrilla: false,
       unidadActiva: false,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'DESACTIVADA',
       tienePermiso: vi.fn().mockReturnValue(true),
       tieneAlgunPermiso: vi.fn().mockReturnValue(true),
       login: vi.fn(),
@@ -83,6 +85,8 @@ describe('PatrullaMisionesPage — Modo Histórico y Filtro por Patrulla (H85 / 
       esPatrulla: true,
       esCuadrilla: false,
       unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
       tienePermiso: vi.fn().mockReturnValue(true),
       tieneAlgunPermiso: vi.fn().mockReturnValue(true),
       login: vi.fn(),
@@ -101,5 +105,42 @@ describe('PatrullaMisionesPage — Modo Histórico y Filtro por Patrulla (H85 / 
         screen.getByText(/La patrulla se encuentra disponible para despacho\./i)
       ).toBeInTheDocument();
     });
+  });
+
+  it('muestra el banner SinUnidadBanner cuando el funcionario no tiene patrulla asignada (SIN_ASIGNACION)', async () => {
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: {
+        id: 'u-pat-2',
+        rut: '12.345.678-5',
+        nombre: 'Mario Patrullero',
+        email: 'mpatrullero@valdivia.cl',
+        rolId: 'r-pat-1',
+        rolNombre: 'Patrulla Verificadora',
+        rolCodigo: 'PATRULLA_VERIFICADORA',
+        delegacionId: 'del-1',
+        delegacionNombre: 'Valdivia Sur',
+        permisos: [],
+        unidadNombre: null,
+        unidadActiva: false,
+      },
+      token: 'mock-token',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: true,
+      esCuadrilla: false,
+      unidadActiva: false,
+      tieneUnidadAsignada: false,
+      estadoAsignacion: 'SIN_ASIGNACION',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
+    });
+
+    render(<PatrullaMisionesPage />);
+
+    expect(screen.getByText(/Sin Patrulla Asignada — Mario Patrullero/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: /^misiones$/i })).toBeInTheDocument();
   });
 });

@@ -128,6 +128,7 @@ export function useConnectivity() {
                   await guardarMisionLocal({
                     ...local,
                     sincronizacionPendiente: false,
+                    actualizadoEn: new Date().toISOString(),
                   });
                 }
                 await obtenerDetalleMision(misionId);

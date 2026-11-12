@@ -2,6 +2,8 @@
  * Tipos de Seguridad, Autenticación y RBAC para sgrai-pwa (Terreno).
  */
 
+import type { components } from './api-generated';
+
 export const ROLES_TERRENO_PERMITIDOS = [
   'PATRULLA_VERIFICADORA',
   'DELEGADO_CUADRILLA',
@@ -14,57 +16,20 @@ export function esRolTerrenoPermitido(rolCodigo?: string | null): boolean {
   return ROLES_TERRENO_PERMITIDOS.includes(rolCodigo.toUpperCase() as RolTerreno);
 }
 
-export interface LoginRequest {
-  identificador: string;
-  password: string;
-}
+export type LoginRequest = components['schemas']['LoginRequest'];
+export type LoginResponseData = components['schemas']['LoginData'];
+export type LoginResponse = components['schemas']['LoginResponse'];
+export type UsuarioActivoDetalle = components['schemas']['UsuarioActivoItem'];
+export type UsuarioPerfilSesion = components['schemas']['UsuarioPerfilSesion'];
 
-export interface UsuarioPerfilSesion {
-  id: string;
-  rut: string;
+export type EstadoAsignacionUnidad = 'ACTIVA' | 'DESACTIVADA' | 'SIN_ASIGNACION';
+
+export interface HistorialUnidadOperador {
+  unidadId: string;
   nombre: string;
-  email: string;
-  rolId: string;
-  rolNombre: string;
-  rolCodigo: string;
-  delegacionId: string | null;
-  delegacionNombre: string | null;
-  permisos: string[];
-  unidadId?: string | null;
-  unidadNombre?: string | null;
-  unidadActiva?: boolean; // H82 (cuadrilla) / H85 (patrulla): false si fue desactivada mediante baja lógica
-}
-
-export interface LoginResponseData {
-  token: string;
-  expiraEn: string;
-  usuario: UsuarioPerfilSesion;
-}
-
-export interface LoginResponse {
-  data: LoginResponseData;
-}
-
-export interface UsuarioActivoDetalle {
-  id: string;
-  rut: string;
-  nombre: string;
-  apellido?: string | null;
-  email: string;
-  activo?: boolean;
-  delegacionId?: string | null;
-  delegacion?: {
-    id: string;
-    nombre: string;
-  } | null;
-  rol?: {
-    id: string;
-    nombre: string;
-    codigo: string;
-    permisos?: string[];
-  } | null;
-  permisos?: string[];
-  unidadId?: string | null;
-  unidadNombre?: string | null;
-  unidadActiva?: boolean;
+  tipoUnidad: 'PATRULLA' | 'CUADRILLA';
+  fechaPrimerRegistro: string;
+  ultimaVezVisto: string;
+  estadoAlMomento: 'ACTIVA' | 'DESACTIVADA';
+  delegacion?: string | null;
 }

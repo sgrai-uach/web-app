@@ -34,6 +34,7 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
   it('permite login exitoso con rol PATRULLA_VERIFICADORA', async () => {
     vi.mocked(seguridadService.loginUsuario).mockResolvedValue({
       token: 'token-patrulla',
+      tipoToken: 'Bearer',
       expiraEn: '2026-10-28T00:00:00Z',
       usuario: {
         id: 'user-patrulla-1',
@@ -73,6 +74,7 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
   it('rechaza login con 403 si el rol no es de terreno (ej: CALL_CENTER o ADMIN)', async () => {
     vi.mocked(seguridadService.loginUsuario).mockResolvedValue({
       token: 'token-admin',
+      tipoToken: 'Bearer',
       expiraEn: '2026-10-28T00:00:00Z',
       usuario: {
         id: 'user-admin-1',
@@ -121,10 +123,11 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
         id: 'rol-admin',
         nombre: 'Administrador General',
         codigo: 'ADMIN',
-        permisos: ['todo'],
+        esAdmin: true,
       },
+      permisos: ['todo'],
       delegacionId: null,
-      delegacion: null,
+      delegacionNombre: null,
     });
 
     const { result } = renderHook(() => useAuth(), {
@@ -152,11 +155,11 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
         id: 'rol-pat',
         nombre: 'Patrulla Verificadora',
         codigo: 'PATRULLA_VERIFICADORA',
-        permisos: [],
+        esAdmin: false,
       },
       permisos: [],
       delegacionId: 'del-1',
-      delegacion: { id: 'del-1', nombre: 'Norte' },
+      delegacionNombre: 'Norte',
       unidadId: 'pat-09',
       unidadNombre: 'Patrulla Costa-9',
       unidadActiva: false,
@@ -174,6 +177,117 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
     expect(result.current.tienePermiso('misiones:terreno:verificar')).toBe(false);
     expect(result.current.usuario?.unidadId).toBe('pat-09');
     expect(result.current.usuario?.unidadNombre).toBe('Patrulla Costa-9');
+  });
+
+  it('mapea correctamente unidadActiva=false cuando la patrulla verificadora fue desactivada (H85)', async () => {
+    vi.mocked(cookieUtils.getAuthCookie).mockReturnValue('token-patrulla-inactiva');
+    vi.mocked(seguridadService.obtenerUsuarioActivo).mockResolvedValue({
+      id: 'user-patrulla-1',
+      rut: '11.111.111-1',
+      nombre: 'Juan Patrullero',
+      email: 'juan@valdivia.cl',
+      activo: true,
+      rol: {
+        id: 'rol-patrulla',
+        nombre: 'Patrulla Verificadora',
+        codigo: 'PATRULLA_VERIFICADORA',
+        esAdmin: false,
+      },
+      permisos: ['misiones:terreno:verificar'],
+      delegacionId: 'del-1',
+      delegacionNombre: 'Valdivia Sur',
+      unidadId: 'pat-1',
+      unidadNombre: 'Patrulla Móvil 01',
+      unidadActiva: false,
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await act(async () => {
+      await result.current.recargarSesion();
+    });
+
+    expect(result.current.autenticado).toBe(true);
+    expect(result.current.esPatrulla).toBe(true);
+    expect(result.current.usuario?.unidadNombre).toBe('Patrulla Móvil 01');
+    expect(result.current.usuario?.unidadActiva).toBe(false);
+    expect(result.current.unidadActiva).toBe(false);
+  });
+
+  it('mapea correctamente unidadActiva=true cuando la patrulla verificadora está activa (H85)', async () => {
+    vi.mocked(cookieUtils.getAuthCookie).mockReturnValue('token-patrulla-activa');
+    vi.mocked(seguridadService.obtenerUsuarioActivo).mockResolvedValue({
+      id: 'user-patrulla-1',
+      rut: '11.111.111-1',
+      nombre: 'Juan Patrullero',
+      email: 'juan@valdivia.cl',
+      activo: true,
+      rol: {
+        id: 'rol-patrulla',
+        nombre: 'Patrulla Verificadora',
+        codigo: 'PATRULLA_VERIFICADORA',
+        esAdmin: false,
+      },
+      permisos: ['misiones:terreno:verificar'],
+      delegacionId: 'del-1',
+      delegacionNombre: 'Valdivia Sur',
+      unidadId: 'pat-1',
+      unidadNombre: 'Patrulla Móvil 01',
+      unidadActiva: true,
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await act(async () => {
+      await result.current.recargarSesion();
+    });
+
+    expect(result.current.autenticado).toBe(true);
+    expect(result.current.esPatrulla).toBe(true);
+    expect(result.current.usuario?.unidadActiva).toBe(true);
+    expect(result.current.unidadActiva).toBe(true);
+    expect(result.current.tieneUnidadAsignada).toBe(true);
+    expect(result.current.estadoAsignacion).toBe('ACTIVA');
+  });
+
+  it('detecta estado SIN_ASIGNACION cuando el funcionario no tiene patrulla asignada', async () => {
+    vi.mocked(cookieUtils.getAuthCookie).mockReturnValue('token-sin-patrulla');
+    vi.mocked(seguridadService.obtenerUsuarioActivo).mockResolvedValue({
+      id: 'user-sin-patrulla-1',
+      rut: '12.345.678-9',
+      nombre: 'Pedro Sin Asignacion',
+      email: 'pedro@valdivia.cl',
+      activo: true,
+      rol: {
+        id: 'rol-patrulla',
+        nombre: 'Patrulla Verificadora',
+        codigo: 'PATRULLA_VERIFICADORA',
+        esAdmin: false,
+      },
+      permisos: ['misiones:terreno:verificar'],
+      delegacionId: 'del-1',
+      delegacionNombre: 'Valdivia Sur',
+      unidadId: null,
+      unidadNombre: null,
+      unidadActiva: false,
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await act(async () => {
+      await result.current.recargarSesion();
+    });
+
+    expect(result.current.autenticado).toBe(true);
+    expect(result.current.esPatrulla).toBe(true);
+    expect(result.current.tieneUnidadAsignada).toBe(false);
+    expect(result.current.estadoAsignacion).toBe('SIN_ASIGNACION');
     expect(result.current.unidadActiva).toBe(false);
   });
 });

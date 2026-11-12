@@ -15,7 +15,7 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './TerrenoSiguienteMision.module.css';
 
 export function TerrenoSiguienteMision() {
-  const { usuario, esCuadrilla, unidadActiva } = useAuth();
+  const { usuario, esCuadrilla, tieneUnidadAsignada, estadoAsignacion } = useAuth();
   const [misionesActivas, setMisionesActivas] = useState<MisionLocal[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
 
@@ -24,6 +24,13 @@ export function TerrenoSiguienteMision() {
 
     async function buscarMisiones() {
       try {
+        if (!tieneUnidadAsignada || !usuario?.unidadId) {
+          if (!cancelado) {
+            setMisionesActivas([]);
+          }
+          return;
+        }
+
         const misiones = await sincronizarMisiones({
           tipoMision: esCuadrilla ? 'ATENCION_CUADRILLA' : 'VERIFICACION',
           patrullaId: !esCuadrilla ? usuario?.unidadId || undefined : undefined,
@@ -62,7 +69,7 @@ export function TerrenoSiguienteMision() {
     return () => {
       cancelado = true;
     };
-  }, [esCuadrilla, usuario?.unidadId]);
+  }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId]);
 
   if (cargando) {
     return (
@@ -88,7 +95,9 @@ export function TerrenoSiguienteMision() {
         <div className={styles.emptyCard}>
           <CheckCircle size={20} color="var(--color-success, #2E7D32)" aria-hidden="true" />
           <span>
-            {!unidadActiva
+            {!tieneUnidadAsignada || estadoAsignacion === 'SIN_ASIGNACION'
+              ? 'Sin asignación operativa. Comunícate con el Centro de Mando.'
+              : estadoAsignacion === 'DESACTIVADA'
               ? 'Unidad inactiva en modo de solo lectura.'
               : 'Sin misiones activas ni pendientes. La unidad se encuentra disponible.'}
           </span>
