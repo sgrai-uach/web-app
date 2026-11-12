@@ -143,6 +143,50 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 
 ---
 
+### 2.2 Evaluar Terreno y Asignar/Modificar Prioridad del Incidente (H38)
+- **Historia:** H38
+- **Método:** `PATCH`
+- **Ruta:** `/api/incidentes/{id}/prioridad` (y cálculo auxiliar en `POST /api/incidentes/{id}/prioridad/calcular`)
+- **Permiso RBAC requerido:** `misiones:terreno:verificar`
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+#### Request Body (`PATCH /api/incidentes/{id}/prioridad`)
+```json
+{
+  "prioridad": "CRITICA",
+  "prioridadSugerida": "ALTA",
+  "justificacionPrioridad": "Se constata riesgo eléctrico activo sobre acceso único de vivienda con adultos mayores.",
+  "nucleoFamiliarTotal": 4,
+  "cantidadNinos": 1,
+  "cantidadAdultosMayores": 2,
+  "personasDiscapacitadas": 0,
+  "personasElectrodependientes": 0,
+  "mascotasAfectadas": 1,
+  "viviendasAfectadas": 1,
+  "nivelCompromisoVivienda": "MODERADO",
+  "riesgoElectrico": true,
+  "riesgoEstructural": false,
+  "riesgoQuimicoSanitario": false,
+  "aislamientoVial": false,
+  "requiereEvacuacion": false,
+  "requiereAsistenciaSocial": true,
+  "requiereApoyoAdicional": true,
+  "detallesAdicionales": "Se requiere coordinación con empresa eléctrica y cuadrilla de despeje.",
+  "factoresGatillantes": [
+    "Peligro eléctrico activo en terreno",
+    "Adultos mayores afectados (2)"
+  ],
+  "versionReporte": 1,
+  "misionId": "60000000-0000-4000-8000-000000000001"
+}
+```
+
+#### Reglas de Validación y Versionado
+- Si `prioridad !== prioridadSugerida`, el campo `justificacionPrioridad` es obligatorio y debe tener al menos **5 caracteres**.
+- Cada envío o rectificación incrementa `versionReporte` (`1`, `2`, `...`), registrando un reporte distinguible en el Centro de Mando y emitiendo el evento WebSocket `incidente:actualizado`.
+
+---
+
 ## 3. Protocolo WebSocket en Tiempo Real
 
 - **Librería cliente:** `socket.io-client`
