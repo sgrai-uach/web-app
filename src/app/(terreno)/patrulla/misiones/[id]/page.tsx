@@ -51,23 +51,12 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       if (encontrada) {
         setMision(encontrada);
       } else {
-        setMision({
-          id: misionId,
-          incidenteId: `inc-${misionId}`,
-          codigoIncidente: `INC-2026-${misionId.substring(0, 5).toUpperCase()}`,
-          tipologia: 'Caída de árbol',
-          direccion: 'Av. Alemania 600, Valdivia',
-          coordenadas: { lat: -39.81, lng: -73.24 },
-          prioridad: 'ALTA',
-          estado: unidadActiva ? 'DESPACHADA' : 'FINALIZADA',
-          fechaDespacho: '2026-10-18T11:00:00Z',
-          actualizadoEn: '2026-10-18T11:45:00Z',
-        });
+        setMision(null);
       }
     } finally {
       setCargando(false);
     }
-  }, [misionId, unidadActiva]);
+  }, [misionId]);
 
   useEffect(() => {
     void cargarDetalle();

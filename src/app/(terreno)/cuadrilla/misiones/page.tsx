@@ -7,7 +7,6 @@ import { Heading } from '@/components/ui/Heading';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
-import { guardarMisionesLocales } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { ordenarMisionesPorPrioridadYFecha } from '@/lib/utils/formatters';
@@ -21,7 +20,7 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaMisionesPage.module.css';
 
 function CuadrillaMisionesContenido() {
-  const { usuario, unidadActiva, tieneUnidadAsignada } = useAuth();
+  const { usuario, unidadActiva, tieneUnidadAsignada, estadoAsignacion } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -41,44 +40,21 @@ function CuadrillaMisionesContenido() {
   const cargarMisiones = useCallback(async () => {
     setCargando(true);
     try {
-      let locales = await sincronizarMisiones({
-        tipoMision: 'ATENCION_CUADRILLA',
-      });
-
-      if (!unidadActiva && locales.length === 0) {
-        const historicas: MisionLocal[] = [
-          {
-            id: 'mision-hist-01',
-            incidenteId: 'inc-089',
-            codigoIncidente: 'INC-2026-00089',
-            tipologia: 'Caída de árbol',
-            direccion: 'Av. Ramón Picarte 1100, Valdivia',
-            prioridad: 'ALTA',
-            estado: 'FINALIZADA',
-            fechaDespacho: '2026-10-20T14:30:00Z',
-            actualizadoEn: '2026-10-20T17:45:00Z',
-          },
-          {
-            id: 'mision-hist-02',
-            incidenteId: 'inc-042',
-            codigoIncidente: 'INC-2026-00042',
-            tipologia: 'Inundación vial',
-            direccion: 'Calle General Lagos 750, Valdivia',
-            prioridad: 'MEDIA',
-            estado: 'FINALIZADA',
-            fechaDespacho: '2026-10-15T09:00:00Z',
-            actualizadoEn: '2026-10-15T12:30:00Z',
-          },
-        ];
-        await guardarMisionesLocales(historicas);
-        locales = historicas;
+      if (!tieneUnidadAsignada || estadoAsignacion === 'SIN_ASIGNACION') {
+        setMisiones([]);
+        return;
       }
+
+      const locales = await sincronizarMisiones({
+        tipoMision: 'ATENCION_CUADRILLA',
+        cuadrillaId: usuario?.unidadId || undefined,
+      });
 
       setMisiones(locales);
     } finally {
       setCargando(false);
     }
-  }, [unidadActiva]);
+  }, [tieneUnidadAsignada, estadoAsignacion, usuario?.unidadId]);
 
   useEffect(() => {
     cargarMisiones();

@@ -49,17 +49,17 @@ export async function registrarPatrullaEnHistorial(
     }
   }
 
-  const index = historial.findIndex(
-    (item) => item.unidadId === usuario.unidadId || item.nombre === usuario.unidadNombre
-  );
+  const index = historial.findIndex((item) => item.unidadId === usuario.unidadId);
 
   const estadoMomento = usuario.unidadActiva === true ? 'ACTIVA' : 'DESACTIVADA';
+  const delegacion = usuario.delegacionNombre || null;
 
   if (index >= 0) {
     historial[index] = {
       ...historial[index],
       unidadId: usuario.unidadId,
       nombre: usuario.unidadNombre,
+      delegacion: delegacion || historial[index].delegacion,
       ultimaVezVisto: ahora,
       estadoAlMomento: estadoMomento,
     };
@@ -67,6 +67,7 @@ export async function registrarPatrullaEnHistorial(
     historial.unshift({
       unidadId: usuario.unidadId,
       nombre: usuario.unidadNombre,
+      delegacion,
       tipoUnidad,
       fechaPrimerRegistro: ahora,
       ultimaVezVisto: ahora,
@@ -142,8 +143,22 @@ export async function obtenerMetricasPerfil(
   let totalMisiones = 0;
 
   try {
+    if (usuario !== null && !usuario.unidadId) {
+      return {
+        misionesAtendidas: 0,
+        misionesEnCurso: 0,
+        misionesPendientes: 0,
+        totalMisiones: 0,
+        especialidad: esCuadrilla
+          ? 'Cuadrilla de Respuesta Operativa y Despeje'
+          : 'Operaciones de Terreno y Triage Primario',
+      };
+    }
+
     const misiones = await sincronizarMisiones({
       tipoMision: esCuadrilla ? 'ATENCION_CUADRILLA' : 'VERIFICACION',
+      patrullaId: !esCuadrilla && usuario?.unidadId ? usuario.unidadId : undefined,
+      cuadrillaId: esCuadrilla && usuario?.unidadId ? usuario.unidadId : undefined,
     });
 
     totalMisiones = misiones.length;
