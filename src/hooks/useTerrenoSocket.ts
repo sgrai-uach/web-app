@@ -3,6 +3,10 @@
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/AuthContext';
+import {
+  establecerSocketTerreno,
+  getSocketUrl,
+} from '@/lib/socket/terrenoSocket';
 
 /**
  * Hook para la sincronización reactiva en tiempo real vía Socket.io para personal de terreno.
@@ -18,14 +22,12 @@ export function useTerrenoSocket(): void {
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
+        establecerSocketTerreno(null);
       }
       return;
     }
 
-    const socketUrl =
-      process.env.NEXT_PUBLIC_SOCKET_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      (typeof window !== 'undefined' ? window.location.origin : '');
+    const socketUrl = getSocketUrl();
 
     const roomName = esCuadrilla
       ? `cuadrilla:${usuario.unidadId}`
@@ -39,6 +41,7 @@ export function useTerrenoSocket(): void {
     });
 
     socketRef.current = socket;
+    establecerSocketTerreno(socket);
 
     socket.on('connect', () => {
       socket.emit('join', roomName);
@@ -68,7 +71,7 @@ export function useTerrenoSocket(): void {
       socket.emit('salir', roomName);
       socket.disconnect();
       socketRef.current = null;
+      establecerSocketTerreno(null);
     };
   }, [token, usuario?.unidadId, esCuadrilla, recargarSesion]);
 }
-
