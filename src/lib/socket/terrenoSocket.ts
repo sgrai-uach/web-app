@@ -60,3 +60,4 @@ export function desconectarSocketTerreno(): void {
     socketInstance = null;
   }
 }
+

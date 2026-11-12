@@ -91,3 +91,4 @@ En la cabecera de la misión activa se despliega un distintivo visual de estado:
 - **`sgrai-pwa`:** Captura coordenadas WGS84, rumbo, velocidad y precisión, emitiendo el evento `telemetria:posicion`.
 - **`sgrai-api`:** Valida el payload con esquemas Zod en la versión `0.11.0`, almacena la posición volátil en Redis (`unidad:{id}:posicion`) y retransmite el evento a la sala `mapa`.
 - **`sgrai-web`:** Consume en tiempo real la sala `mapa` y posiciona el marcador de la patrulla o cuadrilla en la cartografía comunal de despacho.
+

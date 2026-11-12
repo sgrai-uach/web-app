@@ -60,3 +60,4 @@ export interface UseTelemetryResult {
   /** Función para forzar reintento manual de captura y emisión */
   reintentar: () => void;
 }
+
