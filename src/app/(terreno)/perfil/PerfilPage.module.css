@@ -145,3 +145,71 @@
   gap: var(--space-2, 8px);
   margin-top: var(--space-2, 8px);
 }
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.historyCard {
+  background-color: var(--color-bg-light, #ECEFF3);
+  border: 1px solid var(--color-border, #CBD5E1);
+  border-left: 3px solid var(--color-primary-teal, #1B6F7D);
+  border-radius: 0;
+  padding: var(--space-3, 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.historyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+}
+
+.historyTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-dark, #2B2B2B);
+}
+
+.historyDates {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #5F676E);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 8px);
+}
+
+.historyEmpty {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #5F676E);
+  text-align: center;
+  padding: var(--space-3, 12px);
+  font-style: italic;
+}
+
+.statusChip {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.statusChipActive {
+  background-color: var(--color-success-bg, #E8F5E9);
+  color: var(--color-success, #2E7D32);
+  border: 1px solid var(--color-success, #2E7D32);
+}
+
+.statusChipInactive {
+  background-color: var(--color-warning-bg, #FFF3E0);
+  color: var(--color-warning, #E65100);
+  border: 1px solid var(--color-warning, #E65100);
+}
+
