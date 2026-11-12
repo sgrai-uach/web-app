@@ -35,7 +35,7 @@ Para evitar confusiones entre personal no asignado y unidades retiradas del serv
 
 | Situación | Componente / Banner | Mensaje Desplegado | Comportamiento |
 |---|---|---|---|
-| **Sin Patrulla Asignada** | `<SinUnidadBanner />` | *"Sin patrulla asignada: No tienes una patrulla verificadora asignada actualmente. Comunícate con el Centro de Mando o tu supervisor para que te asignen a un móvil operativo."* | Modo neutral informativo, no bloquea navegación, orienta al operador. |
+| **Sin Patrulla Asignada** | `<SinUnidadBanner />` | *"Sin Patrulla Asignada: Actualmente no cuentas con una patrulla verificadora asignada para este turno. Comunícate con el Centro de Mando o Supervisor para coordinar tu asignación operativa antes de recibir despachos."* | Modo neutral informativo, no bloquea navegación, orienta al operador. |
 | **Patrulla Desactivada** | `<UnidadInactivaBanner />` | *"Patrulla Desactivada — [Nombre Unidad]: Esta unidad ha sido retirada del servicio activo (§3.7 de baja lógica). Se encuentra en modo histórico de solo lectura para consulta de faenas anteriores. No es posible recibir nuevos despachos ni ejecutar acciones operativas."* | Modo histórico de solo lectura, desactiva recepción de nuevas alertas y formularios de acción. |
 
 ### 3.2. Historial de Unidades en el Perfil (`/terreno/perfil`)
