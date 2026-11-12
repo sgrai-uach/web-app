@@ -52,7 +52,45 @@ describe('PatrullaMisionesPage — Modo Histórico Patrulla Desactivada (H85)', 
     expect(screen.getByRole('heading', { level: 1, name: /^historial$/i })).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(offlineQueue.guardarMisionesLocales).toHaveBeenCalled();
+      expect(screen.getByText(/Sin registros disponibles/i)).toBeInTheDocument();
+      expect(screen.getByText(/No se encontraron misiones históricas para esta patrulla/i)).toBeInTheDocument();
     });
+  });
+
+  it('muestra el banner SinUnidadBanner cuando el funcionario no tiene patrulla asignada (SIN_ASIGNACION)', async () => {
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: {
+        id: 'u-pat-2',
+        rut: '12.345.678-5',
+        nombre: 'Mario Patrullero',
+        email: 'mpatrullero@valdivia.cl',
+        rolId: 'r-pat-1',
+        rolNombre: 'Patrulla Verificadora',
+        rolCodigo: 'PATRULLA_VERIFICADORA',
+        delegacionId: 'del-1',
+        delegacionNombre: 'Valdivia Sur',
+        permisos: [],
+        unidadNombre: null,
+        unidadActiva: false,
+      },
+      token: 'mock-token',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: true,
+      esCuadrilla: false,
+      unidadActiva: false,
+      tieneUnidadAsignada: false,
+      estadoAsignacion: 'SIN_ASIGNACION',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
+    });
+
+    render(<PatrullaMisionesPage />);
+
+    expect(screen.getByText(/Sin Patrulla Asignada — Mario Patrullero/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: /^misiones$/i })).toBeInTheDocument();
   });
 });

@@ -207,6 +207,12 @@ export default function TerrenoPerfilPage() {
                       {chipLabel}
                     </span>
                   </div>
+                  {item.delegacion && (
+                    <div className={styles.historyDelegacion}>
+                      <MapPin size={13} aria-hidden="true" />
+                      <span>{item.delegacion}</span>
+                    </div>
+                  )}
                   <div className={styles.historyDates}>
                     <span>Registro: {formatearFechaHora24h(item.fechaPrimerRegistro)}</span>
                     <span>·</span>

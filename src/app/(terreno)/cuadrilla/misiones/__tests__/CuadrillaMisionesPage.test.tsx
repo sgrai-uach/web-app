@@ -52,7 +52,45 @@ describe('CuadrillaMisionesPage — Modo Histórico Cuadrilla Desactivada (H82)'
     expect(screen.getByRole('heading', { level: 1, name: /^historial$/i })).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(offlineQueue.guardarMisionesLocales).toHaveBeenCalled();
+      expect(screen.getByText(/Sin registros disponibles/i)).toBeInTheDocument();
+      expect(screen.getByText(/No se encontraron faenas históricas registradas para esta cuadrilla/i)).toBeInTheDocument();
     });
+  });
+
+  it('muestra el banner SinUnidadBanner cuando el funcionario no tiene cuadrilla asignada (SIN_ASIGNACION)', async () => {
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: {
+        id: 'u-cuad-2',
+        rut: '11.111.111-1',
+        nombre: 'Pedro Delegado',
+        email: 'pdelegado@valdivia.cl',
+        rolId: 'r-1',
+        rolNombre: 'Delegado de Cuadrilla',
+        rolCodigo: 'DELEGADO_CUADRILLA',
+        delegacionId: 'del-1',
+        delegacionNombre: 'Las Ánimas',
+        permisos: [],
+        unidadNombre: null,
+        unidadActiva: false,
+      },
+      token: 'mock-token',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: false,
+      esCuadrilla: true,
+      unidadActiva: false,
+      tieneUnidadAsignada: false,
+      estadoAsignacion: 'SIN_ASIGNACION',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
+    });
+
+    render(<CuadrillaMisionesPage />);
+
+    expect(screen.getByText(/Sin Cuadrilla Asignada — Pedro Delegado/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: /^misiones$/i })).toBeInTheDocument();
   });
 });
