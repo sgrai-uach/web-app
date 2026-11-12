@@ -28,6 +28,13 @@ export const ETIQUETAS_PRIORIDAD: Record<string, string> = {
   BAJA: 'Baja',
 };
 
+export const ETIQUETAS_COMPROMISO_VIVIENDA: Record<string, string> = {
+  SIN_DANO: 'Sin daño',
+  LEVE: 'Daño leve',
+  MODERADO: 'Daño moderado',
+  GRAVE_INHABITABLE: 'Grave / Inhabitable',
+};
+
 export const ETIQUETAS_TIPOLOGIA: Record<string, string> = {
   CAIDA_ARBOL: 'Caída de árbol',
   ANEGAMIENTO: 'Anegamiento',
@@ -83,6 +90,7 @@ export function formatearEtiquetaSegura(
   // Búsqueda en los diccionarios canónicos del sistema
   if (ETIQUETAS_ESTADO[normalizado]) return ETIQUETAS_ESTADO[normalizado];
   if (ETIQUETAS_PRIORIDAD[normalizado]) return ETIQUETAS_PRIORIDAD[normalizado];
+  if (ETIQUETAS_COMPROMISO_VIVIENDA[normalizado]) return ETIQUETAS_COMPROMISO_VIVIENDA[normalizado];
   if (ETIQUETAS_TIPOLOGIA[normalizado]) return ETIQUETAS_TIPOLOGIA[normalizado];
   if (ETIQUETAS_ROL[normalizado]) return ETIQUETAS_ROL[normalizado];
   if (ETIQUETAS_TIPO_MISION[normalizado]) return ETIQUETAS_TIPO_MISION[normalizado];

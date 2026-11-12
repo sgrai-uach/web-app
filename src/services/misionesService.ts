@@ -208,6 +208,14 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
 
     if (!error && data && data.data) {
       const d: MisionDetalleApi = data.data;
+      let previaLocal: MisionLocal | undefined;
+      try {
+        previaLocal = await obtenerMisionLocalPorId(id);
+      } catch {
+        previaLocal = undefined;
+      }
+
+      const reportesRemotos = Array.isArray(d.reportesTerreno) ? d.reportesTerreno : [];
       const misionLocal: MisionLocal = {
         id: d.id,
         incidenteId: d.incidente?.id || '',
@@ -226,6 +234,7 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         fechaInicio: d.fechaInicio || null,
         sincronizacionPendiente: false,
         datosAdicionales: {
+          ...(previaLocal?.datosAdicionales || {}),
           trabajo:
             d.descripcion ||
             d.incidente?.descripcion ||
@@ -233,6 +242,10 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
           titulo: d.titulo,
           estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION',
           estadoIncidente: d.incidente?.estado || 'VERIFICANDO',
+          reportesTerreno: reportesRemotos,
+          prioridadEvaluada:
+            Boolean(previaLocal?.datosAdicionales?.prioridadEvaluada) ||
+            reportesRemotos.length > 0,
         },
         actualizadoEn: d.actualizadoEn,
       };

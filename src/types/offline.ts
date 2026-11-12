@@ -71,3 +71,52 @@ export interface ReclasificarTipologiaPayload {
   misionId?: string;
 }
 
+export type PrioridadIncidente = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA';
+
+export type NivelCompromisoVivienda =
+  | 'SIN_DANO'
+  | 'LEVE'
+  | 'MODERADO'
+  | 'GRAVE_INHABITABLE';
+
+export interface EvaluacionTerrenoPrioridadForm {
+  nucleoFamiliarTotal: number;
+  cantidadNinos: number;
+  cantidadAdultosMayores: number;
+  personasDiscapacitadas: number;
+  personasElectrodependientes: number;
+  mascotasAfectadas: number;
+  viviendasAfectadas: number;
+  nivelCompromisoVivienda: NivelCompromisoVivienda;
+  riesgoElectrico: boolean;
+  riesgoEstructural: boolean;
+  riesgoQuimicoSanitario: boolean;
+  aislamientoVial: boolean;
+  requiereEvacuacion: boolean;
+  requiereAsistenciaSocial: boolean;
+  requiereApoyoAdicional: boolean;
+  detallesAdicionales: string;
+}
+
+export interface ReportePrioridadTerrenoLocal {
+  id?: string;
+  versionReporte: number;
+  evaluacion: EvaluacionTerrenoPrioridadForm;
+  prioridadSugerida: PrioridadIncidente;
+  prioridadAsignada: PrioridadIncidente;
+  factoresGatillantes: string[];
+  justificacionPrioridad: string;
+  creadoEn: string;
+  sincronizado: boolean;
+}
+
+export interface AsignarPrioridadPayload extends EvaluacionTerrenoPrioridadForm {
+  prioridad: PrioridadIncidente;
+  prioridadSugerida: PrioridadIncidente;
+  justificacionPrioridad: string;
+  factoresGatillantes: string[];
+  misionId?: string;
+  versionReporte: number;
+}
+
+
