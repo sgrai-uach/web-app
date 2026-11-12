@@ -92,5 +92,11 @@ describe('CuadrillaMisionesPage — Modo Histórico Cuadrilla Desactivada (H82)'
 
     expect(screen.getByText(/Sin Cuadrilla Asignada — Pedro Delegado/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: /^misiones$/i })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/El funcionario no posee una cuadrilla asignada\. Solicite su asignación en el Centro de Mando\./i),
+      ).toBeInTheDocument();
+    });
   });
 });

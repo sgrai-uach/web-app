@@ -159,7 +159,9 @@ function CuadrillaMisionesContenido() {
               Sin registros disponibles
             </p>
             <p style={{ fontSize: '0.875rem', margin: 0 }}>
-              {!unidadActiva
+              {!tieneUnidadAsignada
+                ? 'El funcionario no posee una cuadrilla asignada. Solicite su asignación en el Centro de Mando.'
+                : !unidadActiva
                 ? 'No se encontraron faenas históricas registradas para esta cuadrilla.'
                 : 'La cuadrilla se encuentra disponible para despacho.'}
             </p>

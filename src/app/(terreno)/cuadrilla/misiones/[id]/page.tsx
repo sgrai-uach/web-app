@@ -20,7 +20,12 @@ interface PageProps {
 
 export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const { id: misionId } = use(params);
-  const { usuario, unidadActiva, tieneUnidadAsignada } = useAuth();
+  const {
+    usuario,
+    unidadActiva,
+    tieneUnidadAsignada,
+    estadoAsignacion,
+  } = useAuth();
 
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
@@ -67,7 +72,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     <div className={styles.container}>
       <Link href="/cuadrilla/misiones" className={styles.backLink}>
         <ArrowLeft size={16} aria-hidden="true" />
-        <span>{unidadActiva ? 'Faenas' : 'Historial'}</span>
+        <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}</span>
       </Link>
 
       {!tieneUnidadAsignada ? (
