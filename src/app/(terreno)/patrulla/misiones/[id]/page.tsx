@@ -26,6 +26,11 @@ import {
   aceptarMisionPatrulla,
 } from '@/services/misionesService';
 import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
+import { useTelemetry } from '@/hooks/useTelemetry';
+import {
+  TelemetryStatusBadge,
+  TelemetryWarningBanner,
+} from '@/components/terreno/TelemetryStatusBadge';
 import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaDetailPage.module.css';
 
@@ -103,6 +108,20 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     }
   };
 
+  const estadoNormalizado = mision?.estado?.toUpperCase() || '';
+  const esDespachada = estadoNormalizado === 'DESPACHADA';
+  const esEnCurso =
+    estadoNormalizado === 'EN_CURSO' ||
+    estadoNormalizado === 'EN_RUTA' ||
+    estadoNormalizado === 'EN_TERRENO';
+
+  const misionActiva = Boolean(unidadActiva && esEnCurso);
+  const { estado: estadoTelemetria, reintentar: reintentarTelemetria } = useTelemetry({
+    unidadId: usuario?.unidadId ?? null,
+    tipoUnidad: 'PATRULLA',
+    activa: misionActiva,
+  });
+
   if (cargando || !mision) {
     return (
       <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
@@ -118,13 +137,6 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   } else if (normPrioridad === 'ALTA') {
     prioridadClase = styles.priorityAlta;
   }
-
-  const estadoNormalizado = mision.estado?.toUpperCase() || '';
-  const esDespachada = estadoNormalizado === 'DESPACHADA';
-  const esEnCurso =
-    estadoNormalizado === 'EN_CURSO' ||
-    estadoNormalizado === 'EN_RUTA' ||
-    estadoNormalizado === 'EN_TERRENO';
 
   const tienePermisoVerificar =
     typeof tienePermiso === 'function'
@@ -287,8 +299,19 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                   En Trayecto / Evaluación
                 </h2>
               </div>
-              <span className={styles.activeStatusChip}>Misión activa</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <TelemetryStatusBadge
+                  estado={estadoTelemetria}
+                  onRetry={reintentarTelemetria}
+                />
+                <span className={styles.activeStatusChip}>Misión activa</span>
+              </div>
             </div>
+
+            <TelemetryWarningBanner
+              estado={estadoTelemetria}
+              onRetry={reintentarTelemetria}
+            />
 
             {mision.sincronizacionPendiente ? (
               <div className={styles.offlineQueueBanner} role="status">

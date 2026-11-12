@@ -10,6 +10,11 @@ import { obtenerDetalleMision } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
+import { useTelemetry } from '@/hooks/useTelemetry';
+import {
+  TelemetryStatusBadge,
+  TelemetryWarningBanner,
+} from '@/components/terreno/TelemetryStatusBadge';
 import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaDetailPage.module.css';
@@ -48,6 +53,19 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   useEffect(() => {
     cargarDetalle();
   }, [cargarDetalle]);
+
+  const estadoNormalizado = mision?.estado?.toUpperCase() || '';
+  const esEnCurso =
+    estadoNormalizado === 'EN_CURSO' ||
+    estadoNormalizado === 'EN_RUTA' ||
+    estadoNormalizado === 'EN_TERRENO';
+  const misionActiva = Boolean(unidadActiva && esEnCurso);
+
+  const { estado: estadoTelemetria, reintentar: reintentarTelemetria } = useTelemetry({
+    unidadId: usuario?.unidadId ?? null,
+    tipoUnidad: 'CUADRILLA',
+    activa: misionActiva,
+  });
 
   if (cargando || !mision) {
     return <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>Cargando misión...</div>;
@@ -95,8 +113,19 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
               {formatearPrioridad(mision.prioridad)}
             </span>
           </div>
-          <EstadoBadge estado={mision.estado} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <TelemetryStatusBadge
+              estado={estadoTelemetria}
+              onRetry={reintentarTelemetria}
+            />
+            <EstadoBadge estado={mision.estado} />
+          </div>
         </div>
+
+        <TelemetryWarningBanner
+          estado={estadoTelemetria}
+          onRetry={reintentarTelemetria}
+        />
 
         <div className={styles.detailGrid}>
           {/* Bloque Tipo (único en negrita) */}
