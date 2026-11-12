@@ -15,6 +15,7 @@ import {
   ClipboardCheck,
   WifiOff,
   AlertCircle,
+  ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
@@ -26,6 +27,7 @@ import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
 import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
 import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
+import { EvaluacionPrioridadCard } from '@/components/misiones/EvaluacionPrioridadCard';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
@@ -49,6 +51,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const [errorAceptacion, setErrorAceptacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
   const [seccionCategorizacionAbierta, setSeccionCategorizacionAbierta] = useState<boolean>(true);
+  const [seccionPrioridadAbierta, setSeccionPrioridadAbierta] = useState<boolean>(false);
 
   const cargarDetalle = useCallback(async () => {
     setCargando(true);
@@ -58,6 +61,12 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         setMision(encontrada);
         if (encontrada.datosAdicionales?.tipologiaEvaluada) {
           setSeccionCategorizacionAbierta(false);
+          if (!encontrada.datosAdicionales?.prioridadEvaluada) {
+            setSeccionPrioridadAbierta(true);
+          }
+        }
+        if (encontrada.datosAdicionales?.prioridadEvaluada) {
+          setSeccionPrioridadAbierta(false);
         }
       } else {
         setMision({
@@ -387,6 +396,42 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                     setSeccionCategorizacionAbierta(false);
                   }}
                 />
+              </SeccionDesplegable>
+
+              <SeccionDesplegable
+                titulo="Evaluación en terreno y prioridad"
+                icono={<ShieldAlert size={18} />}
+                abierto={seccionPrioridadAbierta}
+                onToggle={(abierto) => setSeccionPrioridadAbierta(abierto)}
+                indicador={
+                  mision.datosAdicionales?.prioridadEvaluada ? (
+                    <span className={styles.badgeCompletado}>
+                      <CheckCircle2 size={14} aria-hidden="true" />
+                      <span>
+                        Completado
+                        {typeof mision.datosAdicionales?.versionReportePrioridad === 'number'
+                          ? ` (#${mision.datosAdicionales.versionReportePrioridad})`
+                          : ''}
+                      </span>
+                    </span>
+                  ) : mision.sincronizacionPendiente ? (
+                    <span className={styles.syncPendingBadge}>Pendiente</span>
+                  ) : null
+                }
+              >
+                {seccionPrioridadAbierta && (
+                  <EvaluacionPrioridadCard
+                    incidenteId={mision.incidenteId}
+                    misionActual={mision}
+                    onPrioridadActualizada={(resultado) => {
+                      if (resultado.mision) {
+                        setMision(resultado.mision);
+                      }
+                      setSeccionPrioridadAbierta(false);
+                      void actualizarPendientes();
+                    }}
+                  />
+                )}
               </SeccionDesplegable>
             </div>
           </section>
