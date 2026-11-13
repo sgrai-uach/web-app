@@ -7,7 +7,6 @@ import { Heading } from '@/components/ui/Heading';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
-import { guardarMisionesLocales } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { ordenarMisionesPorPrioridadYFecha } from '@/lib/utils/formatters';
@@ -23,7 +22,7 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaMisionesPage.module.css';
 
 function PatrullaMisionesContenido() {
-  const { usuario, unidadActiva, tieneUnidadAsignada } = useAuth();
+  const { usuario, unidadActiva, tieneUnidadAsignada, estadoAsignacion } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -43,68 +42,36 @@ function PatrullaMisionesContenido() {
   const cargarMisiones = useCallback(async () => {
     setCargando(true);
     try {
-      let locales = await sincronizarMisiones({
-        tipoMision: 'VERIFICACION',
-      });
-
-      if (!unidadActiva && locales.length === 0) {
-        const historicas: MisionLocal[] = [
-          {
-            id: 'patrulla-hist-01',
-            incidenteId: 'inc-102',
-            codigoIncidente: 'INC-2026-00102',
-            tipologia: 'Caída de árbol',
-            direccion: 'Av. Alemania 600, Valdivia',
-            prioridad: 'ALTA',
-            estado: 'FINALIZADA',
-            fechaDespacho: '2026-10-18T11:00:00Z',
-            actualizadoEn: '2026-10-18T11:45:00Z',
-          },
-          {
-            id: 'patrulla-hist-02',
-            incidenteId: 'inc-067',
-            codigoIncidente: 'INC-2026-00067',
-            tipologia: 'Deslizamiento',
-            direccion: 'Camino a Niebla Km 4, Valdivia',
-            prioridad: 'CRITICA',
-            estado: 'FINALIZADA',
-            fechaDespacho: '2026-10-14T16:20:00Z',
-            actualizadoEn: '2026-10-14T17:10:00Z',
-          },
-        ];
-        await guardarMisionesLocales(historicas);
-        locales = historicas;
-      } else if (unidadActiva && locales.length === 0) {
-        const inicialesActivas: MisionLocal[] = [
-          {
-            id: '60000000-0000-4000-8000-000000000001',
-            incidenteId: 'a0000000-0000-4000-8000-000000000001',
-            codigoIncidente: 'INC-2026-0001',
-            tipologia: 'Caída de árbol',
-            direccion: 'Av. Ramón Picarte 1200, Valdivia',
-            coordenadas: { lat: -39.819588, lng: -73.245209 },
-            prioridad: 'ALTA',
-            estado: 'DESPACHADA',
-            fechaDespacho: '2026-11-01T20:30:00Z',
-            datosAdicionales: {
-              trabajo: 'Evaluar caída de árbol sobre calzada y riesgo de tendido eléctrico.',
-              titulo: 'Verificación de Incidente INC-2026-0001',
-            },
-            actualizadoEn: '2026-11-01T20:30:00Z',
-          },
-        ];
-        await guardarMisionesLocales(inicialesActivas);
-        locales = inicialesActivas;
+      if (!tieneUnidadAsignada || estadoAsignacion === 'SIN_ASIGNACION') {
+        setMisiones([]);
+        return;
       }
+
+      const locales = await sincronizarMisiones({
+        tipoMision: 'VERIFICACION',
+        patrullaId: usuario?.unidadId || undefined,
+      });
 
       setMisiones(locales);
     } finally {
       setCargando(false);
     }
-  }, [unidadActiva]);
+  }, [tieneUnidadAsignada, estadoAsignacion, usuario?.unidadId]);
 
   useEffect(() => {
     cargarMisiones();
+
+    const handleActualizar = () => {
+      void cargarMisiones();
+    };
+
+    window.addEventListener('sgrai:mision_actualizada', handleActualizar);
+    window.addEventListener('sgrai:outbox-synced', handleActualizar);
+
+    return () => {
+      window.removeEventListener('sgrai:mision_actualizada', handleActualizar);
+      window.removeEventListener('sgrai:outbox-synced', handleActualizar);
+    };
   }, [cargarMisiones]);
 
   const { ultimaMisionAsignada, descartarUltimaMision } = useMisionesSocket({
@@ -183,7 +150,7 @@ function PatrullaMisionesContenido() {
         <NuevaMisionBanner
           codigoMision={ultimaMisionAsignada.codigo}
           misionId={ultimaMisionAsignada.misionId}
-          urlDetalle={`/terreno/patrulla/misiones/${ultimaMisionAsignada.misionId}`}
+          urlDetalle={`/patrulla/misiones/${ultimaMisionAsignada.misionId}`}
           alCerrar={descartarUltimaMision}
         />
       )}

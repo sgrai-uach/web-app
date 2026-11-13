@@ -62,7 +62,8 @@ describe('PatrullaMisionesPage — Modo Histórico Patrulla Desactivada (H85)', 
     expect(screen.getByRole('heading', { level: 1, name: /^historial$/i })).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(offlineQueue.guardarMisionesLocales).toHaveBeenCalled();
+      expect(misionesService.sincronizarMisiones).toHaveBeenCalled();
+      expect(screen.getByText(/No se encontraron misiones históricas para esta patrulla/i)).toBeInTheDocument();
     });
   });
 
@@ -89,6 +90,8 @@ describe('PatrullaMisionesPage — Modo Histórico Patrulla Desactivada (H85)', 
       esPatrulla: true,
       esCuadrilla: false,
       unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
       tienePermiso: vi.fn().mockReturnValue(true),
       tieneAlgunPermiso: vi.fn().mockReturnValue(true),
       login: vi.fn(),

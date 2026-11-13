@@ -14,7 +14,7 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './TerrenoMisionesPendientes.module.css';
 
 export function TerrenoMisionesPendientes() {
-  const { esCuadrilla, unidadActiva } = useAuth();
+  const { usuario, esCuadrilla, unidadActiva, tieneUnidadAsignada } = useAuth();
   const [misionesPendientes, setMisionesPendientes] = useState<MisionLocal[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
 
@@ -23,8 +23,15 @@ export function TerrenoMisionesPendientes() {
 
     async function buscarMisiones() {
       try {
+        if (!tieneUnidadAsignada || !usuario?.unidadId) {
+          if (!cancelado) setMisionesPendientes([]);
+          return;
+        }
+
         const misiones = await sincronizarMisiones({
           tipoMision: esCuadrilla ? 'ATENCION_CUADRILLA' : 'VERIFICACION',
+          patrullaId: !esCuadrilla ? usuario?.unidadId : undefined,
+          cuadrillaId: esCuadrilla ? usuario?.unidadId : undefined,
         });
         if (cancelado) return;
 
@@ -56,7 +63,7 @@ export function TerrenoMisionesPendientes() {
       window.removeEventListener('sgrai:mision_asignada', handleActualizar);
       window.removeEventListener('sgrai:mision_actualizada', handleActualizar);
     };
-  }, [esCuadrilla]);
+  }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId]);
 
   if (cargando) {
     return (

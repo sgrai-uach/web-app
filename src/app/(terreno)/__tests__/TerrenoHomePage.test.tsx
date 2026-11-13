@@ -70,6 +70,7 @@ function buildAuthMock(overrides?: Partial<AuthContextValue>): AuthContextValue 
       rolCodigo: 'PATRULLA_VERIFICADORA',
       delegacionId: 'del-1',
       delegacionNombre: 'Delegación Centro',
+      unidadId: 'pat-alfa-01',
       unidadNombre: 'Patrulla Alfa 01',
       unidadActiva: true,
       permisos: [],

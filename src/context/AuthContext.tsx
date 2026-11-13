@@ -18,6 +18,8 @@ import type {
   EstadoAsignacionUnidad,
 } from '@/types/seguridad';
 import { esRolTerrenoPermitido } from '@/types/seguridad';
+import { limpiarAlmacenamientoOffline } from '@/services/offlineQueue';
+import { registrarPatrullaEnHistorial } from '@/services/perfilTerrenoService';
 
 const SESSION_PROFILE_KEY = 'sgrai_usuario_sesion';
 
@@ -154,16 +156,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       guardarPerfilSesion(perfil);
       setToken(cookieToken);
       setUsuario(perfil);
-    } catch {
-      const perfilRespaldo = leerPerfilGuardado();
-      if (perfilRespaldo && esRolTerrenoPermitido(perfilRespaldo.rolCodigo)) {
-        setToken(cookieToken);
-        setUsuario(perfilRespaldo);
-      } else {
+      if (perfil.unidadId) {
+        void registrarPatrullaEnHistorial(perfil);
+      }
+    } catch (error) {
+      if (
+        error instanceof SeguridadServiceError &&
+        (error.status === 401 || error.status === 403)
+      ) {
         removeAuthCookie();
         guardarPerfilSesion(null);
+        void limpiarAlmacenamientoOffline();
         setUsuario(null);
         setToken(null);
+      } else {
+        const perfilRespaldo = leerPerfilGuardado();
+        if (perfilRespaldo && esRolTerrenoPermitido(perfilRespaldo.rolCodigo)) {
+          setToken(cookieToken);
+          setUsuario(perfilRespaldo);
+        } else {
+          removeAuthCookie();
+          guardarPerfilSesion(null);
+          void limpiarAlmacenamientoOffline();
+          setUsuario(null);
+          setToken(null);
+        }
       }
     } finally {
       setCargando(false);
@@ -192,6 +209,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         guardarPerfilSesion(respuesta.usuario);
         setToken(respuesta.token);
         setUsuario(respuesta.usuario);
+        if (respuesta.usuario.unidadId) {
+          void registrarPatrullaEnHistorial(respuesta.usuario);
+        }
         return respuesta.usuario;
       } finally {
         setCargando(false);
@@ -203,6 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     removeAuthCookie();
     guardarPerfilSesion(null);
+    void limpiarAlmacenamientoOffline();
     setUsuario(null);
     setToken(null);
     try {

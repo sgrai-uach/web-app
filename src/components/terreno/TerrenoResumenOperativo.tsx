@@ -28,7 +28,17 @@ export function TerrenoResumenOperativo() {
 
     async function cargarResumenMisiones() {
       try {
-        const misiones = await sincronizarMisiones();
+        if (!tieneUnidadAsignada || !usuario?.unidadId) {
+          if (!cancelado) {
+            setMetricas({ pendientes: 0, enCurso: 0, finalizadas: 0 });
+          }
+          return;
+        }
+
+        const misiones = await sincronizarMisiones({
+          patrullaId: !esCuadrilla ? usuario.unidadId : undefined,
+          cuadrillaId: esCuadrilla ? usuario.unidadId : undefined,
+        });
         if (cancelado) return;
 
         const misionesPendientes = misiones.filter(
@@ -74,7 +84,7 @@ export function TerrenoResumenOperativo() {
       window.removeEventListener('sgrai:mision_asignada', handleActualizar);
       window.removeEventListener('sgrai:mision_actualizada', handleActualizar);
     };
-  }, []);
+  }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId]);
 
   const UnidadIcon = esCuadrilla ? HardHat : Compass;
 

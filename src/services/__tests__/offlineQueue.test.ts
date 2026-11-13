@@ -3,6 +3,8 @@ import {
   guardarMisionesLocales,
   obtenerMisionesLocales,
   obtenerMisionLocalPorId,
+  limpiarMisionesLocales,
+  limpiarAlmacenamientoOffline,
   guardarCatalogoLocal,
   obtenerCatalogoLocal,
   encolarAccionOutbox,
@@ -83,5 +85,23 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
     expect(resultado.exitosas).toBeGreaterThanOrEqual(1);
     const listaActual = await obtenerAccionesOutbox();
     expect(listaActual.some((a) => a.id === accion1.id)).toBe(false);
+  });
+
+  it('limpia almacenamiento offline y misiones locales correctamente', async () => {
+    await guardarMisionesLocales([misionEjemplo]);
+    await encolarAccionOutbox({
+      tipo: 'RECHAZAR_MISION',
+      url: '/api/misiones/mision-01/rechazar',
+      metodo: 'POST',
+      payload: { justificacion_rechazo: 'Falla mecánica' },
+    });
+
+    await limpiarMisionesLocales();
+    const misiones = await obtenerMisionesLocales();
+    expect(misiones.length).toBe(0);
+
+    await limpiarAlmacenamientoOffline();
+    const pendientes = await contarAccionesPendientes();
+    expect(pendientes).toBe(0);
   });
 });
