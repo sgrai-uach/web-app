@@ -44,7 +44,13 @@ interface PageProps {
 
 export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const { id: misionId } = use(params);
-  const { usuario, unidadActiva, tieneUnidadAsignada, tienePermiso } = useAuth();
+  const {
+    usuario,
+    unidadActiva,
+    tieneUnidadAsignada,
+    estadoAsignacion,
+    tienePermiso,
+  } = useAuth();
   const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
@@ -73,23 +79,12 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         setSeccionCategorizacionAbierta(!tipologiaYaEvaluada);
         setSeccionPrioridadAbierta(tipologiaYaEvaluada && !prioridadYaEvaluada);
       } else {
-        setMision({
-          id: misionId,
-          incidenteId: `inc-${misionId}`,
-          codigoIncidente: `INC-2026-${misionId.substring(0, 5).toUpperCase()}`,
-          tipologia: 'Caída de árbol',
-          direccion: 'Av. Alemania 600, Valdivia',
-          coordenadas: { lat: -39.81, lng: -73.24 },
-          prioridad: 'ALTA',
-          estado: unidadActiva ? 'DESPACHADA' : 'FINALIZADA',
-          fechaDespacho: '2026-10-18T11:00:00Z',
-          actualizadoEn: '2026-10-18T11:45:00Z',
-        });
+        setMision(null);
       }
     } finally {
       setCargando(false);
     }
-  }, [misionId, unidadActiva]);
+  }, [misionId]);
 
   useEffect(() => {
     void cargarDetalle();
@@ -166,7 +161,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       <div className={styles.topBar}>
         <Link href="/patrulla/misiones" className={styles.backLink}>
           <ArrowLeft size={16} aria-hidden="true" />
-          <span>{unidadActiva ? 'Misiones' : 'Historial'}</span>
+          <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Misiones'}</span>
         </Link>
         <ConnectionStatusBadge
           status={status}

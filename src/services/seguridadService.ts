@@ -62,7 +62,7 @@ export async function loginUsuario(
     throw new SeguridadServiceError(response?.status || 500, formatted.message, formatted);
   }
 
-  return data.data as unknown as LoginResponseData;
+  return data.data;
 }
 
 export async function obtenerUsuarioActivo(): Promise<UsuarioActivoDetalle> {
@@ -90,5 +90,5 @@ export async function obtenerUsuarioActivo(): Promise<UsuarioActivoDetalle> {
     throw new SeguridadServiceError(response?.status || 500, formatted.message, formatted);
   }
 
-  return data.data as unknown as UsuarioActivoDetalle;
+  return data.data;
 }

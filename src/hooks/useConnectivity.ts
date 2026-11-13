@@ -90,8 +90,8 @@ export function useConnectivity() {
             try {
               const local = await obtenerMisionLocalPorId(misionId);
               if (local) {
-                let fechaInicioServidor = local.fechaInicio || new Date().toISOString();
                 if (res.ok) {
+                  let fechaInicioServidor = local.fechaInicio || new Date().toISOString();
                   try {
                     const bodyJson = await res.clone().json();
                     if (bodyJson?.data?.mision?.fechaInicio) {
@@ -100,14 +100,22 @@ export function useConnectivity() {
                   } catch {
                     // Ignorar si la respuesta no contiene JSON
                   }
+                  await guardarMisionLocal({
+                    ...local,
+                    estado: 'EN_CURSO',
+                    fechaInicio: fechaInicioServidor,
+                    sincronizacionPendiente: false,
+                    actualizadoEn: new Date().toISOString(),
+                  });
+                } else {
+                  // Conflicto o rechazo por backend (409/422, patrulla desactivada o misión reasignada).
+                  // Se limpia sincronizacionPendiente para no trabar la cola, pero no se promueve falsamente a EN_CURSO.
+                  await guardarMisionLocal({
+                    ...local,
+                    sincronizacionPendiente: false,
+                    actualizadoEn: new Date().toISOString(),
+                  });
                 }
-                await guardarMisionLocal({
-                  ...local,
-                  estado: 'EN_CURSO',
-                  fechaInicio: fechaInicioServidor,
-                  sincronizacionPendiente: false,
-                  actualizadoEn: new Date().toISOString(),
-                });
               }
             } catch {
               // Ignorar fallos de lectura/escritura secundaria en IndexedDB

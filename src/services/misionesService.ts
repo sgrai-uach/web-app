@@ -5,6 +5,7 @@ import type { AceptarMisionPayload, MisionLocal } from '@/types/offline';
 import {
   guardarMisionesLocales,
   guardarMisionLocal,
+  limpiarMisionesLocales,
   obtenerMisionesLocales,
   obtenerMisionLocalPorId,
   encolarAccionOutbox,
@@ -200,6 +201,7 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
         };
       });
 
+      await limpiarMisionesLocales();
       if (remotas.length > 0) {
         await guardarMisionesLocales(remotas);
       }

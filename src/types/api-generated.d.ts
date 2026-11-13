@@ -1689,6 +1689,19 @@ export interface paths {
                                 delegacionNombre: string | null;
                                 /** @description Cantidad de misiones tácticas despachadas o generadas para este incidente */
                                 totalMisiones: number;
+                                /** @description Indica si el incidente posee una misión en estado PLANIFICADA o DESPACHADA pendiente de confirmación en terreno */
+                                tieneMisionDespachada?: boolean;
+                                /** @description Indica si el incidente posee una misión en estado EN_CURSO activa en terreno */
+                                tieneMisionEnCurso?: boolean;
+                                /**
+                                 * @description Indica si la patrulla verificadora completó el diagnóstico técnico en terreno
+                                 * @default false
+                                 */
+                                verificado: boolean;
+                                /** @description Indica si el incidente fue verificado o reclasificado en terreno */
+                                reclasificadoEnTerreno?: boolean;
+                                /** @description Motivo o justificación técnica de la evaluación en terreno */
+                                justificacionReclasificacion?: string | null;
                                 /** @description Fecha y hora de registro en formato ISO 8601 */
                                 creadoEn: string;
                                 /** @description Última fecha y hora de actualización en formato ISO 8601 */
@@ -1906,6 +1919,18 @@ export interface paths {
                                     /** @description Nombre de la cuadrilla que tiene asignado el recurso */
                                     cuadrillaNombre: string | null;
                                 }[];
+                                /**
+                                 * @description Indica si la verificación presencial fue completada
+                                 * @default false
+                                 */
+                                verificado: boolean;
+                                /**
+                                 * @description Indica si fue verificado o reclasificado en terreno
+                                 * @default false
+                                 */
+                                reclasificadoEnTerreno: boolean;
+                                /** @description Justificación técnica en terreno */
+                                justificacionReclasificacion?: string | null;
                                 creadoEn: string;
                                 actualizadoEn: string;
                             };
@@ -1957,6 +1982,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/incidentes/{id}/tipologia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Reclasificar tipología de incidente en terreno (HU-37)
+         * @description Permite a la patrulla verificadora reclasificar técnicamente la tipología del incidente tras la evaluación presencial en terreno, corrigiendo tipificaciones ciudadanas inexactas. Requiere que la misión asignada haya sido aceptada previamente (estado EN_CURSO) y justificación obligatoria del cambio. Actualiza atómicamente incidente.tipo_incidente_id y sincroniza incidente.tipo_afectacion, registra el hito en mision_hito ('Tipología reclasificada en terreno a: [Nombre del Tipo]. Justificación: [Motivo]') y emite el evento WebSocket 'incidente:actualizado' a la sala 'sala:encargados'. Requiere el permiso RBAC 'misiones:terreno:verificar'.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Token Bearer JWT de la patrulla verificadora */
+                    authorization?: string;
+                    /** @description ID de usuario para entornos de prueba */
+                    "x-user-id"?: string;
+                };
+                path: {
+                    /** @description Identificador UUID del incidente */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Datos requeridos para la reclasificación: nuevo tipo de incidente y justificación técnica */
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ReclasificarTipologiaInput"];
+                };
+            };
+            responses: {
+                /** @description Tipología del incidente reclasificada exitosamente en terreno */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReclasificarTipologiaResponse"];
+                    };
+                };
+                /** @description Datos de entrada inválidos o tipo de incidente inactivo */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autorizado / falta permiso misiones:terreno:verificar o pertenece a otra patrulla */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Incidente, tipo de incidente o misión no encontrados */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto: la misión no ha sido aceptada todavía (debe encontrarse en estado EN_CURSO) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
     "/api/personal": {
         parameters: {
             query?: never;
@@ -1994,6 +2113,12 @@ export interface paths {
                     /** @description Si es true, solo retorna usuarios con ficha operativa en personal */
                     soloPersonal?: boolean | null;
                     solo_personal?: boolean | null;
+                    /** @description Si es true, excluye a los funcionarios que ya lideran o integran una cuadrilla operativa activa (aptos como candidatos a delegado o dotación de cuadrilla). */
+                    sinAsignacionCuadrilla?: boolean | null;
+                    sin_asignacion_cuadrilla?: boolean | null;
+                    /** @description Cuadrilla a considerar durante la exclusión de asignaciones (flujo de edición: mantiene visibles los integrantes de la cuadrilla que se está editando). */
+                    excluirCuadrillaId?: string;
+                    excluir_cuadrilla_id?: string;
                     /** @description Búsqueda textual sobre RUT, nombres, apellidos o email */
                     busqueda?: string;
                     /** @description Alias rápido para búsqueda textual */
@@ -3248,7 +3373,170 @@ export interface paths {
             };
         };
         put?: never;
-        post?: never;
+        /**
+         * Asignar y despachar patrulla verificadora a un incidente (HU-20)
+         * @description Despacha una patrulla verificadora disponible a un incidente formal en estado REPORTADO. Ejecuta una transacción atómica que: (1) crea la misión con tipo VERIFICACION y estado DESPACHADA, (2) actualiza el incidente a estado VERIFICANDO, (3) actualiza la patrulla a estado EN_VERIFICACION, y (4) registra el hito inicial en mision_hito. Emite eventos WebSocket a las salas 'patrulla:{id}', 'encargado' y 'mapa'. Requiere permiso 'misiones:asignar'.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CrearMisionVerificacionInput"];
+                };
+            };
+            responses: {
+                /** @description Misión de verificación creada y patrulla despachada exitosamente */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CrearMisionResponse"];
+                    };
+                };
+                /** @description Datos de entrada inválidos o formato JSON malformado */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token ausente */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'misiones:asignar'. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Incidente o patrulla no encontrado */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto: la patrulla seleccionada ya no se encuentra DISPONIBLE o el incidente no está en estado REPORTADO */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor al crear y despachar la misión */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/misiones/{id}/aceptar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirmar y aceptar misión asignada desde terreno (HU-36)
+         * @description Permite a la patrulla verificadora confirmar y aceptar la misión asignada desde su dispositivo móvil (PWA). Ejecuta una transición atómica actualizando mision.estado de DESPACHADA a EN_CURSO, fijando mision.fecha_inicio = CURRENT_TIMESTAMP y registrando el hito 'Misión Aceptada por Patrulla' (código 'MISION_ACEPTADA') en mision_hito. Mantiene patrulla_verificadora.estado en EN_VERIFICACION e incidente.estado en VERIFICANDO, y emite el evento WebSocket 'mision:actualizada' hacia la sala 'encargado'. Requiere el permiso RBAC 'misiones:terreno:verificar'.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Token Bearer JWT de sesión de la patrulla verificadora */
+                    authorization?: string;
+                    /** @description UUID del usuario autenticado con permiso misiones:terreno:verificar */
+                    "x-user-id"?: string;
+                };
+                path: {
+                    /** @description Identificador único UUID de la misión */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Coordenadas GPS opcionales al momento de confirmar la salida en la PWA */
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AceptarMisionInput"];
+                };
+            };
+            responses: {
+                /** @description Misión aceptada exitosamente y hito registrado en bitácora */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AceptarMisionResponse"];
+                    };
+                };
+                /** @description El identificador de la misión no es un UUID válido o las coordenadas son inválidas */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token de sesión inválido/expirado */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere el permiso 'misiones:terreno:verificar' y pertenecer a la patrulla asignada */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No se encontró ninguna misión con el identificador proporcionado */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto de estado: la misión no se encuentra en estado 'DESPACHADA' (ej. ya fue aceptada o cancelada) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -3607,124 +3895,6 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/misiones/{id}/aceptar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Confirmar y aceptar misión asignada por Patrulla Verificadora (HU-36)
-         * @description Ejecuta una transición atómica pasando el estado de la misión de DESPACHADA a EN_CURSO, fijando fecha_inicio = CURRENT_TIMESTAMP, manteniendo el estado de la patrulla en EN_VERIFICACION y del incidente en VERIFICANDO, y registrando el hito MISION_ACEPTADA en mision_hito.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: {
-                    /** @description Token Bearer JWT de sesión */
-                    authorization?: string;
-                    /** @description ID del usuario autenticado en sesión */
-                    "x-user-id"?: string;
-                };
-                path: {
-                    /** @description Identificador único UUID de la misión */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["AceptarMisionInput"];
-                };
-            };
-            responses: {
-                /** @description Misión aceptada exitosamente y hito registrado */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["AceptarMisionResponse"];
-                    };
-                };
-                /** @description Parámetros o coordenadas inválidas */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: {
-                        "application/json": {
-                            message: string;
-                            statusCode?: number;
-                        };
-                    };
-                };
-                /** @description No autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: {
-                        "application/json": {
-                            message: string;
-                            statusCode?: number;
-                        };
-                    };
-                };
-                /** @description No cuenta con el permiso misiones:terreno:verificar o no pertenece a la patrulla asignada */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: {
-                        "application/json": {
-                            message: string;
-                            statusCode?: number;
-                        };
-                    };
-                };
-                /** @description Misión no encontrada */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: {
-                        "application/json": {
-                            message: string;
-                            statusCode?: number;
-                        };
-                    };
-                };
-                /** @description Conflicto de estado: la misión ya se encuentra EN_CURSO u otro estado distinto de DESPACHADA */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: {
-                        "application/json": {
-                            message: string;
-                            statusCode?: number;
-                        };
-                    };
-                };
-                /** @description Error interno del servidor */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
         delete?: never;
         options?: never;
         head?: never;
@@ -5635,6 +5805,10 @@ export interface paths {
                     estado?: "DISPONIBLE" | "EN_VERIFICACION" | "EN_PREVENCION" | "EN_RECUPERACION" | "EN_MISION" | "NO_DISPONIBLE";
                     /** @description Búsqueda textual sobre el nombre de la patrulla o nombre del líder */
                     busqueda?: string;
+                    /** @description Filtrar por patrullas activas o inactivas (baja lógica) */
+                    activo?: boolean;
+                    /** @description Permite incluir patrullas inactivas/desactivadas en el listado */
+                    incluirInactivas?: boolean;
                 };
                 header?: never;
                 path?: never;
@@ -5773,6 +5947,18 @@ export interface paths {
                                 creadoEn: string;
                                 /** @description Fecha ISO de última actualización */
                                 actualizadoEn: string;
+                                /**
+                                 * @description Indica si la patrulla se encuentra activa operacionalmente
+                                 * @default true
+                                 */
+                                activo: boolean;
+                                /** @description Timestamp ISO de baja lógica si fue desactivada */
+                                eliminadoEn?: string | null;
+                                /**
+                                 * Format: uuid
+                                 * @description UUID del usuario que realizó la baja lógica
+                                 */
+                                eliminadoPorId?: string | null;
                             }[];
                             /** @description Metadatos estándar de paginación SGRAI */
                             meta: {
@@ -6006,6 +6192,18 @@ export interface paths {
                                 creadoEn: string;
                                 /** @description Fecha ISO de última actualización */
                                 actualizadoEn: string;
+                                /**
+                                 * @description Indica si la patrulla se encuentra activa operacionalmente
+                                 * @default true
+                                 */
+                                activo: boolean;
+                                /** @description Timestamp ISO de baja lógica si fue desactivada */
+                                eliminadoEn?: string | null;
+                                /**
+                                 * Format: uuid
+                                 * @description UUID del usuario que realizó la baja lógica
+                                 */
+                                eliminadoPorId?: string | null;
                             };
                         };
                     };
@@ -6214,6 +6412,18 @@ export interface paths {
                                 creadoEn: string;
                                 /** @description Fecha ISO de última actualización */
                                 actualizadoEn: string;
+                                /**
+                                 * @description Indica si la patrulla se encuentra activa operacionalmente
+                                 * @default true
+                                 */
+                                activo: boolean;
+                                /** @description Timestamp ISO de baja lógica si fue desactivada */
+                                eliminadoEn?: string | null;
+                                /**
+                                 * Format: uuid
+                                 * @description UUID del usuario que realizó la baja lógica
+                                 */
+                                eliminadoPorId?: string | null;
                             };
                         };
                     };
@@ -6436,6 +6646,18 @@ export interface paths {
                                 creadoEn: string;
                                 /** @description Fecha ISO de última actualización */
                                 actualizadoEn: string;
+                                /**
+                                 * @description Indica si la patrulla se encuentra activa operacionalmente
+                                 * @default true
+                                 */
+                                activo: boolean;
+                                /** @description Timestamp ISO de baja lógica si fue desactivada */
+                                eliminadoEn?: string | null;
+                                /**
+                                 * Format: uuid
+                                 * @description UUID del usuario que realizó la baja lógica
+                                 */
+                                eliminadoPorId?: string | null;
                             };
                         };
                     };
@@ -6485,7 +6707,114 @@ export interface paths {
             };
         };
         post?: never;
-        delete?: never;
+        /**
+         * Desactivar patrulla verificadora mediante baja lógica (HU-85)
+         * @description Desactiva una patrulla verificadora marcándola inactiva (eliminado_en), liberando de forma atómica su vehículo institucional y funcionarios de dotación a estado disponible. Bloquea con 409 Conflict si está desplegada en terreno o con misión activa.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description UUID del usuario autenticado (opcional si se envía Bearer token) */
+                    "x-user-id"?: string;
+                };
+                path: {
+                    /** @description Identificador único UUID de la patrulla verificadora */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Patrulla verificadora desactivada exitosamente y recursos liberados */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Mensaje descriptivo del resultado */
+                            message: string;
+                            /** @description Detalle de la patrulla desactivada y recursos liberados */
+                            data: {
+                                /**
+                                 * Format: uuid
+                                 * @description UUID de la patrulla verificadora desactivada
+                                 */
+                                id: string;
+                                /** @description Código identificador de la patrulla */
+                                codigo?: string | null;
+                                /** @description Nombre de la patrulla */
+                                nombre: string;
+                                /**
+                                 * @description Estado de la patrulla tras la baja (NO_DISPONIBLE)
+                                 * @enum {string}
+                                 */
+                                estado: "DISPONIBLE" | "EN_VERIFICACION" | "EN_PREVENCION" | "EN_RECUPERACION" | "EN_MISION" | "NO_DISPONIBLE";
+                                /** @description Indicador de baja lógica (false) */
+                                activo: boolean;
+                                /** @description Fecha y hora ISO de la baja lógica */
+                                eliminadoEn: string;
+                                /**
+                                 * Format: uuid
+                                 * @description UUID del usuario responsable de la baja
+                                 */
+                                eliminadoPorId?: string | null;
+                                /**
+                                 * Format: uuid
+                                 * @description UUID del vehículo que fue liberado al inventario
+                                 */
+                                vehiculoLiberadoId?: string | null;
+                                /** @description UUIDs de los funcionarios de terreno liberados a estado disponible */
+                                personalLiberadoIds: string[];
+                            };
+                        };
+                    };
+                };
+                /** @description Identificador de patrulla inválido */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token ausente */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'recursos:eliminar' */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Patrulla verificadora no encontrada */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto: la patrulla se encuentra en estado EN_VERIFICACION o posee misiones activas */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         /**
@@ -6658,6 +6987,18 @@ export interface paths {
                                 creadoEn: string;
                                 /** @description Fecha ISO de última actualización */
                                 actualizadoEn: string;
+                                /**
+                                 * @description Indica si la patrulla se encuentra activa operacionalmente
+                                 * @default true
+                                 */
+                                activo: boolean;
+                                /** @description Timestamp ISO de baja lógica si fue desactivada */
+                                eliminadoEn?: string | null;
+                                /**
+                                 * Format: uuid
+                                 * @description UUID del usuario que realizó la baja lógica
+                                 */
+                                eliminadoPorId?: string | null;
                             };
                         };
                     };
@@ -6699,6 +7040,751 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/cuadrillas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar cuadrillas operativas con paginación y filtros (H80 / H34)
+         * @description Retorna el listado paginado de cuadrillas operativas con soporte para filtros de texto (busqueda/q), delegación municipal (delegacionId), estado operativo y vigencia bajo el estándar H34.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Número de página a consultar (base 1) */
+                    pagina?: number;
+                    /** @description Alias de 'pagina' (base 1) */
+                    page?: number;
+                    /** @description Registros por página (máx. 100) */
+                    limite?: number;
+                    /** @description Alias de 'limite' (máx. 100) */
+                    limit?: number;
+                    /** @description Búsqueda textual libre por nombre de cuadrilla, delegado o RUT */
+                    busqueda?: string;
+                    /** @description Alias de 'busqueda' textual libre */
+                    q?: string;
+                    /** @description UUID de delegación municipal para filtrado territorial */
+                    delegacionId?: string;
+                    /** @description Filtro por estado operativo (DISPONIBLE, EN_MISION, NO_DISPONIBLE) o vistas especiales (INACTIVAS, TODAS) */
+                    estado?: "DISPONIBLE" | "EN_MISION" | "NO_DISPONIBLE" | "INACTIVAS" | "TODAS";
+                    /** @description Filtro de vigencia: true (activas), false (inactivas) o all (todas) */
+                    activo?: boolean | ("true" | "false" | "all");
+                    /** @description Incluye cuadrillas con baja lógica en el listado */
+                    incluir_inactivas?: boolean | null;
+                    /** @description Alias de 'incluir_inactivas' */
+                    incluirInactivas?: boolean | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Listado de cuadrillas obtenido exitosamente */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Listado de cuadrillas obtenido exitosamente */
+                            message: string;
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                nombre: string;
+                                /** @enum {string} */
+                                estado: "DISPONIBLE" | "EN_MISION" | "NO_DISPONIBLE";
+                                delegacion: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    nombre: string;
+                                    codigo?: string | null;
+                                };
+                                delegado: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    nombre: string;
+                                    /** Format: email */
+                                    email: string;
+                                    rut?: string | null;
+                                };
+                                /** @default [] */
+                                recursos: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** Format: uuid */
+                                    recursoId: string;
+                                    nombre: string;
+                                    cantidadAsignada: number;
+                                    esIndividual: boolean;
+                                }[];
+                                /** @default [] */
+                                trabajadores: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** Format: uuid */
+                                    personalId: string;
+                                    /** Format: uuid */
+                                    usuarioId: string;
+                                    nombre: string;
+                                    rut?: string | null;
+                                    cargo?: string | null;
+                                    especialidad?: string | null;
+                                    asignadoEn: string;
+                                }[];
+                                /**
+                                 * @description Cantidad total de recursos asignados
+                                 * @example 1
+                                 */
+                                totalRecursos: number;
+                                /**
+                                 * @description Cantidad total de trabajadores asignados
+                                 * @example 1
+                                 */
+                                totalTrabajadores: number;
+                                /**
+                                 * @description Indica si la cuadrilla se encuentra activa operativamente
+                                 * @default true
+                                 * @example true
+                                 */
+                                activo: boolean;
+                                creadoEn: string;
+                                actualizadoEn?: string | null;
+                                /** Format: uuid */
+                                actualizadoPorId?: string | null;
+                                /** Format: uuid */
+                                creadoPorId?: string | null;
+                                /**
+                                 * @description Fecha de baja lógica de la cuadrilla
+                                 * @example null
+                                 */
+                                eliminadoEn?: string | null;
+                                /** Format: uuid */
+                                eliminadoPorId?: string | null;
+                            }[];
+                            meta: {
+                                total: number;
+                                pagina: number;
+                                limite: number;
+                                paginasTotales: number;
+                                page: number;
+                                limit: number;
+                                totalPages: number;
+                                hasNext: boolean;
+                                hasPrev: boolean;
+                            };
+                        };
+                    };
+                };
+                /** @description Parámetros de consulta inválidos */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token inválido */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'recursos:leer' o rol Administrador */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Dar de alta una nueva cuadrilla operativa (H79)
+         * @description Crea una nueva cuadrilla operativa municipal asignando nombre, delegación y líder delegado.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Datos requeridos para dar de alta la cuadrilla */
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Nombre único identificador de la cuadrilla operativa municipal
+                         * @example Cuadrilla Vías y Calles
+                         */
+                        nombre: string;
+                        /**
+                         * Format: uuid
+                         * @description Identificador de la delegación municipal base adscrita
+                         * @example 30000000-0000-4000-8000-000000000001
+                         */
+                        delegacionId: string;
+                        /**
+                         * Format: uuid
+                         * @description Identificador del usuario asignado como delegado de cuadrilla
+                         * @example 00000000-0000-4000-8000-000000000005
+                         */
+                        usuarioDelegadoId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Cuadrilla operativa creada exitosamente */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Cuadrilla operativa creada exitosamente */
+                            message: string;
+                            /**
+                             * CuadrillaResponse
+                             * @description Información detallada de la cuadrilla operativa y su dotación
+                             */
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                nombre: string;
+                                /** @enum {string} */
+                                estado: "DISPONIBLE" | "EN_MISION" | "NO_DISPONIBLE";
+                                delegacion: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    nombre: string;
+                                    codigo?: string | null;
+                                };
+                                delegado: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    nombre: string;
+                                    /** Format: email */
+                                    email: string;
+                                    rut?: string | null;
+                                };
+                                /** @default [] */
+                                recursos: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** Format: uuid */
+                                    recursoId: string;
+                                    nombre: string;
+                                    cantidadAsignada: number;
+                                    esIndividual: boolean;
+                                }[];
+                                /** @default [] */
+                                trabajadores: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** Format: uuid */
+                                    personalId: string;
+                                    /** Format: uuid */
+                                    usuarioId: string;
+                                    nombre: string;
+                                    rut?: string | null;
+                                    cargo?: string | null;
+                                    especialidad?: string | null;
+                                    asignadoEn: string;
+                                }[];
+                                totalRecursos?: number;
+                                totalTrabajadores?: number;
+                                /** @default true */
+                                activo: boolean;
+                                creadoEn: string;
+                                actualizadoEn?: string | null;
+                                /** Format: uuid */
+                                actualizadoPorId?: string | null;
+                                /** Format: uuid */
+                                creadoPorId?: string | null;
+                                eliminadoEn?: string | null;
+                                /** Format: uuid */
+                                eliminadoPorId?: string | null;
+                            };
+                        };
+                    };
+                };
+                /** @description Datos de entrada inválidos */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token inválido */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'recursos:crear' o rol Administrador */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Delegación o usuario delegado no encontrado */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto: nombre de cuadrilla ya existe */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cuadrillas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obtener detalle unitario de una cuadrilla operativa (H81 / H79)
+         * @description Retorna la información detallada de una cuadrilla consolidando su delegación, delegado, recursos y trabajadores.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Detalle de cuadrilla operativa obtenido exitosamente */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Detalle de cuadrilla operativa obtenido exitosamente */
+                            message: string;
+                            /**
+                             * CuadrillaResponse
+                             * @description Información detallada de la cuadrilla operativa y su dotación
+                             */
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                nombre: string;
+                                /** @enum {string} */
+                                estado: "DISPONIBLE" | "EN_MISION" | "NO_DISPONIBLE";
+                                delegacion: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    nombre: string;
+                                    codigo?: string | null;
+                                };
+                                delegado: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    nombre: string;
+                                    /** Format: email */
+                                    email: string;
+                                    rut?: string | null;
+                                };
+                                /** @default [] */
+                                recursos: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** Format: uuid */
+                                    recursoId: string;
+                                    nombre: string;
+                                    cantidadAsignada: number;
+                                    esIndividual: boolean;
+                                }[];
+                                /** @default [] */
+                                trabajadores: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** Format: uuid */
+                                    personalId: string;
+                                    /** Format: uuid */
+                                    usuarioId: string;
+                                    nombre: string;
+                                    rut?: string | null;
+                                    cargo?: string | null;
+                                    especialidad?: string | null;
+                                    asignadoEn: string;
+                                }[];
+                                totalRecursos?: number;
+                                totalTrabajadores?: number;
+                                /** @default true */
+                                activo: boolean;
+                                creadoEn: string;
+                                actualizadoEn?: string | null;
+                                /** Format: uuid */
+                                actualizadoPorId?: string | null;
+                                /** Format: uuid */
+                                creadoPorId?: string | null;
+                                eliminadoEn?: string | null;
+                                /** Format: uuid */
+                                eliminadoPorId?: string | null;
+                            };
+                        };
+                    };
+                };
+                /** @description Identificador de cuadrilla inválido */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token inválido */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'recursos:leer' o rol Administrador */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Cuadrilla no encontrada */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Modificar datos de una cuadrilla, reasignar delegado y ajustar dotación (H81)
+         * @description Permite modificar el nombre, delegación municipal, delegado responsable y ajustar los trabajadores y recursos asignados a la cuadrilla. Bloquea con 409 Conflict si la cuadrilla está EN_MISION.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Datos actualizados de la cuadrilla y dotación logística */
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Nombre único actualizado de la cuadrilla
+                         * @example Cuadrilla Vías y Calles Central
+                         */
+                        nombre: string;
+                        /**
+                         * Format: uuid
+                         * @description Identificador de la delegación municipal base adscrita
+                         * @example 30000000-0000-4000-8000-000000000001
+                         */
+                        delegacionId: string;
+                        /**
+                         * Format: uuid
+                         * @description Identificador del usuario asignado como líder/delegado de la cuadrilla
+                         * @example 00000000-0000-4000-8000-000000000005
+                         */
+                        usuarioDelegadoId: string;
+                        /**
+                         * @description Listado de recursos materiales, vehículos y maquinarias que conforman la dotación
+                         * @default []
+                         */
+                        recursos?: {
+                            /**
+                             * Format: uuid
+                             * @description UUID del recurso logístico, maquinaria o vehículo a dotar
+                             * @example e1000000-0000-4000-8000-000000000001
+                             */
+                            recursoId: string;
+                            /**
+                             * @description Cantidad de unidades del recurso a asignar
+                             * @default 1
+                             * @example 1
+                             */
+                            cantidad?: number;
+                        }[];
+                        /**
+                         * @description Listado de trabajadores operativos asignados a la cuadrilla
+                         * @default []
+                         */
+                        trabajadores?: {
+                            /**
+                             * Format: uuid
+                             * @description UUID de la ficha operativa de personal del funcionario
+                             * @example 40000000-0000-4000-8000-000000000001
+                             */
+                            personalId: string;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Cuadrilla operativa actualizada exitosamente con su dotación */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Cuadrilla operativa actualizada exitosamente */
+                            message: string;
+                            /**
+                             * CuadrillaResponse
+                             * @description Información detallada de la cuadrilla operativa y su dotación
+                             */
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                nombre: string;
+                                /** @enum {string} */
+                                estado: "DISPONIBLE" | "EN_MISION" | "NO_DISPONIBLE";
+                                delegacion: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    nombre: string;
+                                    codigo?: string | null;
+                                };
+                                delegado: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    nombre: string;
+                                    /** Format: email */
+                                    email: string;
+                                    rut?: string | null;
+                                };
+                                /** @default [] */
+                                recursos: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** Format: uuid */
+                                    recursoId: string;
+                                    nombre: string;
+                                    cantidadAsignada: number;
+                                    esIndividual: boolean;
+                                }[];
+                                /** @default [] */
+                                trabajadores: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** Format: uuid */
+                                    personalId: string;
+                                    /** Format: uuid */
+                                    usuarioId: string;
+                                    nombre: string;
+                                    rut?: string | null;
+                                    cargo?: string | null;
+                                    especialidad?: string | null;
+                                    asignadoEn: string;
+                                }[];
+                                totalRecursos?: number;
+                                totalTrabajadores?: number;
+                                /** @default true */
+                                activo: boolean;
+                                creadoEn: string;
+                                actualizadoEn?: string | null;
+                                /** Format: uuid */
+                                actualizadoPorId?: string | null;
+                                /** Format: uuid */
+                                creadoPorId?: string | null;
+                                eliminadoEn?: string | null;
+                                /** Format: uuid */
+                                eliminadoPorId?: string | null;
+                            };
+                        };
+                    };
+                };
+                /** @description Parámetros o datos de entrada inválidos */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token inválido */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'recursos:editar' o rol Administrador */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Cuadrilla, delegación, delegado, personal o recurso no encontrado */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto: cuadrilla en misión activa o nombre duplicado */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Desactivar cuadrilla operativa mediante baja lógica (H82)
+         * @description Aplica baja lógica a una cuadrilla disuelta o retirada de servicio (activo = false, eliminado_en). Desvincula recursos y brigadistas al inventario central preservando trazabilidad histórica. Rechaza con 409 Conflict si posee misiones activas.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cuadrilla operativa desactivada exitosamente */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Cuadrilla operativa desactivada exitosamente */
+                            message: string;
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                nombre: string;
+                                /** @example false */
+                                activo: boolean;
+                                /** @example NO_DISPONIBLE */
+                                estado: string;
+                                /** @example 2 */
+                                recursosDesvinculados: number;
+                                /** @example 3 */
+                                trabajadoresDesvinculados: number;
+                                /** @example true */
+                                delegadoRevertido: boolean;
+                                eliminadoEn: string;
+                                /** Format: uuid */
+                                eliminadoPorId?: string | null;
+                            };
+                        };
+                    };
+                };
+                /** @description Identificador de cuadrilla inválido */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token inválido */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'cuadrillas:eliminar' o rol Administrador */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Cuadrilla operativa no encontrada o ya desactivada */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto: la cuadrilla se encuentra en misión activa o posee misiones en curso */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -7500,6 +8586,419 @@ export interface components {
                 fecha_salida: string;
             };
         };
+        /**
+         * CrearCuadrillaInput
+         * @description Cuerpo de solicitud para dar de alta una nueva cuadrilla operativa
+         */
+        CrearCuadrillaInput: {
+            /**
+             * @description Nombre único identificador de la cuadrilla operativa municipal
+             * @example Cuadrilla Vías y Calles
+             */
+            nombre: string;
+            /**
+             * Format: uuid
+             * @description Identificador de la delegación municipal base adscrita
+             * @example 30000000-0000-4000-8000-000000000001
+             */
+            delegacionId: string;
+            /**
+             * Format: uuid
+             * @description Identificador del usuario asignado como delegado de cuadrilla
+             * @example 00000000-0000-4000-8000-000000000005
+             */
+            usuarioDelegadoId: string;
+        };
+        /**
+         * CrearCuadrillaResponse
+         * @description Respuesta de éxito tras registrar una nueva cuadrilla operativa
+         */
+        CrearCuadrillaResponse: {
+            /** @example Cuadrilla operativa creada exitosamente */
+            message: string;
+            /**
+             * CuadrillaResponse
+             * @description Información detallada de la cuadrilla operativa y su dotación
+             */
+            data: {
+                /** Format: uuid */
+                id: string;
+                nombre: string;
+                /** @enum {string} */
+                estado: "DISPONIBLE" | "EN_MISION" | "NO_DISPONIBLE";
+                delegacion: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    codigo?: string | null;
+                };
+                delegado: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /** Format: email */
+                    email: string;
+                    rut?: string | null;
+                };
+                /** @default [] */
+                recursos: {
+                    /** Format: uuid */
+                    id: string;
+                    /** Format: uuid */
+                    recursoId: string;
+                    nombre: string;
+                    cantidadAsignada: number;
+                    esIndividual: boolean;
+                }[];
+                /** @default [] */
+                trabajadores: {
+                    /** Format: uuid */
+                    id: string;
+                    /** Format: uuid */
+                    personalId: string;
+                    /** Format: uuid */
+                    usuarioId: string;
+                    nombre: string;
+                    rut?: string | null;
+                    cargo?: string | null;
+                    especialidad?: string | null;
+                    asignadoEn: string;
+                }[];
+                totalRecursos?: number;
+                totalTrabajadores?: number;
+                /** @default true */
+                activo: boolean;
+                creadoEn: string;
+                actualizadoEn?: string | null;
+                /** Format: uuid */
+                actualizadoPorId?: string | null;
+                /** Format: uuid */
+                creadoPorId?: string | null;
+                eliminadoEn?: string | null;
+                /** Format: uuid */
+                eliminadoPorId?: string | null;
+            };
+        };
+        /**
+         * EditarCuadrillaInput
+         * @description Cuerpo de solicitud para actualizar los datos, delegado y dotación de una cuadrilla
+         */
+        EditarCuadrillaInput: {
+            /**
+             * @description Nombre único actualizado de la cuadrilla
+             * @example Cuadrilla Vías y Calles Central
+             */
+            nombre: string;
+            /**
+             * Format: uuid
+             * @description Identificador de la delegación municipal base adscrita
+             * @example 30000000-0000-4000-8000-000000000001
+             */
+            delegacionId: string;
+            /**
+             * Format: uuid
+             * @description Identificador del usuario asignado como líder/delegado de la cuadrilla
+             * @example 00000000-0000-4000-8000-000000000005
+             */
+            usuarioDelegadoId: string;
+            /**
+             * @description Listado de recursos materiales, vehículos y maquinarias que conforman la dotación
+             * @default []
+             */
+            recursos: {
+                /**
+                 * Format: uuid
+                 * @description UUID del recurso logístico, maquinaria o vehículo a dotar
+                 * @example e1000000-0000-4000-8000-000000000001
+                 */
+                recursoId: string;
+                /**
+                 * @description Cantidad de unidades del recurso a asignar
+                 * @default 1
+                 * @example 1
+                 */
+                cantidad: number;
+            }[];
+            /**
+             * @description Listado de trabajadores operativos asignados a la cuadrilla
+             * @default []
+             */
+            trabajadores: {
+                /**
+                 * Format: uuid
+                 * @description UUID de la ficha operativa de personal del funcionario
+                 * @example 40000000-0000-4000-8000-000000000001
+                 */
+                personalId: string;
+            }[];
+        };
+        /**
+         * EditarCuadrillaResponse
+         * @description Respuesta de éxito tras actualizar la cuadrilla operativa
+         */
+        EditarCuadrillaResponse: {
+            /** @example Cuadrilla operativa actualizada exitosamente */
+            message: string;
+            /**
+             * CuadrillaResponse
+             * @description Información detallada de la cuadrilla operativa y su dotación
+             */
+            data: {
+                /** Format: uuid */
+                id: string;
+                nombre: string;
+                /** @enum {string} */
+                estado: "DISPONIBLE" | "EN_MISION" | "NO_DISPONIBLE";
+                delegacion: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    codigo?: string | null;
+                };
+                delegado: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /** Format: email */
+                    email: string;
+                    rut?: string | null;
+                };
+                /** @default [] */
+                recursos: {
+                    /** Format: uuid */
+                    id: string;
+                    /** Format: uuid */
+                    recursoId: string;
+                    nombre: string;
+                    cantidadAsignada: number;
+                    esIndividual: boolean;
+                }[];
+                /** @default [] */
+                trabajadores: {
+                    /** Format: uuid */
+                    id: string;
+                    /** Format: uuid */
+                    personalId: string;
+                    /** Format: uuid */
+                    usuarioId: string;
+                    nombre: string;
+                    rut?: string | null;
+                    cargo?: string | null;
+                    especialidad?: string | null;
+                    asignadoEn: string;
+                }[];
+                totalRecursos?: number;
+                totalTrabajadores?: number;
+                /** @default true */
+                activo: boolean;
+                creadoEn: string;
+                actualizadoEn?: string | null;
+                /** Format: uuid */
+                actualizadoPorId?: string | null;
+                /** Format: uuid */
+                creadoPorId?: string | null;
+                eliminadoEn?: string | null;
+                /** Format: uuid */
+                eliminadoPorId?: string | null;
+            };
+        };
+        /**
+         * DetalleCuadrillaResponse
+         * @description Respuesta de éxito con el detalle unitario de la cuadrilla operativa
+         */
+        DetalleCuadrillaResponse: {
+            /** @example Detalle de cuadrilla operativa obtenido exitosamente */
+            message: string;
+            /**
+             * CuadrillaResponse
+             * @description Información detallada de la cuadrilla operativa y su dotación
+             */
+            data: {
+                /** Format: uuid */
+                id: string;
+                nombre: string;
+                /** @enum {string} */
+                estado: "DISPONIBLE" | "EN_MISION" | "NO_DISPONIBLE";
+                delegacion: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    codigo?: string | null;
+                };
+                delegado: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /** Format: email */
+                    email: string;
+                    rut?: string | null;
+                };
+                /** @default [] */
+                recursos: {
+                    /** Format: uuid */
+                    id: string;
+                    /** Format: uuid */
+                    recursoId: string;
+                    nombre: string;
+                    cantidadAsignada: number;
+                    esIndividual: boolean;
+                }[];
+                /** @default [] */
+                trabajadores: {
+                    /** Format: uuid */
+                    id: string;
+                    /** Format: uuid */
+                    personalId: string;
+                    /** Format: uuid */
+                    usuarioId: string;
+                    nombre: string;
+                    rut?: string | null;
+                    cargo?: string | null;
+                    especialidad?: string | null;
+                    asignadoEn: string;
+                }[];
+                totalRecursos?: number;
+                totalTrabajadores?: number;
+                /** @default true */
+                activo: boolean;
+                creadoEn: string;
+                actualizadoEn?: string | null;
+                /** Format: uuid */
+                actualizadoPorId?: string | null;
+                /** Format: uuid */
+                creadoPorId?: string | null;
+                eliminadoEn?: string | null;
+                /** Format: uuid */
+                eliminadoPorId?: string | null;
+            };
+        };
+        /**
+         * ListarCuadrillasQuery
+         * @description Parámetros de consulta para listado paginado de cuadrillas bajo estándar H34 (H80)
+         */
+        ListarCuadrillasQuery: {
+            /** @example 1 */
+            pagina?: number;
+            /** @example 1 */
+            page?: number;
+            /** @example 10 */
+            limite?: number;
+            /** @example 10 */
+            limit?: number;
+            /** @example Vías */
+            busqueda?: string;
+            /** @example Vías */
+            q?: string;
+            /**
+             * Format: uuid
+             * @example 30000000-0000-4000-8000-000000000001
+             */
+            delegacionId?: string;
+            /**
+             * @example DISPONIBLE
+             * @enum {string}
+             */
+            estado?: "DISPONIBLE" | "EN_MISION" | "NO_DISPONIBLE" | "INACTIVAS" | "TODAS";
+            /** @example true */
+            activo?: boolean | ("true" | "false" | "all");
+            /** @example false */
+            incluir_inactivas?: boolean | null;
+            /** @example false */
+            incluirInactivas?: boolean | null;
+        };
+        /**
+         * ListarCuadrillasResponse
+         * @description Respuesta paginada del listado de cuadrillas operativas con filtros
+         */
+        ListarCuadrillasResponse: {
+            /** @example Listado de cuadrillas obtenido exitosamente */
+            message: string;
+            data: {
+                /** Format: uuid */
+                id: string;
+                nombre: string;
+                /** @enum {string} */
+                estado: "DISPONIBLE" | "EN_MISION" | "NO_DISPONIBLE";
+                delegacion: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    codigo?: string | null;
+                };
+                delegado: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /** Format: email */
+                    email: string;
+                    rut?: string | null;
+                };
+                /** @default [] */
+                recursos: {
+                    /** Format: uuid */
+                    id: string;
+                    /** Format: uuid */
+                    recursoId: string;
+                    nombre: string;
+                    cantidadAsignada: number;
+                    esIndividual: boolean;
+                }[];
+                /** @default [] */
+                trabajadores: {
+                    /** Format: uuid */
+                    id: string;
+                    /** Format: uuid */
+                    personalId: string;
+                    /** Format: uuid */
+                    usuarioId: string;
+                    nombre: string;
+                    rut?: string | null;
+                    cargo?: string | null;
+                    especialidad?: string | null;
+                    asignadoEn: string;
+                }[];
+                /**
+                 * @description Cantidad total de recursos asignados
+                 * @example 1
+                 */
+                totalRecursos: number;
+                /**
+                 * @description Cantidad total de trabajadores asignados
+                 * @example 1
+                 */
+                totalTrabajadores: number;
+                /**
+                 * @description Indica si la cuadrilla se encuentra activa operativamente
+                 * @default true
+                 * @example true
+                 */
+                activo: boolean;
+                creadoEn: string;
+                actualizadoEn?: string | null;
+                /** Format: uuid */
+                actualizadoPorId?: string | null;
+                /** Format: uuid */
+                creadoPorId?: string | null;
+                /**
+                 * @description Fecha de baja lógica de la cuadrilla
+                 * @example null
+                 */
+                eliminadoEn?: string | null;
+                /** Format: uuid */
+                eliminadoPorId?: string | null;
+            }[];
+            meta: {
+                total: number;
+                pagina: number;
+                limite: number;
+                paginasTotales: number;
+                page: number;
+                limit: number;
+                totalPages: number;
+                hasNext: boolean;
+                hasPrev: boolean;
+            };
+        };
         ListarRolesResponse: {
             /** @description Colección de perfiles con sus permisos asignados */
             data: components["schemas"]["RolItem"][];
@@ -7689,6 +9188,11 @@ export interface components {
              * @example 30000000-0000-4000-8000-000000000001
              */
             delegacionId?: string | null;
+            /**
+             * @description Nombre de la delegación territorial adscrita
+             * @example Delegación Municipal Norte
+             */
+            delegacionNombre?: string | null;
             rol: components["schemas"]["UsuarioActivoRol"];
             /**
              * @description Lista de códigos de permisos asignados en tiempo real al usuario
@@ -7698,6 +9202,22 @@ export interface components {
              *     ]
              */
             permisos: string[];
+            /**
+             * Format: uuid
+             * @description UUID de la unidad táctica u operativa asignada (patrulla o cuadrilla)
+             * @example 40000000-0000-4000-8000-000000000001
+             */
+            unidadId?: string | null;
+            /**
+             * @description Nombre de la unidad táctica u operativa asignada
+             * @example Patrulla Verificadora Alfa
+             */
+            unidadNombre?: string | null;
+            /**
+             * @description Indica si la unidad operativa se encuentra activa (false si fue dada de baja mediante baja lógica)
+             * @example true
+             */
+            unidadActiva?: boolean;
         };
         /** @description Información del rol institucional asignado */
         UsuarioActivoRol: {
@@ -7803,6 +9323,11 @@ export interface components {
              */
             delegacionId: string | null;
             /**
+             * @description Nombre de la delegación territorial asignada (si aplica)
+             * @example Delegación Municipal Calle Calle
+             */
+            delegacionNombre?: string | null;
+            /**
              * @description Lista de códigos de permisos activos del usuario
              * @example [
              *       "seguridad:roles:leer",
@@ -7810,6 +9335,22 @@ export interface components {
              *     ]
              */
             permisos: string[];
+            /**
+             * Format: uuid
+             * @description UUID de la unidad táctica u operativa asignada (patrulla o cuadrilla)
+             * @example 40000000-0000-4000-8000-000000000001
+             */
+            unidadId?: string | null;
+            /**
+             * @description Nombre de la unidad táctica u operativa asignada
+             * @example Patrulla Verificadora Alfa
+             */
+            unidadNombre?: string | null;
+            /**
+             * @description Indica si la unidad operativa se encuentra activa (false si fue dada de baja mediante baja lógica)
+             * @example true
+             */
+            unidadActiva?: boolean;
         };
         AvisosPaginadosResponse: {
             /** @example Avisos obtenidos exitosamente */
@@ -8088,6 +9629,19 @@ export interface components {
                 delegacionNombre: string | null;
                 /** @description Cantidad de misiones tácticas despachadas o generadas para este incidente */
                 totalMisiones: number;
+                /** @description Indica si el incidente posee una misión en estado PLANIFICADA o DESPACHADA pendiente de confirmación en terreno */
+                tieneMisionDespachada?: boolean;
+                /** @description Indica si el incidente posee una misión en estado EN_CURSO activa en terreno */
+                tieneMisionEnCurso?: boolean;
+                /**
+                 * @description Indica si la patrulla verificadora completó el diagnóstico técnico en terreno
+                 * @default false
+                 */
+                verificado: boolean;
+                /** @description Indica si el incidente fue verificado o reclasificado en terreno */
+                reclasificadoEnTerreno?: boolean;
+                /** @description Motivo o justificación técnica de la evaluación en terreno */
+                justificacionReclasificacion?: string | null;
                 /** @description Fecha y hora de registro en formato ISO 8601 */
                 creadoEn: string;
                 /** @description Última fecha y hora de actualización en formato ISO 8601 */
@@ -8233,6 +9787,18 @@ export interface components {
                     /** @description Nombre de la cuadrilla que tiene asignado el recurso */
                     cuadrillaNombre: string | null;
                 }[];
+                /**
+                 * @description Indica si la verificación presencial fue completada
+                 * @default false
+                 */
+                verificado: boolean;
+                /**
+                 * @description Indica si fue verificado o reclasificado en terreno
+                 * @default false
+                 */
+                reclasificadoEnTerreno: boolean;
+                /** @description Justificación técnica en terreno */
+                justificacionReclasificacion?: string | null;
                 creadoEn: string;
                 actualizadoEn: string;
             };
@@ -9029,6 +10595,231 @@ export interface components {
             /** @example 1 */
             totalPaginas: number;
         };
+        TipoIncidenteCatalogoItem: {
+            /**
+             * Format: uuid
+             * @description Identificador único UUID del tipo de incidente
+             * @example 40000000-0000-4000-8000-000000000001
+             */
+            id: string;
+            /**
+             * @description Nombre canónico del tipo de incidente o afectación
+             * @example Inundación
+             */
+            nombre: string;
+            /**
+             * @description Descripción técnica o alcance del tipo de incidente
+             * @example Acumulación desmedida de agua por crecida de ríos o lluvias torrenciales
+             */
+            descripcion: string | null;
+            /**
+             * @description Indica si el tipo de incidente se encuentra habilitado para selección
+             * @example true
+             */
+            activo: boolean;
+        };
+        ListarTiposIncidenteResponse: {
+            /** @example Catálogo oficial de tipos de incidente obtenido exitosamente. */
+            message: string;
+            data: components["schemas"]["TipoIncidenteCatalogoItem"][];
+        };
+        ReclasificarTipologiaInput: {
+            /**
+             * Format: uuid
+             * @description UUID del nuevo tipo de incidente según el catálogo oficial
+             * @example 40000000-0000-4000-8000-000000000001
+             */
+            tipoIncidenteId?: string;
+            /**
+             * Format: uuid
+             * @description Alias en formato snake_case del UUID del nuevo tipo de incidente
+             * @example 40000000-0000-4000-8000-000000000001
+             */
+            tipo_incidente_id?: string;
+            /**
+             * @description Justificación técnica u operativa del cambio de tipología constatado en terreno
+             * @example Tras evaluación en terreno se constata desborde de cauce con ingreso masivo de agua a viviendas, no un anegamiento menor.
+             */
+            justificacion: string;
+            /**
+             * Format: uuid
+             * @description Identificador UUID de la misión táctica. Opcional: si se omite, el sistema resuelve la misión EN_CURSO asociada al incidente.
+             * @example 60000000-0000-4000-8000-000000000001
+             */
+            misionId?: string;
+            /**
+             * Format: uuid
+             * @description Alias en formato snake_case de misionId
+             * @example 60000000-0000-4000-8000-000000000001
+             */
+            mision_id?: string;
+        };
+        IncidenteReclasificadoResumen: {
+            /**
+             * Format: uuid
+             * @description Identificador único UUID del incidente
+             */
+            id: string;
+            /**
+             * @description Código interno del incidente
+             * @example INC-2026-001
+             */
+            codigo: string;
+            /**
+             * Format: uuid
+             * @description UUID del nuevo tipo de incidente
+             */
+            tipoIncidenteId: string;
+            /**
+             * @description Nombre canónico del nuevo tipo de incidente
+             * @example Inundación
+             */
+            tipoAfectacion: string;
+            /**
+             * @description Estado actual del incidente
+             * @example VERIFICANDO
+             */
+            estado: string;
+            /**
+             * @description Prioridad actual del incidente
+             * @example ALTA
+             */
+            prioridad: string;
+            /** @description Fecha y hora de actualización en formato ISO 8601 */
+            actualizadoEn: string;
+        };
+        MisionHitoTipologia: {
+            /**
+             * Format: uuid
+             * @description Identificador único UUID del hito en mision_hito
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Identificador de la misión asociada
+             */
+            misionId: string;
+            /**
+             * @description Código canónico del hito
+             * @example TIPOLOGIA_RECLASIFICADA
+             */
+            hito: string;
+            /**
+             * @description Glosa descriptiva del hito con el tipo de incidente y justificación
+             * @example Tipología reclasificada en terreno a: Inundación. Justificación: Desborde constatado.
+             */
+            descripcion: string;
+            /**
+             * Format: uuid
+             * @description UUID del evaluador en sesión que ejecutó la reclasificación
+             */
+            registradoPorId: string | null;
+            /** @description Fecha y hora de registro del hito (ISO 8601) */
+            creadoEn: string;
+        };
+        ReclasificarTipologiaResponse: {
+            /** @example Tipología del incidente reclasificada exitosamente en terreno. */
+            message: string;
+            data: {
+                incidente: components["schemas"]["IncidenteReclasificadoResumen"];
+                hito: components["schemas"]["MisionHitoTipologia"];
+            };
+        };
+        AceptarMisionInput: {
+            /**
+             * @description Coordenada GPS opcional de latitud (WGS84) al momento de aceptar la misión desde la PWA
+             * @example -39.819588
+             */
+            latitud?: number;
+            /**
+             * @description Coordenada GPS opcional de longitud (WGS84) al momento de aceptar la misión desde la PWA
+             * @example -73.245209
+             */
+            longitud?: number;
+        };
+        MisionHitoRegistrado: {
+            /**
+             * Format: uuid
+             * @description Identificador único UUID del hito registrado en mision_hito
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Identificador único UUID de la misión
+             */
+            misionId: string;
+            /**
+             * @description Código canónico del hito
+             * @example MISION_ACEPTADA
+             */
+            hito: string;
+            /**
+             * @description Glosa descriptiva del hito operativo
+             * @example Misión Aceptada por Patrulla
+             */
+            descripcion: string;
+            /**
+             * Format: uuid
+             * @description UUID del funcionario de patrulla en sesión que confirmó la salida
+             */
+            registradoPorId: string | null;
+            /** @description Latitud reportada al momento del hito */
+            latitud: number | null;
+            /** @description Longitud reportada al momento del hito */
+            longitud: number | null;
+            /** @description Fecha y hora del hito en formato ISO 8601 */
+            creadoEn: string;
+        };
+        AceptarMisionResponse: {
+            /** @example Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación. */
+            message: string;
+            data: {
+                mision: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    titulo: string;
+                    descripcion: string | null;
+                    /** @enum {string} */
+                    tipoMision: "VERIFICACION" | "ATENCION_CUADRILLA" | "PREVENCION" | "RECUPERACION" | "ASISTENCIA_SOCIAL";
+                    /**
+                     * @example EN_CURSO
+                     * @enum {string}
+                     */
+                    estado: "PLANIFICADA" | "DESPACHADA" | "EN_CURSO" | "COMPLETADA" | "CANCELADA" | "RECHAZADA";
+                    /** @enum {string} */
+                    prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+                    /** Format: uuid */
+                    incidenteId: string | null;
+                    /** Format: uuid */
+                    patrullaId: string | null;
+                    /** @description Timestamp ISO 8601 fijado al momento de aceptar la misión */
+                    fechaInicio: string;
+                    actualizadoEn: string;
+                };
+                patrulla: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /**
+                     * @description Se mantiene en EN_VERIFICACION durante el trayecto y evaluación
+                     * @example EN_VERIFICACION
+                     */
+                    estado: string;
+                } | null;
+                incidente: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    /**
+                     * @description Permanece en estado canónico VERIFICANDO (no 'En camino')
+                     * @example VERIFICANDO
+                     */
+                    estado: string;
+                } | null;
+                hito: components["schemas"]["MisionHitoRegistrado"];
+            };
+        };
         PuntoCriticoItem: {
             /**
              * Format: uuid
@@ -9673,6 +11464,18 @@ export interface components {
             creadoEn: string;
             /** @description Fecha ISO de última actualización */
             actualizadoEn: string;
+            /**
+             * @description Indica si la patrulla se encuentra activa operacionalmente
+             * @default true
+             */
+            activo: boolean;
+            /** @description Timestamp ISO de baja lógica si fue desactivada */
+            eliminadoEn?: string | null;
+            /**
+             * Format: uuid
+             * @description UUID del usuario que realizó la baja lógica
+             */
+            eliminadoPorId?: string | null;
         };
         ListarPatrullasResponse: {
             /** @description Mensaje de resultado */
@@ -9799,6 +11602,18 @@ export interface components {
                 creadoEn: string;
                 /** @description Fecha ISO de última actualización */
                 actualizadoEn: string;
+                /**
+                 * @description Indica si la patrulla se encuentra activa operacionalmente
+                 * @default true
+                 */
+                activo: boolean;
+                /** @description Timestamp ISO de baja lógica si fue desactivada */
+                eliminadoEn?: string | null;
+                /**
+                 * Format: uuid
+                 * @description UUID del usuario que realizó la baja lógica
+                 */
+                eliminadoPorId?: string | null;
             }[];
             /** @description Metadatos estándar de paginación SGRAI */
             meta: {
@@ -9941,6 +11756,18 @@ export interface components {
                 creadoEn: string;
                 /** @description Fecha ISO de última actualización */
                 actualizadoEn: string;
+                /**
+                 * @description Indica si la patrulla se encuentra activa operacionalmente
+                 * @default true
+                 */
+                activo: boolean;
+                /** @description Timestamp ISO de baja lógica si fue desactivada */
+                eliminadoEn?: string | null;
+                /**
+                 * Format: uuid
+                 * @description UUID del usuario que realizó la baja lógica
+                 */
+                eliminadoPorId?: string | null;
             };
         };
         ActualizarEstadoPatrullaInput: {
@@ -10088,6 +11915,18 @@ export interface components {
                 creadoEn: string;
                 /** @description Fecha ISO de última actualización */
                 actualizadoEn: string;
+                /**
+                 * @description Indica si la patrulla se encuentra activa operacionalmente
+                 * @default true
+                 */
+                activo: boolean;
+                /** @description Timestamp ISO de baja lógica si fue desactivada */
+                eliminadoEn?: string | null;
+                /**
+                 * Format: uuid
+                 * @description UUID del usuario que realizó la baja lógica
+                 */
+                eliminadoPorId?: string | null;
             };
         };
         CrearPatrullaInput: {
@@ -10251,6 +12090,225 @@ export interface components {
                 creadoEn: string;
                 /** @description Fecha ISO de última actualización */
                 actualizadoEn: string;
+                /**
+                 * @description Indica si la patrulla se encuentra activa operacionalmente
+                 * @default true
+                 */
+                activo: boolean;
+                /** @description Timestamp ISO de baja lógica si fue desactivada */
+                eliminadoEn?: string | null;
+                /**
+                 * Format: uuid
+                 * @description UUID del usuario que realizó la baja lógica
+                 */
+                eliminadoPorId?: string | null;
+            };
+        };
+        ModificarPatrullaInput: {
+            /**
+             * @description Nombre descriptivo de la patrulla verificadora
+             * @example Patrulla Norte 01
+             */
+            nombre?: string;
+            /**
+             * Format: uuid
+             * @description UUID de la delegación municipal base adscrita
+             * @example 30000000-0000-4000-8000-000000000001
+             */
+            delegacionId: string;
+            /**
+             * Format: uuid
+             * @description UUID del vehículo institucional asignado (recurso individualizado o null para desasignar)
+             * @example e1000000-0000-4000-8000-000000000002
+             */
+            vehiculoId?: string | null;
+            /**
+             * @description Lista de UUIDs de personal asignado a la dotación de la patrulla
+             * @example [
+             *       "b1000000-0000-4000-8000-000000000001"
+             *     ]
+             */
+            personalIds: string[];
+            /**
+             * Format: uuid
+             * @description UUID del usuario líder de la patrulla (opcional; si se omite, se asigna al primer integrante)
+             */
+            usuarioLiderId?: string | null;
+        };
+        ModificarPatrullaResponse: {
+            /** @description Mensaje descriptivo del resultado */
+            message: string;
+            /** @description Patrulla verificadora modificada exitosamente */
+            data: {
+                /**
+                 * Format: uuid
+                 * @description UUID de la patrulla verificadora
+                 */
+                id: string;
+                /** @description Código identificador único de la patrulla (ej. PV-NORTE-01) */
+                codigo?: string;
+                /** @description Nombre identificador de la patrulla */
+                nombre: string;
+                /**
+                 * @description Estado operativo canónico de la patrulla
+                 * @enum {string}
+                 */
+                estado: "DISPONIBLE" | "EN_VERIFICACION" | "EN_PREVENCION" | "EN_RECUPERACION" | "EN_MISION" | "NO_DISPONIBLE";
+                /** @description Coordenada latitud WGS84 actual de la patrulla */
+                latitud: number | null;
+                /** @description Coordenada longitud WGS84 actual de la patrulla */
+                longitud: number | null;
+                /** @description Timestamp ISO de última actualización de coordenadas */
+                ultimaActualizacionUbicacion: string | null;
+                /** @description Delegación territorial asignada */
+                delegacion: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    codigo: string | null;
+                } | null;
+                /** @description Vehículo institucional individual asignado */
+                vehiculo?: {
+                    /**
+                     * Format: uuid
+                     * @description UUID del recurso vehicular asignado
+                     */
+                    id: string;
+                    /** @description Nombre o descripción del vehículo */
+                    nombre: string;
+                    /** @description Metadatos técnicos como patente */
+                    detalles?: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Estado de disponibilidad del vehículo */
+                    estado: string;
+                } | null;
+                /** @description Funcionario líder responsable de la patrulla (usuario_lider_id) */
+                lider: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /** Format: email */
+                    email: string;
+                    telefono: string | null;
+                    rut: string | null;
+                } | null;
+                /** @description Lista de funcionarios de terreno conformando la patrulla */
+                integrantes: {
+                    /**
+                     * Format: uuid
+                     * @description UUID de ficha en tabla personal
+                     */
+                    id: string;
+                    /**
+                     * Format: uuid
+                     * @description UUID de usuario en tabla usuario
+                     */
+                    usuarioId: string;
+                    /** @description Nombre completo del funcionario */
+                    nombre: string;
+                    /**
+                     * Format: email
+                     * @description Correo institucional
+                     */
+                    email: string;
+                    /** @description Teléfono de contacto o móvil de terreno */
+                    telefono: string | null;
+                    /** @description RUT del funcionario */
+                    rut: string | null;
+                    /** @description Cargo del funcionario */
+                    cargo: string | null;
+                    /** @description Especialidad técnica */
+                    especialidad: string | null;
+                    /** @description Rol dentro de la patrulla (ej. OPERATIVO, LIDER, CONDUCTOR) */
+                    rolEnPatrulla: string;
+                    /** @description Estado operativo individual del personal */
+                    estadoOperativo: string;
+                }[];
+                /** @description Misión táctica e incidente en curso actualmente atendido por la patrulla */
+                misionActiva: {
+                    /**
+                     * Format: uuid
+                     * @description UUID de la misión activa
+                     */
+                    id: string;
+                    /** @description Código oficial de la misión (ej. MIS-2026-0001) */
+                    codigo: string;
+                    /** @description Título de la misión */
+                    titulo: string;
+                    /** @description Tipo de misión (VERIFICACION, PREVENCION, etc.) */
+                    tipoMision: string;
+                    /** @description Estado de la misión (PLANIFICADA, DESPACHADA, EN_CURSO) */
+                    estado: string;
+                    /** @description Prioridad del incidente o misión */
+                    prioridad: string;
+                    /**
+                     * Format: uuid
+                     * @description UUID del incidente formal asociado
+                     */
+                    incidenteId: string | null;
+                    /** @description Código del incidente formal (ej. INC-2026-0001) */
+                    incidenteCodigo: string | null;
+                    /** @description Folio de seguimiento del incidente */
+                    incidenteFolio: string | null;
+                    /** @description Tipo de afectación del incidente */
+                    incidenteTipoAfectacion: string | null;
+                    /** @description Dirección o ubicación del incidente */
+                    incidenteDireccion: string | null;
+                } | null;
+                /** @description Fecha ISO de conformación de la patrulla */
+                creadoEn: string;
+                /** @description Fecha ISO de última actualización */
+                actualizadoEn: string;
+                /**
+                 * @description Indica si la patrulla se encuentra activa operacionalmente
+                 * @default true
+                 */
+                activo: boolean;
+                /** @description Timestamp ISO de baja lógica si fue desactivada */
+                eliminadoEn?: string | null;
+                /**
+                 * Format: uuid
+                 * @description UUID del usuario que realizó la baja lógica
+                 */
+                eliminadoPorId?: string | null;
+            };
+        };
+        DesactivarPatrullaResponse: {
+            /** @description Mensaje descriptivo del resultado */
+            message: string;
+            /** @description Detalle de la patrulla desactivada y recursos liberados */
+            data: {
+                /**
+                 * Format: uuid
+                 * @description UUID de la patrulla verificadora desactivada
+                 */
+                id: string;
+                /** @description Código identificador de la patrulla */
+                codigo?: string | null;
+                /** @description Nombre de la patrulla */
+                nombre: string;
+                /**
+                 * @description Estado de la patrulla tras la baja (NO_DISPONIBLE)
+                 * @enum {string}
+                 */
+                estado: "DISPONIBLE" | "EN_VERIFICACION" | "EN_PREVENCION" | "EN_RECUPERACION" | "EN_MISION" | "NO_DISPONIBLE";
+                /** @description Indicador de baja lógica (false) */
+                activo: boolean;
+                /** @description Fecha y hora ISO de la baja lógica */
+                eliminadoEn: string;
+                /**
+                 * Format: uuid
+                 * @description UUID del usuario responsable de la baja
+                 */
+                eliminadoPorId?: string | null;
+                /**
+                 * Format: uuid
+                 * @description UUID del vehículo que fue liberado al inventario
+                 */
+                vehiculoLiberadoId?: string | null;
+                /** @description UUIDs de los funcionarios de terreno liberados a estado disponible */
+                personalLiberadoIds: string[];
             };
         };
         MensajeGenericoResponse: {
@@ -10284,96 +12342,188 @@ export interface components {
              */
             confirmacionPassword: string;
         };
-        AceptarMisionInput: {
-            /**
-             * @description Latitud WGS84 opcional del dispositivo móvil al momento de confirmar la salida
-             * @example -39.819588
-             */
-            latitud?: number;
-            /**
-             * @description Longitud WGS84 opcional del dispositivo móvil al momento de confirmar la salida
-             * @example -73.245209
-             */
-            longitud?: number;
-        };
-        MisionHitoRegistrado: {
-            /**
-             * Format: uuid
-             * @description Identificador único UUID del hito registrado en mision_hito
-             */
-            id: string;
-            /**
-             * Format: uuid
-             * @description Identificador único UUID de la misión
-             */
-            misionId: string;
-            /**
-             * @description Código del hito operativo
-             * @example MISION_ACEPTADA
-             */
-            hito: string;
-            /**
-             * @description Glosa descriptiva del hito registrado
-             * @example Misión Aceptada por Patrulla
-             */
-            descripcion: string;
-            /**
-             * Format: uuid
-             * @description Identificador del usuario autenticado que registró el hito
-             */
-            registradoPorId: string | null;
-            /**
-             * @description Latitud WGS84 registrada al momento del hito
-             */
-            latitud?: number | null;
-            /**
-             * @description Longitud WGS84 registrada al momento del hito
-             */
-            longitud?: number | null;
-            /**
-             * @description Fecha y hora de creación del hito en formato ISO 8601
-             */
-            creadoEn: string;
-        };
-        AceptarMisionResponse: {
-            /**
-             * @description Mensaje descriptivo del resultado de la transición atómica
-             * @example Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación.
-             */
+        AsignarCuadrillaMisionResponse: {
+            /** @example Cuadrilla asignada y despachada exitosamente al incidente. Patrulla verificadora liberada. */
             message: string;
             data: {
-                mision: {
+                mision: components["schemas"]["MisionCreadaResumen"];
+                cuadrilla: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /** @example EN_MISION */
+                    estado: string;
+                    /** Format: uuid */
+                    delegacionId?: string | null;
+                };
+                incidente: {
                     /** Format: uuid */
                     id: string;
                     codigo: string;
-                    titulo: string;
-                    descripcion: string | null;
-                    tipoMision: "VERIFICACION" | "ATENCION_CUADRILLA" | "PREVENCION" | "RECUPERACION" | "ASISTENCIA_SOCIAL" | string;
-                    estado: "EN_CURSO" | string;
-                    prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | string;
+                    /** @example EN_ATENCION */
+                    estado: string;
+                    prioridad: string;
+                };
+                patrullaLiberada: components["schemas"]["PatrullaLiberada"];
+                hitoCuadrilla: {
                     /** Format: uuid */
-                    incidenteId: string | null;
+                    id: string;
                     /** Format: uuid */
-                    patrullaId: string | null;
+                    misionId: string;
+                    /** @example CUADRILLA_DESPACHADA */
+                    hito: string;
+                    descripcion: string;
+                    creadoEn: string;
+                };
+                hitoPatrulla?: {
                     /** Format: uuid */
-                    cuadrillaId?: string | null;
-                    fechaInicio: string;
-                    actualizadoEn: string;
+                    id: string;
+                    /** Format: uuid */
+                    misionId: string;
+                    /** @example VERIFICACION_FINALIZADA */
+                    hito: string;
+                    descripcion: string;
+                    creadoEn: string;
+                } | null;
+            };
+        };
+        MisionCreadaResumen: {
+            /** Format: uuid */
+            id: string;
+            /** @example MIS-2026-0005 */
+            codigo: string;
+            titulo: string;
+            descripcion: string | null;
+            /** @enum {string} */
+            tipoMision: "VERIFICACION" | "ATENCION_CUADRILLA" | "PREVENCION" | "RECUPERACION" | "ASISTENCIA_SOCIAL";
+            /**
+             * @example DESPACHADA
+             * @enum {string}
+             */
+            estado: "PLANIFICADA" | "DESPACHADA" | "EN_CURSO" | "COMPLETADA" | "CANCELADA" | "RECHAZADA";
+            /** @enum {string} */
+            prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+            /** Format: uuid */
+            incidenteId: string;
+            /** Format: uuid */
+            patrullaId?: string | null;
+            /** Format: uuid */
+            cuadrillaId?: string | null;
+            /** Format: uuid */
+            encargadoId: string | null;
+            /** Format: uuid */
+            creadoPorId?: string | null;
+            fechaInicio?: string | null;
+            creadoEn: string;
+        };
+        /** @description Datos de la patrulla verificadora previa que fue liberada automáticamente (null si no había patrulla) */
+        PatrullaLiberada: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            /** @example DISPONIBLE */
+            estado: string;
+            /** Format: uuid */
+            misionPreviaId?: string | null;
+        } | null;
+        AsignarCuadrillaMisionInput: {
+            /**
+             * @description Tipo de misión táctica a despachar
+             * @example ATENCION_CUADRILLA
+             * @enum {string}
+             */
+            tipoMision: "ATENCION_CUADRILLA";
+            /**
+             * Format: uuid
+             * @description UUID del incidente en estado REPORTADO o VERIFICANDO a atender
+             * @example 30000000-0000-4000-8000-000000000001
+             */
+            incidenteId: string;
+            /**
+             * Format: uuid
+             * @description UUID de la cuadrilla operativa disponible a despachar
+             * @example 50000000-0000-4000-8000-000000000001
+             */
+            cuadrillaId: string;
+            /**
+             * @description Título descriptivo de la misión operativa (se autogenera si se omite)
+             * @example Atención y despeje táctico - Incidente INC-2026-001
+             */
+            titulo?: string;
+            /**
+             * @description Instrucciones tácticas u observaciones impartidas a la cuadrilla
+             * @example Despejar ramas caídas sobre tendido eléctrico en sector Las Ánimas.
+             */
+            descripcion?: string;
+            /**
+             * @description Nivel de prioridad. Si se omite, se hereda de la misión de verificación activa de la patrulla o del incidente.
+             * @example ALTA
+             * @enum {string}
+             */
+            prioridad?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+        };
+        CrearMisionResponse: {
+            /** @example Misión de verificación creada y patrulla despachada exitosamente. */
+            message: string;
+            data: {
+                mision: components["schemas"]["MisionCreadaResumen"];
+                incidente: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    estado: string;
                 };
                 patrulla: {
                     /** Format: uuid */
                     id: string;
                     nombre: string;
-                    estado: "EN_VERIFICACION" | string;
-                } | null;
-                incidente: {
+                    estado: string;
+                };
+                hitoInicial: {
                     /** Format: uuid */
                     id: string;
-                    codigo: string;
-                    estado: "VERIFICANDO" | string;
-                } | null;
-                hito: components["schemas"]["MisionHitoRegistrado"];
+                    hito: string;
+                    descripcion: string;
+                    creadoEn: string;
+                };
             };
+        };
+        CrearMisionVerificacionInput: {
+            /**
+             * Format: uuid
+             * @description Identificador único UUID del incidente a verificar
+             * @example 50000000-0000-4000-8000-000000000001
+             */
+            incidenteId: string;
+            /**
+             * Format: uuid
+             * @description Identificador único UUID de la patrulla verificadora disponible
+             * @example f1000000-0000-4000-8000-000000000001
+             */
+            patrullaId: string;
+            /**
+             * @description Tipo de misión operativa a despachar (fijo en VERIFICACION para evaluación preliminar)
+             * @default VERIFICACION
+             * @example VERIFICACION
+             * @enum {string}
+             */
+            tipoMision: "VERIFICACION";
+            /**
+             * @description Título descriptivo opcional para la misión de verificación
+             * @example Verificación en terreno: Aniego en Las Ánimas
+             */
+            titulo?: string;
+            /**
+             * @description Instrucciones tácticas preliminares para la patrulla
+             * @example Evaluar anegamiento en calzada y riesgo de ingreso a viviendas.
+             */
+            descripcion?: string | null;
+            /**
+             * @description Nivel de prioridad o urgencia táctica (si se omite, hereda la del incidente)
+             * @example ALTA
+             * @enum {string}
+             */
+            prioridad?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
         };
     };
     responses: never;

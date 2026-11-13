@@ -28,7 +28,17 @@ export function TerrenoResumenOperativo() {
 
     async function cargarResumenMisiones() {
       try {
-        const misiones = await sincronizarMisiones();
+        if (!tieneUnidadAsignada || !usuario?.unidadId) {
+          if (!cancelado) {
+            setMetricas({ pendientes: 0, enCurso: 0, finalizadas: 0 });
+          }
+          return;
+        }
+
+        const misiones = await sincronizarMisiones({
+          patrullaId: !esCuadrilla ? usuario.unidadId : undefined,
+          cuadrillaId: esCuadrilla ? usuario.unidadId : undefined,
+        });
         if (cancelado) return;
 
         // Auto-detección resiliente de unidad asignada a partir de misiones recibidas
@@ -87,7 +97,7 @@ export function TerrenoResumenOperativo() {
     return () => {
       cancelado = true;
     };
-  }, [tieneUnidadAsignada, esCuadrilla, actualizarUnidadAsignada]);
+  }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId, actualizarUnidadAsignada]);
 
   const UnidadIcon = esCuadrilla ? HardHat : Compass;
 
@@ -112,7 +122,7 @@ export function TerrenoResumenOperativo() {
         {/* Tarjeta 1: Resumen Operativo de Misiones / Faenas */}
         <div
           className={`${styles.kpiCard} ${
-            !unidadActiva ? styles.kpiCardWarning : ''
+            tieneUnidadAsignada && !unidadActiva ? styles.kpiCardWarning : ''
           }`.trim()}
         >
           <div className={styles.kpiHeader}>

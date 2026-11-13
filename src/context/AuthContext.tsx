@@ -18,6 +18,8 @@ import type {
   EstadoAsignacionUnidad,
 } from '@/types/seguridad';
 import { esRolTerrenoPermitido } from '@/types/seguridad';
+import { limpiarAlmacenamientoOffline } from '@/services/offlineQueue';
+import { registrarPatrullaEnHistorial } from '@/services/perfilTerrenoService';
 
 const SESSION_PROFILE_KEY = 'sgrai_usuario_sesion';
 
@@ -31,6 +33,7 @@ const PERFIL_DEMO_PATRULLA: UsuarioPerfilSesion = {
   rolCodigo: 'PATRULLA_VERIFICADORA',
   delegacionId: 'del-01',
   delegacionNombre: 'Valdivia Norte',
+  unidadId: 'f1000000-0000-4000-8000-000000000050',
   unidadNombre: 'Patrulla Rápida Costa-1',
   unidadActiva: true,
   permisos: ['misiones:terreno:verificar', 'misiones:terreno:reportar'],
@@ -104,11 +107,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         rolId: detalle.rol?.id || '',
         rolNombre: detalle.rol?.nombre || '',
         rolCodigo: detalle.rol?.codigo || '',
-        delegacionId: detalle.delegacionId || detalle.delegacion?.id || null,
-        delegacionNombre: detalle.delegacion?.nombre || null,
-        permisos: Array.isArray(detalle.permisos)
-          ? detalle.permisos
-          : detalle.rol?.permisos || [],
+        delegacionId: detalle.delegacionId ?? null,
+        delegacionNombre: detalle.delegacionNombre ?? null,
+        permisos: Array.isArray(detalle.permisos) ? detalle.permisos : [],
         unidadId: detalle.unidadId ?? null,
         unidadNombre: detalle.unidadNombre ?? null,
         unidadActiva:
@@ -171,16 +172,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       guardarPerfilSesion(perfil);
       setToken(cookieToken);
       setUsuario(perfil);
-    } catch {
-      const perfilRespaldo = leerPerfilGuardado();
-      if (perfilRespaldo && esRolTerrenoPermitido(perfilRespaldo.rolCodigo)) {
-        setToken(cookieToken);
-        setUsuario(perfilRespaldo);
-      } else {
+      if (perfil.unidadId) {
+        void registrarPatrullaEnHistorial(perfil);
+      }
+    } catch (error) {
+      if (
+        error instanceof SeguridadServiceError &&
+        (error.status === 401 || error.status === 403)
+      ) {
         removeAuthCookie();
         guardarPerfilSesion(null);
+        void limpiarAlmacenamientoOffline();
         setUsuario(null);
         setToken(null);
+      } else {
+        const perfilRespaldo = leerPerfilGuardado();
+        if (perfilRespaldo && esRolTerrenoPermitido(perfilRespaldo.rolCodigo)) {
+          setToken(cookieToken);
+          setUsuario(perfilRespaldo);
+        } else {
+          removeAuthCookie();
+          guardarPerfilSesion(null);
+          void limpiarAlmacenamientoOffline();
+          setUsuario(null);
+          setToken(null);
+        }
       }
     } finally {
       setCargando(false);
@@ -209,6 +225,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         guardarPerfilSesion(respuesta.usuario);
         setToken(respuesta.token);
         setUsuario(respuesta.usuario);
+        if (respuesta.usuario.unidadId) {
+          void registrarPatrullaEnHistorial(respuesta.usuario);
+        }
         return respuesta.usuario;
       } finally {
         setCargando(false);
@@ -220,6 +239,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     removeAuthCookie();
     guardarPerfilSesion(null);
+    void limpiarAlmacenamientoOffline();
     setUsuario(null);
     setToken(null);
     try {

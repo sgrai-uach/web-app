@@ -30,9 +30,15 @@ const misionDespachadaMock: MisionLocal = {
 function configurarAuthMock(opciones?: {
   unidadActiva?: boolean;
   permisoVerificar?: boolean;
+  tieneUnidadAsignada?: boolean;
+  estadoAsignacion?: 'ACTIVA' | 'DESACTIVADA' | 'SIN_ASIGNACION';
 }) {
-  const unidadActiva = opciones?.unidadActiva ?? true;
+  const tieneUnidadAsignada = opciones?.tieneUnidadAsignada ?? true;
+  const unidadActiva = tieneUnidadAsignada ? (opciones?.unidadActiva ?? true) : false;
   const permisoVerificar = opciones?.permisoVerificar ?? true;
+  const estadoAsignacion =
+    opciones?.estadoAsignacion ??
+    (!tieneUnidadAsignada ? 'SIN_ASIGNACION' : unidadActiva ? 'ACTIVA' : 'DESACTIVADA');
 
   vi.mocked(AuthContextModule.useAuth).mockReturnValue({
     usuario: {
@@ -46,7 +52,8 @@ function configurarAuthMock(opciones?: {
       delegacionId: 'del-1',
       delegacionNombre: 'Valdivia Norte',
       permisos: permisoVerificar ? ['misiones:terreno:verificar'] : [],
-      unidadNombre: 'Patrulla Rápida Costa-1',
+      unidadNombre: tieneUnidadAsignada ? 'Patrulla Rápida Costa-1' : null,
+      unidadId: tieneUnidadAsignada ? 'f1000000-0000-4000-8000-000000000050' : null,
       unidadActiva,
     },
     token: 'jwt-mock-token',
@@ -55,8 +62,8 @@ function configurarAuthMock(opciones?: {
     esPatrulla: true,
     esCuadrilla: false,
     unidadActiva,
-    tieneUnidadAsignada: true,
-    estadoAsignacion: unidadActiva ? 'ACTIVA' : 'DESACTIVADA',
+    tieneUnidadAsignada,
+    estadoAsignacion,
     actualizarUnidadAsignada: vi.fn(),
     tienePermiso: vi
       .fn()
@@ -262,6 +269,59 @@ describe('PatrullaMisionDetailPage — Confirmar y aceptar misión asignada (HU-
         screen.queryByText(/pendiente de sincronizar/i)
       ).not.toBeInTheDocument();
     });
+  });
+
+  it('muestra banner de unidad inactiva y bloquea controles operativos cuando la patrulla está DESACTIVADA', async () => {
+    configurarAuthMock({ unidadActiva: false, estadoAsignacion: 'DESACTIVADA' });
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(misionDespachadaMock);
+
+    await act(async () => {
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <PatrullaMisionDetailPage
+            params={Promise.resolve({ id: misionDespachadaMock.id })}
+          />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Patrulla Desactivada/i)).toBeInTheDocument();
+    });
+
+    // Debe mostrar la advertencia de modo solo lectura
+    expect(
+      screen.getByText(/Esta unidad ha sido retirada del servicio activo/i)
+    ).toBeInTheDocument();
+
+    // No debe mostrar botón de aceptar misión
+    expect(
+      screen.queryByRole('button', { name: /aceptar misi[oó]n/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('muestra banner sin patrulla asignada cuando estadoAsignacion es SIN_ASIGNACION', async () => {
+    configurarAuthMock({ tieneUnidadAsignada: false, estadoAsignacion: 'SIN_ASIGNACION' });
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(misionDespachadaMock);
+
+    await act(async () => {
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <PatrullaMisionDetailPage
+            params={Promise.resolve({ id: misionDespachadaMock.id })}
+          />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Sin Patrulla Asignada/i)).toBeInTheDocument();
+    });
+
+    // No debe mostrar botón de aceptar misión
+    expect(
+      screen.queryByRole('button', { name: /aceptar misi[oó]n/i })
+    ).not.toBeInTheDocument();
   });
 });
 
