@@ -335,5 +335,28 @@ describe('EvaluacionPrioridadCard (H38)', () => {
     fireEvent.click(btnMasMascotas);
     expect(screen.getByTestId('valor-mascotasAfectadas')).toHaveTextContent('3');
   });
+
+  it('permite añadir y quitar otra familia afectada sin errores y actualiza el conteo de hogares', () => {
+    render(
+      <EvaluacionPrioridadCard
+        incidenteId={misionMock.incidenteId}
+        misionActual={misionMock}
+      />
+    );
+
+    expect(screen.getByText('1 Hogar / Vivienda')).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Añadir otra familia afectada/i })
+    );
+
+    expect(screen.getByText('Familia #2')).toBeInTheDocument();
+    expect(screen.getByText('2 Hogares / Viviendas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Eliminar Familia #2/i }));
+
+    expect(screen.queryByText('Familia #2')).not.toBeInTheDocument();
+    expect(screen.getByText('1 Hogar / Vivienda')).toBeInTheDocument();
+  });
 });
 

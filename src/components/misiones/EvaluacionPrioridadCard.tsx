@@ -374,6 +374,7 @@ export function EvaluacionPrioridadCard({
 
   const agregarFamilia = () => {
     setEvaluacion((prev) => {
+      const actuales = prev.familias || [];
       const nuevaFamilia: FamiliaAfectadaItem = {
         id: `fam-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         referencia: '',
@@ -399,8 +400,13 @@ export function EvaluacionPrioridadCard({
     setEvaluacion((prev) => {
       const filtradas = (prev.familias || []).filter((f) => f.id !== familiaId);
       if (filtradas.length === 0) return prev; // Mantener al menos 1 familia
+      const consolidado = consolidarEvaluacionFamilias({
+        ...prev,
+        familias: filtradas,
+      });
       return {
         ...prev,
+        ...consolidado,
         familias: filtradas,
         viviendasAfectadas: filtradas.length,
       };
