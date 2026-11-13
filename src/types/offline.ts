@@ -79,7 +79,21 @@ export type NivelCompromisoVivienda =
   | 'MODERADO'
   | 'GRAVE_INHABITABLE';
 
+export interface FamiliaAfectadaItem {
+  id: string;
+  referencia?: string; // Ej: "Familia Pérez", "Casa 2", "Depto 201"
+  nucleoFamiliarTotal: number;
+  cantidadNinos: number;
+  cantidadAdultosMayores: number;
+  personasDiscapacitadas: number;
+  personasElectrodependientes: number;
+  mascotasAfectadas: number;
+  nivelCompromisoVivienda: NivelCompromisoVivienda;
+  requiereAsistenciaSocial: boolean;
+}
+
 export interface EvaluacionTerrenoPrioridadForm {
+  familias: FamiliaAfectadaItem[];
   nucleoFamiliarTotal: number;
   cantidadNinos: number;
   cantidadAdultosMayores: number;

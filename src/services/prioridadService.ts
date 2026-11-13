@@ -82,7 +82,60 @@ export function obtenerReportesPrioridadMision(
           ? r.versionReporte
           : idx + 1;
 
+      const familiasCargadas = Array.isArray(r.familias) && r.familias.length > 0
+        ? (r.familias as Record<string, unknown>[]).map((f, fIdx) => ({
+            id: typeof f.id === 'string' ? f.id : `fam-${fIdx + 1}`,
+            referencia: typeof f.referencia === 'string' ? f.referencia : '',
+            nucleoFamiliarTotal: Number(f.nucleoFamiliarTotal ?? f.personasAfectadas ?? 0),
+            cantidadNinos: Number(f.cantidadNinos ?? 0),
+            cantidadAdultosMayores: Number(f.cantidadAdultosMayores ?? 0),
+            personasDiscapacitadas: Number(f.personasDiscapacitadas ?? 0),
+            personasElectrodependientes: Number(f.personasElectrodependientes ?? 0),
+            mascotasAfectadas: Number(f.mascotasAfectadas ?? 0),
+            nivelCompromisoVivienda: esNivelCompromisoValido(f.nivelCompromisoVivienda)
+              ? (String(f.nivelCompromisoVivienda).toUpperCase() as NivelCompromisoVivienda)
+              : 'SIN_DANO',
+            requiereAsistenciaSocial: Boolean(f.requiereAsistenciaSocial),
+          }))
+        : [
+            {
+              id: 'fam-1',
+              referencia: '',
+              nucleoFamiliarTotal:
+                typeof r.nucleoFamiliarTotal === 'number'
+                  ? r.nucleoFamiliarTotal
+                  : typeof r.personasAfectadas === 'number'
+                    ? r.personasAfectadas
+                    : VALORES_INICIALES_EVALUACION_PRIORIDAD.nucleoFamiliarTotal,
+              cantidadNinos:
+                typeof r.cantidadNinos === 'number'
+                  ? r.cantidadNinos
+                  : VALORES_INICIALES_EVALUACION_PRIORIDAD.cantidadNinos,
+              cantidadAdultosMayores:
+                typeof r.cantidadAdultosMayores === 'number'
+                  ? r.cantidadAdultosMayores
+                  : VALORES_INICIALES_EVALUACION_PRIORIDAD.cantidadAdultosMayores,
+              personasDiscapacitadas:
+                typeof r.personasDiscapacitadas === 'number'
+                  ? r.personasDiscapacitadas
+                  : VALORES_INICIALES_EVALUACION_PRIORIDAD.personasDiscapacitadas,
+              personasElectrodependientes:
+                typeof r.personasElectrodependientes === 'number'
+                  ? r.personasElectrodependientes
+                  : VALORES_INICIALES_EVALUACION_PRIORIDAD.personasElectrodependientes,
+              mascotasAfectadas:
+                typeof r.mascotasAfectadas === 'number'
+                  ? r.mascotasAfectadas
+                  : VALORES_INICIALES_EVALUACION_PRIORIDAD.mascotasAfectadas,
+              nivelCompromisoVivienda: esNivelCompromisoValido(r.nivelCompromisoVivienda)
+                ? (r.nivelCompromisoVivienda.toUpperCase() as NivelCompromisoVivienda)
+                : VALORES_INICIALES_EVALUACION_PRIORIDAD.nivelCompromisoVivienda,
+              requiereAsistenciaSocial: Boolean(r.requiereAsistenciaSocial),
+            },
+          ];
+
       const evalBase: EvaluacionTerrenoPrioridadForm = {
+        familias: familiasCargadas,
         nucleoFamiliarTotal:
           typeof r.nucleoFamiliarTotal === 'number'
             ? r.nucleoFamiliarTotal
@@ -324,6 +377,7 @@ export async function asignarPrioridadEnTerreno(
     id: idRemoto || `rep-prio-v${versionReporte}-${Date.now()}`,
     versionReporte,
     evaluacion: {
+      familias: validado.familias || [],
       nucleoFamiliarTotal: validado.nucleoFamiliarTotal,
       cantidadNinos: validado.cantidadNinos,
       cantidadAdultosMayores: validado.cantidadAdultosMayores,

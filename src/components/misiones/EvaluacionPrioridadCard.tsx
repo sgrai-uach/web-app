@@ -16,7 +16,6 @@ import {
   Accessibility,
   Zap,
   HeartHandshake,
-  Home,
   ShieldAlert,
   History,
 } from 'lucide-react';
@@ -30,6 +29,7 @@ import {
   PRIORIDADES_CANONICAS,
   NIVELES_COMPROMISO_VIVIENDA,
   calcularPrioridadSugerida,
+  consolidarEvaluacionFamilias,
 } from '@/lib/validations/prioridad';
 import {
   asignarPrioridadEnTerreno,
@@ -41,6 +41,7 @@ import { formatearPrioridad } from '@/lib/utils/formatters';
 import { ETIQUETAS_COMPROMISO_VIVIENDA } from '@/lib/utils/labels';
 import type {
   EvaluacionTerrenoPrioridadForm,
+  FamiliaAfectadaItem,
   MisionLocal,
   NivelCompromisoVivienda,
   PrioridadIncidente,
@@ -58,58 +59,6 @@ export interface EvaluacionPrioridadCardProps {
   deshabilitado?: boolean;
 }
 
-interface ContadorConfig {
-  campo: keyof Pick<
-    EvaluacionTerrenoPrioridadForm,
-    | 'nucleoFamiliarTotal'
-    | 'cantidadNinos'
-    | 'cantidadAdultosMayores'
-    | 'personasDiscapacitadas'
-    | 'personasElectrodependientes'
-    | 'mascotasAfectadas'
-    | 'viviendasAfectadas'
-  >;
-  etiqueta: string;
-  icono: React.ReactNode;
-}
-
-const CONTADORES_AFECTACION: ContadorConfig[] = [
-  {
-    campo: 'nucleoFamiliarTotal',
-    etiqueta: 'Tamaño núcleo familiar',
-    icono: <Users size={16} aria-hidden="true" />,
-  },
-  {
-    campo: 'cantidadNinos',
-    etiqueta: 'Cantidad de niños',
-    icono: <Baby size={16} aria-hidden="true" />,
-  },
-  {
-    campo: 'cantidadAdultosMayores',
-    etiqueta: 'Adultos mayores',
-    icono: <UserCheck size={16} aria-hidden="true" />,
-  },
-  {
-    campo: 'personasDiscapacitadas',
-    etiqueta: 'Personas con discapacidad',
-    icono: <Accessibility size={16} aria-hidden="true" />,
-  },
-  {
-    campo: 'personasElectrodependientes',
-    etiqueta: 'Personas electrodependientes',
-    icono: <Zap size={16} aria-hidden="true" />,
-  },
-  {
-    campo: 'mascotasAfectadas',
-    etiqueta: 'Mascotas afectadas',
-    icono: <HeartHandshake size={16} aria-hidden="true" />,
-  },
-  {
-    campo: 'viviendasAfectadas',
-    etiqueta: 'Viviendas afectadas',
-    icono: <Home size={16} aria-hidden="true" />,
-  },
-];
 
 interface SwitchPeligroConfig {
   campo: keyof Pick<
@@ -191,10 +140,29 @@ export function EvaluacionPrioridadCard({
 
   const [modoEdicion, setModoEdicion] = useState<boolean>(false);
   const [evaluacion, setEvaluacion] = useState<EvaluacionTerrenoPrioridadForm>(
-    () =>
-      ultimoReporte?.evaluacion
-        ? { ...ultimoReporte.evaluacion }
-        : { ...VALORES_INICIALES_EVALUACION_PRIORIDAD }
+    () => {
+      if (ultimoReporte?.evaluacion) {
+        const evalBase = { ...ultimoReporte.evaluacion };
+        if (!evalBase.familias || evalBase.familias.length === 0) {
+          evalBase.familias = [
+            {
+              id: 'fam-1',
+              referencia: '',
+              nucleoFamiliarTotal: evalBase.nucleoFamiliarTotal,
+              cantidadNinos: evalBase.cantidadNinos,
+              cantidadAdultosMayores: evalBase.cantidadAdultosMayores,
+              personasDiscapacitadas: evalBase.personasDiscapacitadas,
+              personasElectrodependientes: evalBase.personasElectrodependientes,
+              mascotasAfectadas: evalBase.mascotasAfectadas,
+              nivelCompromisoVivienda: evalBase.nivelCompromisoVivienda,
+              requiereAsistenciaSocial: evalBase.requiereAsistenciaSocial,
+            },
+          ];
+        }
+        return evalBase;
+      }
+      return { ...VALORES_INICIALES_EVALUACION_PRIORIDAD };
+    }
   );
 
   // Calcula la prioridad sugerida de manera reactiva e inmediata en cliente
@@ -248,8 +216,25 @@ export function EvaluacionPrioridadCard({
 
   // Sincronizar formulario si llega un último reporte nuevo desde misionActual
   useEffect(() => {
-    if (ultimoReporte && !modoEdicion) {
-      setEvaluacion({ ...ultimoReporte.evaluacion });
+    if (ultimoReporte) {
+      const evalBase = { ...ultimoReporte.evaluacion };
+      if (!evalBase.familias || evalBase.familias.length === 0) {
+        evalBase.familias = [
+          {
+            id: 'fam-1',
+            referencia: '',
+            nucleoFamiliarTotal: evalBase.nucleoFamiliarTotal,
+            cantidadNinos: evalBase.cantidadNinos,
+            cantidadAdultosMayores: evalBase.cantidadAdultosMayores,
+            personasDiscapacitadas: evalBase.personasDiscapacitadas,
+            personasElectrodependientes: evalBase.personasElectrodependientes,
+            mascotasAfectadas: evalBase.mascotasAfectadas,
+            nivelCompromisoVivienda: evalBase.nivelCompromisoVivienda,
+            requiereAsistenciaSocial: evalBase.requiereAsistenciaSocial,
+          },
+        ];
+      }
+      setEvaluacion(evalBase);
       if (ultimoReporte.prioridadAsignada !== ultimoReporte.prioridadSugerida) {
         setPrioridadManual(ultimoReporte.prioridadAsignada);
         setJustificacionPrioridad(ultimoReporte.justificacionPrioridad || '');
@@ -258,7 +243,7 @@ export function EvaluacionPrioridadCard({
         setJustificacionPrioridad('');
       }
     }
-  }, [ultimoReporte, modoEdicion]);
+  }, [ultimoReporte]);
 
   // Consulta no bloqueante al endpoint de cálculo si está disponible
   useEffect(() => {
@@ -294,16 +279,104 @@ export function EvaluacionPrioridadCard({
     (longitudJustificacion >= JUSTIFICACION_MIN &&
       longitudJustificacion <= JUSTIFICACION_MAX);
 
-  const ajustarContador = (
-    campo: ContadorConfig['campo'],
+  const ajustarContadorFamilia = (
+    familiaId: string,
+    campo: keyof Pick<
+      FamiliaAfectadaItem,
+      | 'nucleoFamiliarTotal'
+      | 'cantidadNinos'
+      | 'cantidadAdultosMayores'
+      | 'personasDiscapacitadas'
+      | 'personasElectrodependientes'
+      | 'mascotasAfectadas'
+    >,
     delta: number
   ) => {
     setEvaluacion((prev) => {
-      const actual = prev[campo] || 0;
-      const nuevo = Math.max(0, Math.min(999, actual + delta));
+      const familiasActualizadas = (prev.familias || []).map((fam) => {
+        if (fam.id !== familiaId) return fam;
+        const actual = fam[campo] || 0;
+        const nuevo = Math.max(0, Math.min(999, actual + delta));
+        return {
+          ...fam,
+          [campo]: nuevo,
+        };
+      });
+
+      // Recalcular agregados
+      const consolidado = consolidarEvaluacionFamilias({
+        ...prev,
+        familias: familiasActualizadas,
+      });
+
       return {
         ...prev,
-        [campo]: nuevo,
+        ...consolidado,
+        familias: familiasActualizadas,
+      };
+    });
+    setErrorValidacion(null);
+  };
+
+  const cambiarCompromisoFamilia = (
+    familiaId: string,
+    nivel: NivelCompromisoVivienda
+  ) => {
+    setEvaluacion((prev) => {
+      const familiasActualizadas = (prev.familias || []).map((fam) =>
+        fam.id === familiaId ? { ...fam, nivelCompromisoVivienda: nivel } : fam
+      );
+      return {
+        ...prev,
+        familias: familiasActualizadas,
+        ...(familiasActualizadas.length === 1
+          ? { nivelCompromisoVivienda: nivel }
+          : {}),
+      };
+    });
+    setErrorValidacion(null);
+  };
+
+  const cambiarReferenciaFamilia = (familiaId: string, ref: string) => {
+    setEvaluacion((prev) => ({
+      ...prev,
+      familias: (prev.familias || []).map((fam) =>
+        fam.id === familiaId ? { ...fam, referencia: ref } : fam
+      ),
+    }));
+  };
+
+  const agregarFamilia = () => {
+    setEvaluacion((prev) => {
+      const nuevaFamilia: FamiliaAfectadaItem = {
+        id: `fam-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        referencia: '',
+        nucleoFamiliarTotal: 0,
+        cantidadNinos: 0,
+        cantidadAdultosMayores: 0,
+        personasDiscapacitadas: 0,
+        personasElectrodependientes: 0,
+        mascotasAfectadas: 0,
+        nivelCompromisoVivienda: 'SIN_DANO',
+        requiereAsistenciaSocial: false,
+      };
+      return {
+        ...prev,
+        familias: [...actuales, nuevaFamilia],
+        viviendasAfectadas: actuales.length + 1,
+      };
+    });
+    setErrorValidacion(null);
+  };
+
+  const eliminarFamilia = (familiaId: string) => {
+    setEvaluacion((prev) => {
+      const filtradas = (prev.familias || []).filter((f) => f.id !== familiaId);
+      if (filtradas.length === 0) return prev; // Mantener al menos 1 familia
+      return {
+        ...prev,
+        familias: filtradas,
+        viviendasAfectadas: filtradas.length,
       };
     });
     setErrorValidacion(null);
@@ -524,7 +597,24 @@ export function EvaluacionPrioridadCard({
               size="md"
               icon={<Edit3 size={16} />}
               onClick={() => {
-                setEvaluacion({ ...ultimoReporte.evaluacion });
+                const evalBase = { ...ultimoReporte.evaluacion };
+                if (!evalBase.familias || evalBase.familias.length === 0) {
+                  evalBase.familias = [
+                    {
+                      id: 'fam-1',
+                      referencia: '',
+                      nucleoFamiliarTotal: evalBase.nucleoFamiliarTotal,
+                      cantidadNinos: evalBase.cantidadNinos,
+                      cantidadAdultosMayores: evalBase.cantidadAdultosMayores,
+                      personasDiscapacitadas: evalBase.personasDiscapacitadas,
+                      personasElectrodependientes: evalBase.personasElectrodependientes,
+                      mascotasAfectadas: evalBase.mascotasAfectadas,
+                      nivelCompromisoVivienda: evalBase.nivelCompromisoVivienda,
+                      requiereAsistenciaSocial: evalBase.requiereAsistenciaSocial,
+                    },
+                  ];
+                }
+                setEvaluacion(evalBase);
                 if (
                   ultimoReporte.prioridadAsignada !==
                   ultimoReporte.prioridadSugerida
@@ -558,94 +648,163 @@ export function EvaluacionPrioridadCard({
             </div>
           )}
 
-          {/* Bloque 1: Contadores numéricos táctiles de grupo familiar y vivienda */}
+          {/* Bloque 1: Familias y Viviendas Afectadas */}
           <div className={styles.blockSection}>
-            <h4 className={styles.blockTitle}>
-              <Users size={16} aria-hidden="true" />
-              <span>1. Grupo Familiar y Viviendas Afectadas</span>
-            </h4>
-
-            <div className={styles.countersGrid}>
-              {CONTADORES_AFECTACION.map((item) => {
-                const valorActual = evaluacion[item.campo];
-                return (
-                  <div key={item.campo} className={styles.counterCard}>
-                    <div className={styles.counterLabelGroup}>
-                      <span className={styles.counterIcon}>{item.icono}</span>
-                      <span className={styles.counterLabel}>{item.etiqueta}</span>
-                    </div>
-                    <div className={styles.counterControls}>
-                      <button
-                        type="button"
-                        className={styles.counterBtn}
-                        onClick={() => ajustarContador(item.campo, -1)}
-                        disabled={deshabilitado || guardando || valorActual <= 0}
-                        aria-label={`Disminuir ${item.etiqueta}`}
-                      >
-                        <Minus size={18} aria-hidden="true" />
-                      </button>
-                      <span
-                        className={styles.counterValue}
-                        data-testid={`valor-${item.campo}`}
-                      >
-                        {valorActual}
-                      </span>
-                      <button
-                        type="button"
-                        className={styles.counterBtn}
-                        onClick={() => ajustarContador(item.campo, 1)}
-                        disabled={deshabilitado || guardando}
-                        aria-label={`Aumentar ${item.etiqueta}`}
-                      >
-                        <Plus size={18} aria-hidden="true" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <h4 className={styles.blockTitle}>
+                <Users size={16} aria-hidden="true" />
+                <span>1. Familias y Viviendas Afectadas</span>
+              </h4>
+              <Chip variant="neutral" size="sm">
+                {(evaluacion.familias || []).length} {((evaluacion.familias || []).length === 1 ? 'Hogar / Vivienda' : 'Hogares / Viviendas')}
+              </Chip>
             </div>
 
-            <div className={styles.fieldGroup}>
-              <span className={styles.infoLabel}>
-                Nivel de compromiso de vivienda
-              </span>
-              <div
-                className={styles.prioritySelectorGrid}
-                role="radiogroup"
-                aria-label="Nivel de compromiso de vivienda"
-              >
-                {NIVELES_COMPROMISO_VIVIENDA.map((nivel) => {
-                  const activo = evaluacion.nivelCompromisoVivienda === nivel;
-                  return (
-                    <button
-                      key={nivel}
-                      type="button"
-                      role="radio"
-                      aria-checked={activo}
-                      disabled={deshabilitado || guardando}
-                      onClick={() => {
-                        setEvaluacion((prev) => ({
-                          ...prev,
-                          nivelCompromisoVivienda:
-                            nivel as NivelCompromisoVivienda,
-                        }));
-                        setErrorValidacion(null);
-                      }}
-                      className={`${styles.priorityOptionBtn} ${
-                        activo
-                          ? nivel === 'GRAVE_INHABITABLE'
-                            ? styles.priorityOptionSelectedCritica
-                            : nivel === 'MODERADO'
-                              ? styles.priorityOptionSelectedAlta
-                              : styles.priorityOptionSelectedMedia
-                          : ''
-                      }`}
-                    >
-                      <span>{ETIQUETAS_COMPROMISO_VIVIENDA[nivel]}</span>
-                    </button>
-                  );
-                })}
+            {/* Listado dinámico de familias con su vivienda asociada */}
+            {(evaluacion.familias && evaluacion.familias.length > 0) ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {evaluacion.familias.map((fam, fIndex) => (
+                  <div key={fam.id} className={styles.familiaCard}>
+                    <div className={styles.familiaHeader}>
+                      <div className={styles.familiaTitleGroup}>
+                        <span className={styles.familiaBadge}>
+                          Familia #{fIndex + 1}
+                        </span>
+                        <input
+                          type="text"
+                          className={styles.familiaRefInput}
+                          placeholder="Referencia (ej: Familia Pérez, Casa 2)"
+                          value={fam.referencia || ''}
+                          disabled={deshabilitado || guardando}
+                          onChange={(e) => cambiarReferenciaFamilia(fam.id, e.target.value)}
+                          aria-label={`Referencia para Familia #${fIndex + 1}`}
+                        />
+                      </div>
+
+                      {evaluacion.familias.length > 1 && (
+                        <button
+                          type="button"
+                          className={styles.btnEliminarFamilia}
+                          disabled={deshabilitado || guardando}
+                          onClick={() => eliminarFamilia(fam.id)}
+                          aria-label={`Eliminar Familia #${fIndex + 1}`}
+                        >
+                          <Minus size={14} aria-hidden="true" />
+                          <span>Quitar</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Contadores por Familia */}
+                    <div className={styles.countersGrid}>
+                      {[
+                        { campo: 'nucleoFamiliarTotal' as const, etiqueta: 'Tamaño núcleo familiar', icono: <Users size={16} /> },
+                        { campo: 'cantidadNinos' as const, etiqueta: 'Cantidad de niños', icono: <Baby size={16} /> },
+                        { campo: 'cantidadAdultosMayores' as const, etiqueta: 'Adultos mayores', icono: <UserCheck size={16} /> },
+                        { campo: 'personasDiscapacitadas' as const, etiqueta: 'Personas con discapacidad', icono: <Accessibility size={16} /> },
+                        { campo: 'personasElectrodependientes' as const, etiqueta: 'Personas electrodependientes', icono: <Zap size={16} /> },
+                        { campo: 'mascotasAfectadas' as const, etiqueta: 'Mascotas afectadas', icono: <HeartHandshake size={16} /> },
+                      ].map((item) => {
+                        const valorActual = fam[item.campo];
+                        return (
+                          <div key={item.campo} className={styles.counterCard}>
+                            <div className={styles.counterLabelGroup}>
+                              <span className={styles.counterIcon}>{item.icono}</span>
+                              <span className={styles.counterLabel}>{item.etiqueta}</span>
+                            </div>
+                            <div className={styles.counterControls}>
+                              <button
+                                type="button"
+                                className={styles.counterBtn}
+                                onClick={() => ajustarContadorFamilia(fam.id, item.campo, -1)}
+                                disabled={deshabilitado || guardando || valorActual <= 0}
+                                aria-label={`Disminuir ${item.etiqueta}`}
+                              >
+                                <Minus size={18} aria-hidden="true" />
+                              </button>
+                              <span
+                                className={styles.counterValue}
+                                data-testid={fIndex === 0 ? `valor-${item.campo}` : undefined}
+                              >
+                                {valorActual}
+                              </span>
+                              <button
+                                type="button"
+                                className={styles.counterBtn}
+                                onClick={() => ajustarContadorFamilia(fam.id, item.campo, 1)}
+                                disabled={deshabilitado || guardando}
+                                aria-label={`Aumentar ${item.etiqueta}`}
+                              >
+                                <Plus size={18} aria-hidden="true" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Compromiso de Vivienda para esta Familia */}
+                    <div className={styles.fieldGroup}>
+                      <span className={styles.infoLabel}>
+                        Compromiso de vivienda de esta familia
+                      </span>
+                      <div
+                        className={styles.prioritySelectorGrid}
+                        role="radiogroup"
+                        aria-label={`Nivel de compromiso de vivienda Familia #${fIndex + 1}`}
+                      >
+                        {NIVELES_COMPROMISO_VIVIENDA.map((nivel) => {
+                          const activo = fam.nivelCompromisoVivienda === nivel;
+                          return (
+                            <button
+                              key={nivel}
+                              type="button"
+                              role="radio"
+                              aria-checked={activo}
+                              disabled={deshabilitado || guardando}
+                              onClick={() => cambiarCompromisoFamilia(fam.id, nivel as NivelCompromisoVivienda)}
+                              className={`${styles.priorityOptionBtn} ${
+                                activo
+                                  ? nivel === 'GRAVE_INHABITABLE'
+                                    ? styles.priorityOptionSelectedCritica
+                                    : nivel === 'MODERADO'
+                                      ? styles.priorityOptionSelectedAlta
+                                      : styles.priorityOptionSelectedMedia
+                                  : ''
+                              }`}
+                            >
+                              <span>{ETIQUETAS_COMPROMISO_VIVIENDA[nivel]}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  className={styles.btnAgregarFamilia}
+                  disabled={deshabilitado || guardando}
+                  onClick={agregarFamilia}
+                >
+                  <Plus size={16} aria-hidden="true" />
+                  <span>Añadir otra familia afectada</span>
+                </button>
               </div>
+            ) : null}
+
+            {/* Resumen Consolidado */}
+            <div className={styles.resumenConsolidadoFamilias}>
+              <span>
+                <strong>Total personas afectadas:</strong> {calculoLocal ? evaluacion.nucleoFamiliarTotal : 0}
+              </span>
+              <span>
+                <strong>Total viviendas afectadas:</strong> {(evaluacion.familias || []).length}
+              </span>
+              <span>
+                <strong>Compromiso máximo:</strong> {ETIQUETAS_COMPROMISO_VIVIENDA[evaluacion.nivelCompromisoVivienda]}
+              </span>
             </div>
           </div>
 

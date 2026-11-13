@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type {
   EvaluacionTerrenoPrioridadForm,
+  NivelCompromisoVivienda,
   PrioridadIncidente,
 } from '@/types/offline';
 
@@ -19,13 +20,27 @@ export const NIVELES_COMPROMISO_VIVIENDA = [
 ] as const;
 
 export const VALORES_INICIALES_EVALUACION_PRIORIDAD: EvaluacionTerrenoPrioridadForm = {
+  familias: [
+    {
+      id: 'fam-1',
+      referencia: '',
+      nucleoFamiliarTotal: 0,
+      cantidadNinos: 0,
+      cantidadAdultosMayores: 0,
+      personasDiscapacitadas: 0,
+      personasElectrodependientes: 0,
+      mascotasAfectadas: 0,
+      nivelCompromisoVivienda: 'SIN_DANO',
+      requiereAsistenciaSocial: false,
+    },
+  ],
   nucleoFamiliarTotal: 0,
   cantidadNinos: 0,
   cantidadAdultosMayores: 0,
   personasDiscapacitadas: 0,
   personasElectrodependientes: 0,
   mascotasAfectadas: 0,
-  viviendasAfectadas: 0,
+  viviendasAfectadas: 1,
   nivelCompromisoVivienda: 'SIN_DANO',
   riesgoElectrico: false,
   riesgoEstructural: false,
@@ -43,7 +58,21 @@ const contadorEnteroSchema = z
   .min(0, { message: 'El valor no puede ser negativo.' })
   .max(999, { message: 'El valor excede el límite permitido.' });
 
+export const familiaAfectadaSchema = z.object({
+  id: z.string().default(() => Math.random().toString(36).substring(2, 9)),
+  referencia: z.string().trim().max(100).optional().default(''),
+  nucleoFamiliarTotal: contadorEnteroSchema,
+  cantidadNinos: contadorEnteroSchema,
+  cantidadAdultosMayores: contadorEnteroSchema,
+  personasDiscapacitadas: contadorEnteroSchema,
+  personasElectrodependientes: contadorEnteroSchema,
+  mascotasAfectadas: contadorEnteroSchema,
+  nivelCompromisoVivienda: z.enum(NIVELES_COMPROMISO_VIVIENDA),
+  requiereAsistenciaSocial: z.boolean().default(false),
+});
+
 export const evaluacionTerrenoSchema = z.object({
+  familias: z.array(familiaAfectadaSchema).optional().default([]),
   nucleoFamiliarTotal: contadorEnteroSchema,
   cantidadNinos: contadorEnteroSchema,
   cantidadAdultosMayores: contadorEnteroSchema,
@@ -112,13 +141,104 @@ export interface ResultadoCalculoPrioridad {
   factoresGatillantes: string[];
 }
 
+export function consolidarEvaluacionFamilias(
+  evaluacion: EvaluacionTerrenoPrioridadForm
+): EvaluacionTerrenoPrioridadForm {
+  if (!evaluacion.familias || evaluacion.familias.length === 0) {
+    return evaluacion;
+  }
+
+  // Si solo hay 1 familia pero los contadores globales en la raíz son mayores (ej: llamadas directas o fixtures con ...VALORES_INICIALES),
+  // respetamos los valores globales y los reflejamos en la familia.
+  const soloUnaFamilia = evaluacion.familias.length === 1;
+  const f0 = evaluacion.familias[0];
+  const sumaFamilias =
+    f0.nucleoFamiliarTotal +
+    f0.cantidadNinos +
+    f0.cantidadAdultosMayores +
+    f0.personasDiscapacitadas +
+    f0.personasElectrodependientes +
+    f0.mascotasAfectadas;
+  const sumaGlobal =
+    (evaluacion.nucleoFamiliarTotal || 0) +
+    (evaluacion.cantidadNinos || 0) +
+    (evaluacion.cantidadAdultosMayores || 0) +
+    (evaluacion.personasDiscapacitadas || 0) +
+    (evaluacion.personasElectrodependientes || 0) +
+    (evaluacion.mascotasAfectadas || 0);
+
+  if (soloUnaFamilia && sumaGlobal > sumaFamilias) {
+    return {
+      ...evaluacion,
+      familias: [
+        {
+          ...f0,
+          nucleoFamiliarTotal: evaluacion.nucleoFamiliarTotal,
+          cantidadNinos: evaluacion.cantidadNinos,
+          cantidadAdultosMayores: evaluacion.cantidadAdultosMayores,
+          personasDiscapacitadas: evaluacion.personasDiscapacitadas,
+          personasElectrodependientes: evaluacion.personasElectrodependientes,
+          mascotasAfectadas: evaluacion.mascotasAfectadas,
+          nivelCompromisoVivienda: evaluacion.nivelCompromisoVivienda,
+          requiereAsistenciaSocial: evaluacion.requiereAsistenciaSocial,
+        },
+      ],
+    };
+  }
+
+  let totalPersonas = 0;
+  let totalNinos = 0;
+  let totalAdultosMayores = 0;
+  let totalDiscapacitados = 0;
+  let totalElectrodependientes = 0;
+  let totalMascotas = 0;
+  let requiereFibeGlobal = evaluacion.requiereAsistenciaSocial;
+
+  const ordenCompromiso: Record<NivelCompromisoVivienda, number> = {
+    SIN_DANO: 0,
+    LEVE: 1,
+    MODERADO: 2,
+    GRAVE_INHABITABLE: 3,
+  };
+  let maxCompromiso: NivelCompromisoVivienda = 'SIN_DANO';
+
+  for (const fam of evaluacion.familias) {
+    totalPersonas += fam.nucleoFamiliarTotal;
+    totalNinos += fam.cantidadNinos;
+    totalAdultosMayores += fam.cantidadAdultosMayores;
+    totalDiscapacitados += fam.personasDiscapacitadas;
+    totalElectrodependientes += fam.personasElectrodependientes;
+    totalMascotas += fam.mascotasAfectadas;
+    if (fam.requiereAsistenciaSocial) {
+      requiereFibeGlobal = true;
+    }
+    if (ordenCompromiso[fam.nivelCompromisoVivienda] > ordenCompromiso[maxCompromiso]) {
+      maxCompromiso = fam.nivelCompromisoVivienda;
+    }
+  }
+
+  return {
+    ...evaluacion,
+    nucleoFamiliarTotal: totalPersonas,
+    cantidadNinos: totalNinos,
+    cantidadAdultosMayores: totalAdultosMayores,
+    personasDiscapacitadas: totalDiscapacitados,
+    personasElectrodependientes: totalElectrodependientes,
+    mascotasAfectadas: totalMascotas,
+    viviendasAfectadas: evaluacion.familias.length,
+    nivelCompromisoVivienda: maxCompromiso,
+    requiereAsistenciaSocial: requiereFibeGlobal,
+  };
+}
+
 /**
  * Calcula en vivo la prioridad sugerida y sus factores gatillantes a partir
  * de los datos constatados por la Patrulla Verificadora en terreno (HU-38).
  */
 export function calcularPrioridadSugerida(
-  evaluacion: EvaluacionTerrenoPrioridadForm
+  evaluacionRaw: EvaluacionTerrenoPrioridadForm
 ): ResultadoCalculoPrioridad {
+  const evaluacion = consolidarEvaluacionFamilias(evaluacionRaw);
   const factoresCriticos: string[] = [];
   const factoresAltos: string[] = [];
   const factoresMedios: string[] = [];
@@ -185,7 +305,15 @@ export function calcularPrioridadSugerida(
       `Núcleo familiar afectado (${evaluacion.nucleoFamiliarTotal} personas)`
     );
   }
-  if (evaluacion.viviendasAfectadas > 0 && evaluacion.viviendasAfectadas < 3) {
+  const tieneDanoOCompromiso =
+    evaluacion.nivelCompromisoVivienda !== 'SIN_DANO' ||
+    evaluacion.nucleoFamiliarTotal > 0 ||
+    evaluacion.personasElectrodependientes > 0 ||
+    evaluacion.personasDiscapacitadas > 0 ||
+    evaluacion.cantidadAdultosMayores > 0 ||
+    evaluacion.cantidadNinos > 0;
+
+  if (evaluacion.viviendasAfectadas > 0 && evaluacion.viviendasAfectadas < 3 && tieneDanoOCompromiso) {
     factoresMedios.push(
       `Viviendas afectadas (${evaluacion.viviendasAfectadas})`
     );

@@ -195,6 +195,20 @@ describe('EvaluacionPrioridadCard (H38)', () => {
             versionReporte: 1,
             evaluacion: {
               ...VALORES_INICIALES_EVALUACION_PRIORIDAD,
+              familias: [
+                {
+                  id: 'fam-1',
+                  referencia: '',
+                  nucleoFamiliarTotal: 4,
+                  cantidadNinos: 0,
+                  cantidadAdultosMayores: 2,
+                  personasDiscapacitadas: 0,
+                  personasElectrodependientes: 0,
+                  mascotasAfectadas: 0,
+                  nivelCompromisoVivienda: 'MODERADO',
+                  requiereAsistenciaSocial: false,
+                },
+              ],
               nucleoFamiliarTotal: 4,
               cantidadAdultosMayores: 2,
               viviendasAfectadas: 1,
