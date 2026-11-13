@@ -58,6 +58,8 @@ function configurarAuthMock(opciones?: {
     esPatrulla: true,
     esCuadrilla: false,
     unidadActiva,
+    tieneUnidadAsignada: true,
+    estadoAsignacion: unidadActiva ? 'ACTIVA' : 'DESACTIVADA',
     tienePermiso: vi
       .fn()
       .mockImplementation((permiso: string) =>
@@ -286,6 +288,14 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useConnectivityModule.useConnectivity).mockReturnValue({
+      online: true,
+      sincronizando: false,
+      pendientes: 0,
+      status: 'connected',
+      sincronizar: vi.fn(),
+      actualizarPendientes: vi.fn().mockResolvedValue(undefined),
+    });
     vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(misionDespachada);
     vi.mocked(AuthContextModule.useAuth).mockReturnValue({
       usuario: {
@@ -298,7 +308,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
         rolCodigo: 'PATRULLA_VERIFICADORA',
         delegacionId: 'del-1',
         delegacionNombre: 'Valdivia Sur',
-        permisos: [],
+        permisos: ['misiones:terreno:verificar'],
         unidadNombre: 'Patrulla Móvil 01',
         unidadActiva: true,
       },
@@ -308,7 +318,9 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
       esPatrulla: true,
       esCuadrilla: false,
       unidadActiva: true,
-      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockImplementation((p: string) => p === 'misiones:terreno:verificar'),
       tieneAlgunPermiso: vi.fn().mockReturnValue(true),
       login: vi.fn(),
       logout: vi.fn(),
@@ -404,6 +416,8 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
       esPatrulla: true,
       esCuadrilla: false,
       unidadActiva: false,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'DESACTIVADA',
       tienePermiso: vi.fn().mockReturnValue(true),
       tieneAlgunPermiso: vi.fn().mockReturnValue(true),
       login: vi.fn(),
@@ -439,6 +453,61 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
     });
 
     expect(screen.queryByRole('button', { name: /rechazar misión/i })).toBeNull();
+  });
+
+  it('no muestra el botón "Rechazar Misión" si el usuario no tiene permiso misiones:terreno:verificar (RBAC)', async () => {
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: {
+        id: 'u-pat-1',
+        rut: '12.345.678-5',
+        nombre: 'Mario Patrullero',
+        email: 'mpatrullero@valdivia.cl',
+        rolId: 'r-pat-1',
+        rolNombre: 'Patrulla Verificadora',
+        rolCodigo: 'PATRULLA_VERIFICADORA',
+        delegacionId: 'del-1',
+        delegacionNombre: 'Valdivia Sur',
+        permisos: [],
+        unidadNombre: 'Patrulla Móvil 01',
+        unidadActiva: true,
+      },
+      token: 'mock-token',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: true,
+      esCuadrilla: false,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockReturnValue(false),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(false),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
+    });
+
+    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' }} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('INC-2026-00100')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /rechazar misión/i })).toBeNull();
+  });
+
+  it('muestra la tarjeta de misión no encontrada cuando la misión no existe en local ni remoto', async () => {
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(null);
+
+    render(<PatrullaMisionDetailPage params={{ id: 'mis-inexistente' }} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Misión no encontrada')).toBeInTheDocument();
+      expect(
+        screen.getByText(/La misión solicitada no existe o no se encuentra asignada/i)
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('link', { name: /volver a la bandeja/i })).toBeInTheDocument();
   });
 });
 

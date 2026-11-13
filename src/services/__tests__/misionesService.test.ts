@@ -339,6 +339,41 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
 
       Object.defineProperty(navigator, 'onLine', { value: originalOnLine, configurable: true });
     });
+
+    it('debe encolar en outbox cuando fetch arroja TypeError Load failed (Safari/WebKit)', async () => {
+      vi.mocked(apiClient.POST).mockRejectedValue(new TypeError('Load failed'));
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: 'mis-webkit',
+        incidenteId: 'inc-001',
+        codigoIncidente: 'INC-2026-1042',
+        tipologia: 'Caída de árbol',
+        direccion: 'Av. Ramón Picarte',
+        prioridad: 'ALTA',
+        estado: 'DESPACHADA',
+        fechaDespacho: '2026-11-03T18:00:00.000Z',
+        actualizadoEn: '2026-11-03T18:00:00.000Z',
+      });
+
+      const res = await rechazarMision('mis-webkit', {
+        justificacion_rechazo: 'Falla de transmisión celular en terreno',
+      });
+
+      expect(res.exito).toBe(true);
+      expect(res.modoOffline).toBe(true);
+      expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tipo: 'RECHAZAR_MISION',
+          url: '/api/misiones/mis-webkit/rechazar',
+        })
+      );
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'mis-webkit',
+          estado: 'RECHAZADA',
+          sincronizacionPendiente: true,
+        })
+      );
+    });
   });
 
   describe('aceptarMisionPatrulla — Confirmación de salida de Patrulla Verificadora (HU-36)', () => {

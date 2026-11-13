@@ -8,7 +8,7 @@ import { z } from 'zod';
 export const rechazoMisionSchema = z.object({
   justificacion_rechazo: z
     .string({
-      errorMap: () => ({ message: 'La justificación de rechazo es obligatoria.' }),
+      error: 'La justificación de rechazo es obligatoria.',
     })
     .transform((val) => val.trim())
     .refine((val) => val.length >= 5, {

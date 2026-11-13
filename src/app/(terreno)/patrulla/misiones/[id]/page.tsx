@@ -43,7 +43,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       ? use(params as Promise<{ id: string }>)
       : (params as { id: string });
   const misionId = resolvedParams?.id;
-  const { usuario, unidadActiva, tieneUnidadAsignada, tienePermiso } = useAuth();
+  const { usuario, unidadActiva, tieneUnidadAsignada, tienePermiso, esPatrulla } = useAuth();
   const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
@@ -64,23 +64,12 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       if (encontrada) {
         setMision(encontrada);
       } else {
-        setMision({
-          id: misionId,
-          incidenteId: `inc-${misionId}`,
-          codigoIncidente: `INC-2026-${misionId.substring(0, 5).toUpperCase()}`,
-          tipologia: 'Caída de árbol',
-          direccion: 'Av. Alemania 600, Valdivia',
-          coordenadas: { lat: -39.81, lng: -73.24 },
-          prioridad: 'ALTA',
-          estado: unidadActiva ? 'DESPACHADA' : 'FINALIZADA',
-          fechaDespacho: '2026-10-18T11:00:00Z',
-          actualizadoEn: '2026-10-18T11:45:00Z',
-        });
+        setMision(null);
       }
     } finally {
       setCargando(false);
     }
-  }, [misionId, unidadActiva]);
+  }, [misionId]);
 
   useEffect(() => {
     void cargarDetalle();
@@ -121,10 +110,46 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     }
   };
 
-  if (cargando || !mision) {
+  if (cargando) {
     return (
       <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
         Cargando misión...
+      </div>
+    );
+  }
+
+  if (!mision) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.topBar}>
+          <Link href="/patrulla/misiones" className={styles.backLink}>
+            <ArrowLeft size={16} aria-hidden="true" />
+            <span>Misiones</span>
+          </Link>
+        </div>
+        <div className={styles.detailCard} style={{ textAlign: 'center', padding: 'var(--space-6)' }}>
+          <AlertCircle size={40} color="var(--color-text-muted)" aria-hidden="true" style={{ margin: '0 auto var(--space-3)' }} />
+          <h2 style={{ fontSize: '1.125rem', fontWeight: 700, margin: '0 0 var(--space-2)' }}>
+            Misión no encontrada
+          </h2>
+          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: '0 0 var(--space-4)' }}>
+            La misión solicitada no existe o no se encuentra asignada a su unidad operativa.
+          </p>
+          <Link
+            href="/patrulla/misiones"
+            style={{
+              display: 'inline-block',
+              padding: 'var(--space-2) var(--space-4)',
+              background: 'var(--color-primary-teal)',
+              color: 'var(--color-white)',
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+            }}
+          >
+            Volver a la bandeja
+          </Link>
+        </div>
       </div>
     );
   }
@@ -163,37 +188,57 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
 
   const esRechazable =
     unidadActiva &&
-    (estadoNormalizado === 'DESPACHADA' || estadoNormalizado === 'ASIGNADA' || estadoNormalizado === 'PENDIENTE');
+    esPatrulla &&
+    tienePermisoVerificar &&
+    (estadoNormalizado === 'DESPACHADA' ||
+      estadoNormalizado === 'ASIGNADA' ||
+      estadoNormalizado === 'PENDIENTE');
 
   const handleConfirmarRechazo = async (
     motivo: string,
     coordenadas?: CoordenadasGPS
   ) => {
-    const res = await rechazarMision(mision.id, {
-      justificacion_rechazo: motivo,
-      latitud: coordenadas?.lat,
-      longitud: coordenadas?.lng,
-    });
+    try {
+      const res = await rechazarMision(mision.id, {
+        justificacion_rechazo: motivo,
+        latitud: coordenadas?.lat,
+        longitud: coordenadas?.lng,
+      });
 
-    setMision((prev) =>
-      prev
-        ? {
-            ...prev,
-            estado: 'RECHAZADA',
-            actualizadoEn: res.mision?.actualizadoEn || new Date().toISOString(),
-            datosAdicionales: {
-              ...prev.datosAdicionales,
-              justificacionRechazo: motivo,
-            },
-          }
-        : prev
-    );
+      setMision((prev) =>
+        prev
+          ? {
+              ...prev,
+              estado: 'RECHAZADA',
+              sincronizacionPendiente: Boolean(res.modoOffline),
+              actualizadoEn: res.mision?.actualizadoEn || new Date().toISOString(),
+              datosAdicionales: {
+                ...prev.datosAdicionales,
+                justificacionRechazo: motivo,
+              },
+            }
+          : prev
+      );
 
-    setModalRechazoAbierto(false);
-    setFeedbackMensaje({
-      tipo: res.modoOffline ? 'offline' : 'success',
-      texto: res.mensaje,
-    });
+      setModalRechazoAbierto(false);
+      await actualizarPendientes();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
+      }
+      setFeedbackMensaje({
+        tipo: res.modoOffline ? 'offline' : 'success',
+        texto: res.mensaje,
+      });
+    } catch (err) {
+      setModalRechazoAbierto(false);
+      setFeedbackMensaje({
+        tipo: 'offline',
+        texto:
+          err instanceof Error
+            ? err.message
+            : 'No se pudo registrar el rechazo de la misión.',
+      });
+    }
   };
 
   return (
@@ -246,10 +291,10 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             <XCircle size={18} aria-hidden="true" />
             <span>Misión Rechazada por Patrulla Verificadora</span>
           </div>
-          {mision.datosAdicionales?.justificacionRechazo && (
+          {Boolean(mision.datosAdicionales?.justificacionRechazo) && (
             <p className={styles.rejectedReason}>
               <strong>Motivo documentado:</strong>{' '}
-              {String(mision.datosAdicionales.justificacionRechazo)}
+              {String(mision.datosAdicionales?.justificacionRechazo)}
             </p>
           )}
         </div>

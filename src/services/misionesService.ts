@@ -143,6 +143,7 @@ export async function obtenerCoordenadasOpcionales(
  */
 export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<MisionLocal[]> {
   try {
+    const token = typeof window !== 'undefined' ? getAuthCookie() : null;
     const { data, error } = await apiClient.GET('/api/misiones', {
       params: {
         query: {
@@ -153,7 +154,7 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
           orden: 'desc',
         },
         header: {
-          authorization: '',
+          authorization: token ? (token.startsWith('Bearer ') ? token : `Bearer ${token}`) : '',
         },
       },
     });
@@ -292,6 +293,7 @@ export async function rechazarMision(
       await guardarMisionLocal({
         ...local,
         estado: 'RECHAZADA',
+        sincronizacionPendiente: true,
         actualizadoEn: new Date().toISOString(),
         datosAdicionales: {
           ...local.datosAdicionales,
@@ -317,18 +319,22 @@ export async function rechazarMision(
     const { data, error, response } = await apiClient.POST('/api/misiones/{id}/rechazar', {
       params: {
         path: { id },
-        header: {
-          authorization: '',
-        },
       },
       body: payloadApi,
     });
 
     if (error || !response.ok) {
+      const status = response?.status ?? 500;
       const errorMsg =
         (error as { message?: string })?.message ||
-        `Error al rechazar la misión (${response.status}).`;
-      throw new Error(errorMsg);
+        (status === 403
+          ? 'No cuenta con permisos para rechazar esta misión.'
+          : status === 404
+            ? 'La misión solicitada no fue encontrada.'
+            : status === 409
+              ? 'La misión ya no se encuentra en un estado que permita su rechazo.'
+              : `Error al rechazar la misión (${status}).`);
+      throw new MisionServiceError(status, errorMsg);
     }
 
     const local = await obtenerMisionLocalPorId(id);
@@ -336,6 +342,7 @@ export async function rechazarMision(
       await guardarMisionLocal({
         ...local,
         estado: 'RECHAZADA',
+        sincronizacionPendiente: false,
         actualizadoEn: data?.data?.mision?.actualizadoEn || new Date().toISOString(),
         datosAdicionales: {
           ...local.datosAdicionales,
@@ -350,44 +357,43 @@ export async function rechazarMision(
       mision: data?.data?.mision,
     };
   } catch (err) {
-    if (
-      err instanceof TypeError &&
-      (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed'))
-    ) {
-      await encolarAccionOutbox({
-        tipo: 'RECHAZAR_MISION',
-        url: `/api/misiones/${id}/rechazar`,
-        metodo: 'POST',
-        payload: payloadApi,
-      });
-
-      const local = await obtenerMisionLocalPorId(id);
-      if (local) {
-        await guardarMisionLocal({
-          ...local,
-          estado: 'RECHAZADA',
-          actualizadoEn: new Date().toISOString(),
-          datosAdicionales: {
-            ...local.datosAdicionales,
-            justificacionRechazo: datosValidados.justificacion_rechazo,
-          },
-        });
-      }
-
-      return {
-        exito: true,
-        mensaje: 'Sin conexión estable. Rechazo guardado localmente para envío diferido.',
-        modoOffline: true,
-        mision: {
-          id,
-          codigo: local?.codigoIncidente || id,
-          estado: 'RECHAZADA',
-          justificacionRechazo: datosValidados.justificacion_rechazo,
-        },
-      };
+    if (err instanceof MisionServiceError) {
+      throw err;
     }
 
-    throw err;
+    // Falla de red, corte de conexión o error de transporte (WebKit/Fetch/AbortError)
+    await encolarAccionOutbox({
+      tipo: 'RECHAZAR_MISION',
+      url: `/api/misiones/${id}/rechazar`,
+      metodo: 'POST',
+      payload: payloadApi,
+    });
+
+    const local = await obtenerMisionLocalPorId(id);
+    if (local) {
+      await guardarMisionLocal({
+        ...local,
+        estado: 'RECHAZADA',
+        sincronizacionPendiente: true,
+        actualizadoEn: new Date().toISOString(),
+        datosAdicionales: {
+          ...local.datosAdicionales,
+          justificacionRechazo: datosValidados.justificacion_rechazo,
+        },
+      });
+    }
+
+    return {
+      exito: true,
+      mensaje: 'Sin conexión estable. Rechazo guardado localmente para envío diferido.',
+      modoOffline: true,
+      mision: {
+        id,
+        codigo: local?.codigoIncidente || id,
+        estado: 'RECHAZADA',
+        justificacionRechazo: datosValidados.justificacion_rechazo,
+      },
+    };
   }
 }
 
