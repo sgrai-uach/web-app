@@ -42,5 +42,17 @@ describe('Socket Client Singleton (Terreno PWA)', () => {
     getSocket();
     expect(socketIoClient.io).toHaveBeenCalledTimes(2);
   });
+
+  it('adjunta auth.token en la configuración de inicialización de io()', () => {
+    getSocket();
+    expect(socketIoClient.io).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        auth: expect.objectContaining({
+          token: expect.any(String),
+        }),
+      })
+    );
+  });
 });
 
