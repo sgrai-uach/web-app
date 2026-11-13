@@ -3,6 +3,7 @@ import {
   VALORES_INICIALES_EVALUACION_PRIORIDAD,
   asignarPrioridadSchema,
   calcularPrioridadSugerida,
+  familiaAfectadaSchema,
 } from '../prioridad';
 
 describe('Validaciones y cálculo de prioridad en terreno (H38)', () => {
@@ -127,6 +128,38 @@ describe('Validaciones y cálculo de prioridad en terreno (H38)', () => {
       });
 
       expect(parsed.success).toBe(true);
+    });
+
+    it('rechaza en familiaAfectadaSchema cuando niños + adultos mayores, discapacidad o electrodependientes superan el núcleo familiar', () => {
+      const baseFamilia = {
+        nucleoFamiliarTotal: 3,
+        cantidadNinos: 2,
+        cantidadAdultosMayores: 2,
+        personasDiscapacitadas: 0,
+        personasElectrodependientes: 0,
+        mascotasAfectadas: 5,
+        nivelCompromisoVivienda: 'SIN_DANO' as const,
+        requiereAsistenciaSocial: false,
+      };
+
+      const resEtario = familiaAfectadaSchema.safeParse(baseFamilia);
+      expect(resEtario.success).toBe(false);
+
+      const resDiscapacidad = familiaAfectadaSchema.safeParse({
+        ...baseFamilia,
+        cantidadNinos: 1,
+        cantidadAdultosMayores: 1,
+        personasDiscapacitadas: 4,
+      });
+      expect(resDiscapacidad.success).toBe(false);
+
+      const resElectro = familiaAfectadaSchema.safeParse({
+        ...baseFamilia,
+        cantidadNinos: 1,
+        cantidadAdultosMayores: 1,
+        personasElectrodependientes: 4,
+      });
+      expect(resElectro.success).toBe(false);
     });
   });
 });

@@ -58,20 +58,79 @@ const contadorEnteroSchema = z
   .min(0, { message: 'El valor no puede ser negativo.' })
   .max(999, { message: 'El valor excede el límite permitido.' });
 
-export const familiaAfectadaSchema = z.object({
-  id: z.string().default(() => Math.random().toString(36).substring(2, 9)),
-  referencia: z.string().trim().max(100).optional().default(''),
-  nucleoFamiliarTotal: contadorEnteroSchema,
-  cantidadNinos: contadorEnteroSchema,
-  cantidadAdultosMayores: contadorEnteroSchema,
-  personasDiscapacitadas: contadorEnteroSchema,
-  personasElectrodependientes: contadorEnteroSchema,
-  mascotasAfectadas: contadorEnteroSchema,
-  nivelCompromisoVivienda: z.enum(NIVELES_COMPROMISO_VIVIENDA),
-  requiereAsistenciaSocial: z.boolean().default(false),
-});
+export interface ContadoresFamiliaLimites {
+  nucleoFamiliarTotal: number;
+  cantidadNinos: number;
+  cantidadAdultosMayores: number;
+  personasDiscapacitadas: number;
+  personasElectrodependientes: number;
+}
 
-export const evaluacionTerrenoSchema = z.object({
+/**
+ * Calcula los límites derivados del tamaño del núcleo familiar para evitar
+ * registrar más integrantes que el total declarado de la familia.
+ */
+export function calcularLimitesFamilia(fam: ContadoresFamiliaLimites) {
+  const totalEtarios = fam.cantidadNinos + fam.cantidadAdultosMayores;
+  const minimoNucleo = Math.max(
+    totalEtarios,
+    fam.personasDiscapacitadas,
+    fam.personasElectrodependientes
+  );
+
+  return {
+    totalEtarios,
+    minimoNucleo,
+    cupoEtarioDisponible: Math.max(0, fam.nucleoFamiliarTotal - totalEtarios),
+  };
+}
+
+function validarLimitesNucleoFamiliar(
+  data: ContadoresFamiliaLimites,
+  ctx: z.RefinementCtx
+) {
+  if (data.cantidadNinos + data.cantidadAdultosMayores > data.nucleoFamiliarTotal) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        'La suma de niños y adultos mayores no puede superar el tamaño del núcleo familiar.',
+      path: ['cantidadNinos'],
+    });
+  }
+  if (data.personasDiscapacitadas > data.nucleoFamiliarTotal) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        'Las personas con discapacidad no pueden superar el tamaño del núcleo familiar.',
+      path: ['personasDiscapacitadas'],
+    });
+  }
+  if (data.personasElectrodependientes > data.nucleoFamiliarTotal) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        'Las personas electrodependientes no pueden superar el tamaño del núcleo familiar.',
+      path: ['personasElectrodependientes'],
+    });
+  }
+}
+
+export const familiaAfectadaSchema = z
+  .object({
+    id: z.string().default(() => Math.random().toString(36).substring(2, 9)),
+    referencia: z.string().trim().max(100).optional().default(''),
+    nucleoFamiliarTotal: contadorEnteroSchema,
+    cantidadNinos: contadorEnteroSchema,
+    cantidadAdultosMayores: contadorEnteroSchema,
+    personasDiscapacitadas: contadorEnteroSchema,
+    personasElectrodependientes: contadorEnteroSchema,
+    mascotasAfectadas: contadorEnteroSchema,
+    nivelCompromisoVivienda: z.enum(NIVELES_COMPROMISO_VIVIENDA),
+    requiereAsistenciaSocial: z.boolean().default(false),
+  })
+  .superRefine(validarLimitesNucleoFamiliar);
+
+const evaluacionTerrenoBaseSchema = z.object({
   familias: z.array(familiaAfectadaSchema).optional().default([]),
   nucleoFamiliarTotal: contadorEnteroSchema,
   cantidadNinos: contadorEnteroSchema,
@@ -98,7 +157,11 @@ export const evaluacionTerrenoSchema = z.object({
     .default(''),
 });
 
-export const asignarPrioridadSchema = evaluacionTerrenoSchema
+export const evaluacionTerrenoSchema = evaluacionTerrenoBaseSchema.superRefine(
+  validarLimitesNucleoFamiliar
+);
+
+export const asignarPrioridadSchema = evaluacionTerrenoBaseSchema
   .extend({
     prioridad: z.enum(PRIORIDADES_CANONICAS, {
       message: 'Seleccione un nivel de prioridad canónico válido (BAJA, MEDIA, ALTA o CRITICA).',
@@ -119,6 +182,7 @@ export const asignarPrioridadSchema = evaluacionTerrenoSchema
       .optional(),
     versionReporte: z.number().int().min(1).optional().default(1),
   })
+  .superRefine(validarLimitesNucleoFamiliar)
   .refine(
     (data) => {
       if (data.prioridad === data.prioridadSugerida) {

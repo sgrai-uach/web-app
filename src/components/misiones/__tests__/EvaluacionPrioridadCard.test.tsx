@@ -46,7 +46,10 @@ describe('EvaluacionPrioridadCard (H38)', () => {
     const badgeSugerida = screen.getByTestId('badge-prioridad-sugerida');
     expect(badgeSugerida).toHaveTextContent('Baja');
 
-    // Incrementar contador de personas electrodependientes eleva la sugerencia a CRITICA
+    // Definir tamaño del núcleo familiar y luego incrementar personas electrodependientes
+    fireEvent.click(
+      screen.getByRole('button', { name: /Aumentar Tamaño núcleo familiar/i })
+    );
     const btnMasElectro = screen.getByRole('button', {
       name: /Aumentar Personas electrodependientes/i,
     });
@@ -275,6 +278,62 @@ describe('EvaluacionPrioridadCard (H38)', () => {
         name: /Requiere apoyo táctico adicional/i,
       })
     ).not.toBeInTheDocument();
+  });
+
+  it('impide añadir más integrantes que el tamaño del núcleo familiar y permite mascotas independientes', () => {
+    render(
+      <EvaluacionPrioridadCard
+        incidenteId={misionMock.incidenteId}
+        misionActual={misionMock}
+      />
+    );
+
+    const btnMasNucleo = screen.getByRole('button', {
+      name: /Aumentar Tamaño núcleo familiar/i,
+    });
+    const btnMenosNucleo = screen.getByRole('button', {
+      name: /Disminuir Tamaño núcleo familiar/i,
+    });
+    const btnMasNinos = screen.getByRole('button', {
+      name: /Aumentar Cantidad de niños/i,
+    });
+    const btnMasAdultos = screen.getByRole('button', {
+      name: /Aumentar Adultos mayores/i,
+    });
+    const btnMasDiscapacidad = screen.getByRole('button', {
+      name: /Aumentar Personas con discapacidad/i,
+    });
+    const btnMasMascotas = screen.getByRole('button', {
+      name: /Aumentar Mascotas afectadas/i,
+    });
+
+    // Con núcleo en 0, los contadores de integrantes están deshabilitados pero mascotas sí permite aumentar
+    expect(btnMasNinos).toBeDisabled();
+    expect(btnMasAdultos).toBeDisabled();
+    expect(btnMasDiscapacidad).toBeDisabled();
+    expect(btnMasMascotas).not.toBeDisabled();
+
+    // Fijar núcleo familiar en 2
+    fireEvent.click(btnMasNucleo);
+    fireEvent.click(btnMasNucleo);
+    expect(screen.getByTestId('valor-nucleoFamiliarTotal')).toHaveTextContent('2');
+
+    // Agregar 1 niño y 1 adulto mayor completa el cupo etario (2/2)
+    fireEvent.click(btnMasNinos);
+    fireEvent.click(btnMasAdultos);
+    expect(screen.getByTestId('valor-cantidadNinos')).toHaveTextContent('1');
+    expect(screen.getByTestId('valor-cantidadAdultosMayores')).toHaveTextContent('1');
+    expect(btnMasNinos).toBeDisabled();
+    expect(btnMasAdultos).toBeDisabled();
+
+    // No se puede disminuir el núcleo por debajo de 2 mientras haya 2 integrantes registrados
+    expect(btnMenosNucleo).toBeDisabled();
+
+    // Mascotas sigue habilitado independientemente del tamaño del núcleo
+    fireEvent.click(btnMasMascotas);
+    fireEvent.click(btnMasMascotas);
+    fireEvent.click(btnMasMascotas);
+    expect(screen.getByTestId('valor-mascotasAfectadas')).toHaveTextContent('3');
   });
 });
 

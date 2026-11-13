@@ -18,6 +18,7 @@ import {
   HeartHandshake,
   ShieldAlert,
   History,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
@@ -30,6 +31,7 @@ import {
   NIVELES_COMPROMISO_VIVIENDA,
   calcularPrioridadSugerida,
   consolidarEvaluacionFamilias,
+  calcularLimitesFamilia,
 } from '@/lib/validations/prioridad';
 import {
   asignarPrioridadEnTerreno,
@@ -279,24 +281,48 @@ export function EvaluacionPrioridadCard({
     (longitudJustificacion >= JUSTIFICACION_MIN &&
       longitudJustificacion <= JUSTIFICACION_MAX);
 
+  type CampoContadorFamilia = keyof Pick<
+    FamiliaAfectadaItem,
+    | 'nucleoFamiliarTotal'
+    | 'cantidadNinos'
+    | 'cantidadAdultosMayores'
+    | 'personasDiscapacitadas'
+    | 'personasElectrodependientes'
+    | 'mascotasAfectadas'
+  >;
+
+  const obtenerRangoContadorFamilia = (
+    fam: FamiliaAfectadaItem,
+    campo: CampoContadorFamilia
+  ): { min: number; max: number } => {
+    const { minimoNucleo } = calcularLimitesFamilia(fam);
+    switch (campo) {
+      case 'nucleoFamiliarTotal':
+        return { min: minimoNucleo, max: 999 };
+      case 'cantidadNinos':
+        return { min: 0, max: Math.max(0, fam.nucleoFamiliarTotal - fam.cantidadAdultosMayores) };
+      case 'cantidadAdultosMayores':
+        return { min: 0, max: Math.max(0, fam.nucleoFamiliarTotal - fam.cantidadNinos) };
+      case 'personasDiscapacitadas':
+      case 'personasElectrodependientes':
+        return { min: 0, max: Math.max(0, fam.nucleoFamiliarTotal) };
+      case 'mascotasAfectadas':
+      default:
+        return { min: 0, max: 999 };
+    }
+  };
+
   const ajustarContadorFamilia = (
     familiaId: string,
-    campo: keyof Pick<
-      FamiliaAfectadaItem,
-      | 'nucleoFamiliarTotal'
-      | 'cantidadNinos'
-      | 'cantidadAdultosMayores'
-      | 'personasDiscapacitadas'
-      | 'personasElectrodependientes'
-      | 'mascotasAfectadas'
-    >,
+    campo: CampoContadorFamilia,
     delta: number
   ) => {
     setEvaluacion((prev) => {
       const familiasActualizadas = (prev.familias || []).map((fam) => {
         if (fam.id !== familiaId) return fam;
         const actual = fam[campo] || 0;
-        const nuevo = Math.max(0, Math.min(999, actual + delta));
+        const { min, max } = obtenerRangoContadorFamilia(fam, campo);
+        const nuevo = Math.max(min, Math.min(max, actual + delta));
         return {
           ...fam,
           [campo]: nuevo,
@@ -706,6 +732,7 @@ export function EvaluacionPrioridadCard({
                         { campo: 'mascotasAfectadas' as const, etiqueta: 'Mascotas afectadas', icono: <HeartHandshake size={16} /> },
                       ].map((item) => {
                         const valorActual = fam[item.campo];
+                        const { min, max } = obtenerRangoContadorFamilia(fam, item.campo);
                         return (
                           <div key={item.campo} className={styles.counterCard}>
                             <div className={styles.counterLabelGroup}>
@@ -717,7 +744,7 @@ export function EvaluacionPrioridadCard({
                                 type="button"
                                 className={styles.counterBtn}
                                 onClick={() => ajustarContadorFamilia(fam.id, item.campo, -1)}
-                                disabled={deshabilitado || guardando || valorActual <= 0}
+                                disabled={deshabilitado || guardando || valorActual <= min}
                                 aria-label={`Disminuir ${item.etiqueta}`}
                               >
                                 <Minus size={18} aria-hidden="true" />
@@ -732,7 +759,7 @@ export function EvaluacionPrioridadCard({
                                 type="button"
                                 className={styles.counterBtn}
                                 onClick={() => ajustarContadorFamilia(fam.id, item.campo, 1)}
-                                disabled={deshabilitado || guardando}
+                                disabled={deshabilitado || guardando || valorActual >= max}
                                 aria-label={`Aumentar ${item.etiqueta}`}
                               >
                                 <Plus size={18} aria-hidden="true" />
@@ -742,6 +769,31 @@ export function EvaluacionPrioridadCard({
                         );
                       })}
                     </div>
+
+                    {(() => {
+                      const { totalEtarios } = calcularLimitesFamilia(fam);
+                      if (fam.nucleoFamiliarTotal === 0) {
+                        return (
+                          <div className={styles.cupoInfoHint} role="status">
+                            <Info size={14} aria-hidden="true" />
+                            <span>
+                              Defina el tamaño del núcleo familiar para registrar integrantes.
+                            </span>
+                          </div>
+                        );
+                      }
+                      if (totalEtarios >= fam.nucleoFamiliarTotal) {
+                        return (
+                          <div className={styles.cupoInfoHint} role="status">
+                            <Info size={14} aria-hidden="true" />
+                            <span>
+                              Cupo de integrantes etarios completo ({totalEtarios}/{fam.nucleoFamiliarTotal}).
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
 
                     {/* Compromiso de Vivienda para esta Familia */}
                     <div className={styles.fieldGroup}>

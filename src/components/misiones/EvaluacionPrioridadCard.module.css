@@ -93,6 +93,19 @@
   min-height: 56px;
 }
 
+.cupoInfoHint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background-color: var(--color-info-bg, #e0f2f1);
+  border-left: 3px solid var(--color-primary-teal, #1b6f7d);
+  color: var(--color-primary-teal-dark, #14505a);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .counterLabelGroup {
   display: flex;
   align-items: center;
