@@ -5,6 +5,7 @@ import {
   contarAccionesPendientes,
   sincronizarColaOutbox,
   obtenerMisionLocalPorId,
+  obtenerMisionesLocales,
   guardarMisionLocal,
 } from '@/services/offlineQueue';
 import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge';
@@ -61,6 +62,27 @@ export function useConnectivity() {
         // Códigos 2xx o 409/422 que indiquen que el recurso ya fue procesado / idempotente
         const procesada = res.ok || res.status === 409 || res.status === 422;
 
+        if (procesada && accion.tipo === 'ACTUALIZAR_TIPOLOGIA') {
+          const match = accion.url.match(/\/api\/incidentes\/([^/]+)\/tipologia/);
+          const incidenteId = match?.[1];
+          const misionId = accion.payload?.misionId as string | undefined;
+          try {
+            let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+            if (!local && incidenteId) {
+              const todas = await obtenerMisionesLocales();
+              local = todas.find((m) => m.incidenteId === incidenteId);
+            }
+            if (local) {
+              await guardarMisionLocal({
+                ...local,
+                sincronizacionPendiente: false,
+                actualizadoEn: new Date().toISOString(),
+              });
+            }
+          } catch {
+            // Ignorar fallos de persistencia secundaria
+          }
+        }
         if (procesada && accion.tipo === 'ACEPTAR_MISION') {
           const match = accion.url.match(/\/api\/misiones\/([^/]+)\/aceptar/);
           const misionId = match?.[1];

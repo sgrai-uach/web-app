@@ -3314,6 +3314,8 @@ export interface paths {
                                 incidenteId?: string | null;
                                 /** @description Código legible del incidente */
                                 incidenteCodigo?: string | null;
+                                /** @description Tipo de afectación vigente del incidente asociado */
+                                incidenteTipoAfectacion?: string | null;
                                 /** Format: uuid */
                                 cuadrillaId?: string | null;
                                 cuadrillaNombre?: string | null;
@@ -3741,6 +3743,7 @@ export interface paths {
                                 } | null;
                                 /** @description Hitos cronológicos de tiempo de la misión para análisis táctico (HU-17) */
                                 bitacoraTiempos: {
+                                    id?: string;
                                     /**
                                      * @description Hito temporal de la misión
                                      * @example PLANIFICACION
@@ -3760,6 +3763,9 @@ export interface paths {
                                     timestamp: string;
                                     /** @description Glosa descriptiva del hito operativo */
                                     descripcion: string;
+                                    metadatos?: {
+                                        [key: string]: unknown;
+                                    } | null;
                                 }[];
                                 /** @description Informes técnicos levantados en terreno con su respectiva evidencia multimedia (vacío si no hay reportes) */
                                 reportesTerreno: {
@@ -3839,6 +3845,13 @@ export interface paths {
                                     /** @description Fecha y hora de última modificación en formato ISO 8601 */
                                     actualizadoEn: string;
                                 }[];
+                                evaluaciones?: {
+                                    tipologiaEvaluada: boolean;
+                                    tipologiaEvaluadaEn: string | null;
+                                    prioridadEvaluada: boolean;
+                                    prioridadEvaluadaEn: string | null;
+                                    versionReportePrioridad: number | null;
+                                };
                             };
                         };
                     };

@@ -8,24 +8,33 @@ import {
   Calendar,
   Archive,
   Map,
+  Tag,
   CheckCircle,
+  CheckCircle2,
   Navigation,
   ClipboardCheck,
   WifiOff,
+  AlertCircle,
+  ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
+import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
+import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
+import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
+import { EvaluacionPrioridadCard } from '@/components/misiones/EvaluacionPrioridadCard';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
 } from '@/services/misionesService';
-import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
+import { formatearPrioridad, formatearFechaHora24h, formatearTipologia } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaDetailPage.module.css';
 
@@ -49,6 +58,8 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
   const [errorAceptacion, setErrorAceptacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
+  const [seccionCategorizacionAbierta, setSeccionCategorizacionAbierta] = useState<boolean>(true);
+  const [seccionPrioridadAbierta, setSeccionPrioridadAbierta] = useState<boolean>(false);
 
   const cargarDetalle = useCallback(async () => {
     setCargando(true);
@@ -56,6 +67,17 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       const encontrada = await obtenerDetalleMision(misionId);
       if (encontrada) {
         setMision(encontrada);
+        const reportesCount = Array.isArray(encontrada.datosAdicionales?.reportesPrioridad)
+          ? encontrada.datosAdicionales.reportesPrioridad.length
+          : Array.isArray(encontrada.datosAdicionales?.reportesTerreno)
+            ? encontrada.datosAdicionales.reportesTerreno.length
+            : 0;
+        const tipologiaYaEvaluada = Boolean(encontrada.datosAdicionales?.tipologiaEvaluada);
+        const prioridadYaEvaluada =
+          Boolean(encontrada.datosAdicionales?.prioridadEvaluada) || reportesCount > 0;
+
+        setSeccionCategorizacionAbierta(!tipologiaYaEvaluada);
+        setSeccionPrioridadAbierta(tipologiaYaEvaluada && !prioridadYaEvaluada);
       } else {
         setMision(null);
       }
@@ -111,14 +133,6 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     );
   }
 
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
-  }
-
   const estadoNormalizado = mision.estado?.toUpperCase() || '';
   const esDespachada = estadoNormalizado === 'DESPACHADA';
   const esEnCurso =
@@ -171,12 +185,17 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
           <div className={styles.codeArea}>
+            <AlertCircle
+              size={20}
+              color="var(--color-primary-teal, #1B6F7D)"
+              aria-hidden="true"
+            />
             <span className={styles.code}>{mision.codigoIncidente}</span>
-            <span className={`${styles.priorityChip} ${prioridadClase}`}>
+            <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
               {formatearPrioridad(mision.prioridad)}
-            </span>
+            </Chip>
           </div>
-          <EstadoBadge estado={mision.estado} />
+          <EstadoBadge estado={mision.estado} size="md" />
         </div>
 
         <div className={styles.detailGrid}>
@@ -184,7 +203,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Tipo</span>
             <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
-              {mision.tipologia}
+              {formatearTipologia(mision.tipologia)}
             </span>
           </div>
 
@@ -280,45 +299,49 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               <div className={styles.enTrayectoTitleRow}>
                 <Navigation
                   size={20}
-                  color="var(--color-primary-teal)"
+                  color="var(--color-primary-teal, #1B6F7D)"
                   aria-hidden="true"
                 />
                 <h2 className={styles.enTrayectoTitle}>
                   En Trayecto / Evaluación
                 </h2>
               </div>
-              <span className={styles.activeStatusChip}>Misión activa</span>
+              <Chip variant="success" size="sm">
+                Misión activa
+              </Chip>
             </div>
 
-            {mision.sincronizacionPendiente ? (
-              <div className={styles.offlineQueueBanner} role="status">
-                <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
-                <span>
-                  Pendiente de sincronizar: La aceptación fue guardada en la cola
-                  local del dispositivo y se enviará automáticamente al recuperar
-                  conexión.
-                </span>
-              </div>
-            ) : (
-              mensajeConfirmacion && (
-                <div className={styles.SyncedBanner} role="status">
-                  {mensajeConfirmacion}
+            <div className={styles.enTrayectoContent}>
+              {mision.sincronizacionPendiente ? (
+                <div className={styles.offlineQueueBanner} role="status">
+                  <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+                  <span>
+                    Pendiente de sincronizar: La aceptación fue guardada en la cola
+                    local del dispositivo y se enviará automáticamente al recuperar
+                    conexión.
+                  </span>
                 </div>
-              )
-            )}
+              ) : (
+                mensajeConfirmacion && (
+                  <div className={styles.SyncedBanner} role="status">
+                    {mensajeConfirmacion}
+                  </div>
+                )
+              )}
 
-            <div className={styles.canonicalStatesGrid}>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Misión</span>
-                <span className={styles.canonicalStateValue}>En curso</span>
-              </div>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Patrulla</span>
-                <span className={styles.canonicalStateValue}>En verificación</span>
-              </div>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Incidente</span>
-                <span className={styles.canonicalStateValue}>Verificando</span>
+              <div className={styles.canonicalStatesGrid}>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Misión</span>
+                  <span className={styles.canonicalStateValue}>En curso</span>
+                </div>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Patrulla</span>
+                  <span className={styles.canonicalStateValue}>En verificación</span>
+                </div>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Incidente</span>
+                  <span className={styles.canonicalStateValue}>Verificando</span>
+                </div>
               </div>
             </div>
           </section>
@@ -331,19 +354,116 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             <div className={styles.evaluationHeader}>
               <h3 className={styles.evaluationTitle}>
                 <ClipboardCheck
-                  size={18}
-                  color="var(--color-primary-teal)"
+                  size={20}
+                  color="var(--color-primary-teal, #1B6F7D)"
                   aria-hidden="true"
                 />
                 <span>Formularios de Reporte Técnico</span>
               </h3>
-              <span className={styles.activeStatusChip}>Habilitado</span>
             </div>
-            <p className={styles.evaluationBody}>
-              La unidad se encuentra en trayecto / evaluación. Los formularios
-              operativos para categorizar el incidente, ajustar la prioridad y
-              enviar el reporte de situación están habilitados.
-            </p>
+
+            <div className={styles.evaluationContent}>
+              {(() => {
+                const reportesPrioridadCount = Array.isArray(
+                  mision.datosAdicionales?.reportesPrioridad
+                )
+                  ? mision.datosAdicionales.reportesPrioridad.length
+                  : Array.isArray(mision.datosAdicionales?.reportesTerreno)
+                    ? mision.datosAdicionales.reportesTerreno.length
+                    : 0;
+                const tipologiaCompletada = Boolean(
+                  mision.datosAdicionales?.tipologiaEvaluada
+                );
+                const prioridadCompletada =
+                  Boolean(mision.datosAdicionales?.prioridadEvaluada) ||
+                  reportesPrioridadCount > 0;
+                const versionPrioridad =
+                  typeof mision.datosAdicionales?.versionReportePrioridad === 'number'
+                    ? mision.datosAdicionales.versionReportePrioridad
+                    : reportesPrioridadCount > 0
+                      ? reportesPrioridadCount
+                      : undefined;
+
+                return (
+                  <>
+                    <SeccionDesplegable
+                      titulo="Categorización del incidente"
+                      icono={<Tag size={18} />}
+                      abierto={seccionCategorizacionAbierta}
+                      onToggle={(abierto) => setSeccionCategorizacionAbierta(abierto)}
+                      indicador={
+                        tipologiaCompletada ? (
+                          <Chip
+                            variant="success"
+                            size="sm"
+                            icon={<CheckCircle2 size={12} />}
+                          >
+                            Completado
+                          </Chip>
+                        ) : mision.sincronizacionPendiente ? (
+                          <Chip variant="warning" size="sm">
+                            Pendiente
+                          </Chip>
+                        ) : null
+                      }
+                    >
+                      <EvaluacionTipologiaCard
+                        incidenteId={mision.incidenteId}
+                        misionActual={mision}
+                        onTipologiaActualizada={(resultado) => {
+                          if (resultado.mision) {
+                            setMision(resultado.mision);
+                          }
+                          setSeccionCategorizacionAbierta(false);
+                          if (!prioridadCompletada) {
+                            setSeccionPrioridadAbierta(true);
+                          }
+                        }}
+                      />
+                    </SeccionDesplegable>
+
+                    <SeccionDesplegable
+                      titulo="Evaluación en terreno y prioridad"
+                      icono={<ShieldAlert size={18} />}
+                      abierto={seccionPrioridadAbierta}
+                      onToggle={(abierto) => setSeccionPrioridadAbierta(abierto)}
+                      indicador={
+                        prioridadCompletada ? (
+                          <Chip
+                            variant="success"
+                            size="sm"
+                            icon={<CheckCircle2 size={12} />}
+                          >
+                            Completado
+                            {typeof versionPrioridad === 'number'
+                              ? ` (#${versionPrioridad})`
+                              : ''}
+                          </Chip>
+                        ) : mision.sincronizacionPendiente ? (
+                          <Chip variant="warning" size="sm">
+                            Pendiente
+                          </Chip>
+                        ) : null
+                      }
+                    >
+                      {seccionPrioridadAbierta && (
+                        <EvaluacionPrioridadCard
+                          incidenteId={mision.incidenteId}
+                          misionActual={mision}
+                          onPrioridadActualizada={(resultado) => {
+                            if (resultado.mision) {
+                              setMision(resultado.mision);
+                            }
+                            setSeccionPrioridadAbierta(false);
+                            void actualizarPendientes();
+                          }}
+                        />
+                      )}
+                    </SeccionDesplegable>
+                  </>
+                );
+              })()}
+            </div>
           </section>
         </>
       )}

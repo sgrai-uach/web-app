@@ -345,4 +345,123 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
       expect(coordsSinGps).toEqual({});
     });
   });
+
+  describe('Sincronización de tipología y estado de evaluaciones desde backend', () => {
+    it('usa incidenteTipoAfectacion en sincronizarMisiones y deriva tipologiaEvaluada/prioridadEvaluada en obtenerDetalleMision', async () => {
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: [
+            {
+              id: 'mis-7700',
+              codigo: 'MIS-2026-7700',
+              titulo: 'Verificación: Anegamiento - INC-592395-562',
+              descripcion: 'Revisar corte de suministro',
+              tipoMision: 'VERIFICACION',
+              estado: 'EN_CURSO',
+              prioridad: 'ALTA',
+              incidenteId: 'inc-562',
+              incidenteCodigo: 'INC-592395-562',
+              incidenteTipoAfectacion: 'Corte de agua potable',
+              cuadrillaId: null,
+              cuadrillaNombre: null,
+              patrullaId: 'pat-001',
+              patrullaNombre: 'Patrulla 1',
+              delegacionId: 'del-001',
+              delegacionNombre: 'Norte',
+              fechaInicio: '2026-10-30T04:00:00Z',
+              fechaCierre: null,
+              creadoEn: '2026-10-30T04:00:00Z',
+              actualizadoEn: '2026-10-30T04:00:00Z',
+            },
+          ],
+          meta: {
+            total: 1,
+            page: 1,
+            limit: 20,
+            totalPages: 1,
+            hasNext: false,
+            hasPrev: false,
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const lista = await sincronizarMisiones({ tipoMision: 'VERIFICACION' });
+      expect(lista[0]?.tipologia).toBe('Corte de agua potable');
+
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: {
+            id: 'mis-7700',
+            codigo: 'MIS-2026-7700',
+            titulo: 'Verificación: Corte de agua potable - INC-592395-562',
+            descripcion: 'Revisar corte de suministro',
+            tipoMision: 'VERIFICACION',
+            estado: 'EN_CURSO',
+            prioridad: 'ALTA',
+            justificacionRechazo: null,
+            fechaInicio: '2026-10-30T04:00:00Z',
+            fechaCierre: null,
+            creadoEn: '2026-10-30T04:00:00Z',
+            actualizadoEn: '2026-10-30T05:00:00Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: {
+              id: 'inc-562',
+              codigo: 'INC-592395-562',
+              codigoSeguimiento: 'SEG-562',
+              tipoAfectacion: 'Corte de agua potable',
+              descripcion: 'Sin suministro',
+              direccion: 'Av. Alemania 500',
+              latitud: -39.81,
+              longitud: -73.24,
+              estado: 'VERIFICANDO',
+              prioridad: 'ALTA',
+              requiereAsistenciaSocial: false,
+              delegacionNombre: 'Norte',
+            },
+            prevencion: null,
+            cuadrilla: null,
+            patrulla: null,
+            bitacoraTiempos: [
+              {
+                id: 'hito-1',
+                hito: 'TIPOLOGIA_RECLASIFICADA',
+                fecha: '2026-10-30',
+                hora: '04:30:00',
+                timestamp: '2026-10-30T04:30:00Z',
+                descripcion: 'Reclasificado. Justificación: Matriz rota',
+                metadatos: {
+                  tipoAnterior: 'Anegamiento',
+                  tipoNuevo: 'Corte de agua potable',
+                  justificacion: 'Matriz rota',
+                },
+              },
+            ],
+            reportesTerreno: [{ id: 'rep-1', versionReporte: 1 }],
+            evaluaciones: {
+              tipologiaEvaluada: true,
+              tipologiaEvaluadaEn: '2026-10-30T04:30:00Z',
+              prioridadEvaluada: true,
+              prioridadEvaluadaEn: '2026-10-30T04:45:00Z',
+              versionReportePrioridad: 1,
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle = await obtenerDetalleMision('mis-7700');
+      expect(detalle?.tipologia).toBe('Corte de agua potable');
+      expect(detalle?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+      expect(detalle?.datosAdicionales?.esReclasificacion).toBe(true);
+      expect(detalle?.datosAdicionales?.justificacionTipologia).toBe('Matriz rota');
+      expect(detalle?.datosAdicionales?.prioridadEvaluada).toBe(true);
+      expect(detalle?.datosAdicionales?.versionReportePrioridad).toBe(1);
+    });
+  });
 });

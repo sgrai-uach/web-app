@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { ArrowLeft, MapPin, Calendar, Archive, Map } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
+import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { obtenerDetalleMision } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
@@ -53,14 +55,6 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     return <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>Cargando misión...</div>;
   }
 
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
-  }
-
   const trabajoTexto = (mision.datosAdicionales?.trabajo as string) || mision.direccion;
   const esSoloLectura =
     !unidadActiva ||
@@ -91,11 +85,11 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         <div className={styles.headerRow}>
           <div className={styles.codeArea}>
             <span className={styles.code}>{mision.codigoIncidente}</span>
-            <span className={`${styles.priorityChip} ${prioridadClase}`}>
+            <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
               {formatearPrioridad(mision.prioridad)}
-            </span>
+            </Chip>
           </div>
-          <EstadoBadge estado={mision.estado} />
+          <EstadoBadge estado={mision.estado} size="md" />
         </div>
 
         <div className={styles.detailGrid}>

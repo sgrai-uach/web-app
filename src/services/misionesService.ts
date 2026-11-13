@@ -159,24 +159,47 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
     });
 
     if (!error && data && Array.isArray(data.data)) {
-      const remotas: MisionLocal[] = data.data.map((item: MisionApiItem) => ({
-        id: item.id,
-        incidenteId: item.incidenteId || '',
-        codigoIncidente: item.incidenteCodigo || item.codigo,
-        tipologia: limpiarTituloMision(item.titulo),
-        direccion:
-          item.descripcion ||
-          (item.delegacionNombre ? `Sector ${item.delegacionNombre}` : 'Valdivia'),
-        prioridad: item.prioridad,
-        estado: item.estado,
-        fechaDespacho: item.fechaInicio || item.creadoEn,
-        fechaInicio: item.fechaInicio || null,
-        datosAdicionales: {
-          trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
-          titulo: item.titulo,
-        },
-        actualizadoEn: item.actualizadoEn,
-      }));
+      let localesPreviasMap = new Map<string, MisionLocal>();
+      try {
+        const previas = await obtenerMisionesLocales();
+        localesPreviasMap = new Map(previas.map((m) => [m.id, m]));
+      } catch {
+        // Ignorar si IndexedDB no está disponible
+      }
+
+      const remotas: MisionLocal[] = data.data.map((item: MisionApiItem) => {
+        const previa = localesPreviasMap.get(item.id);
+        const tipoAfectacionRemoto = (
+          item as { incidenteTipoAfectacion?: string | null }
+        ).incidenteTipoAfectacion;
+
+        return {
+          id: item.id,
+          incidenteId: item.incidenteId || '',
+          codigoIncidente: item.incidenteCodigo || item.codigo,
+          tipologia: tipoAfectacionRemoto
+            ? formatearTipologia(tipoAfectacionRemoto)
+            : limpiarTituloMision(item.titulo),
+          direccion:
+            item.descripcion ||
+            (item.delegacionNombre ? `Sector ${item.delegacionNombre}` : 'Valdivia'),
+          prioridad: item.prioridad,
+          estado: item.estado,
+          fechaDespacho: item.fechaInicio || item.creadoEn,
+          fechaInicio: item.fechaInicio || null,
+          sincronizacionPendiente: previa?.sincronizacionPendiente ?? false,
+          datosAdicionales: {
+            ...(previa?.datosAdicionales || {}),
+            trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
+            titulo: item.titulo,
+            patrullaId: (item as Record<string, unknown>).patrullaId as string | null | undefined,
+            patrullaNombre: (item as Record<string, unknown>).patrullaNombre as string | null | undefined,
+            cuadrillaId: (item as Record<string, unknown>).cuadrillaId as string | null | undefined,
+            cuadrillaNombre: (item as Record<string, unknown>).cuadrillaNombre as string | null | undefined,
+          },
+          actualizadoEn: item.actualizadoEn,
+        };
+      });
 
       await limpiarMisionesLocales();
       if (remotas.length > 0) {
@@ -206,6 +229,64 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
 
     if (!error && data && data.data) {
       const d: MisionDetalleApi = data.data;
+      let previaLocal: MisionLocal | undefined;
+      try {
+        previaLocal = await obtenerMisionLocalPorId(id);
+      } catch {
+        previaLocal = undefined;
+      }
+
+      const reportesRemotos = Array.isArray(d.reportesTerreno) ? d.reportesTerreno : [];
+      const bitacoraRemota = Array.isArray(d.bitacoraTiempos) ? d.bitacoraTiempos : [];
+      const evalRemota = (
+        d as {
+          evaluaciones?: {
+            tipologiaEvaluada?: boolean;
+            tipologiaEvaluadaEn?: string | null;
+            prioridadEvaluada?: boolean;
+            prioridadEvaluadaEn?: string | null;
+            versionReportePrioridad?: number | null;
+          };
+        }
+      ).evaluaciones;
+
+      const hitosTipologia = bitacoraRemota.filter(
+        (h) => h.hito === 'TIPOLOGIA_RECLASIFICADA' || h.hito === 'TIPOLOGIA_CONFIRMADA'
+      );
+      const ultimoHitoTipologia =
+        hitosTipologia.length > 0 ? hitosTipologia[hitosTipologia.length - 1] : undefined;
+
+      const metadatosHito = (
+        ultimoHitoTipologia as { metadatos?: Record<string, unknown> | null } | undefined
+      )?.metadatos;
+
+      const justificacionDesdeHito =
+        typeof metadatosHito?.justificacion === 'string'
+          ? metadatosHito.justificacion
+          : ultimoHitoTipologia?.hito === 'TIPOLOGIA_RECLASIFICADA' &&
+              typeof ultimoHitoTipologia.descripcion === 'string' &&
+              ultimoHitoTipologia.descripcion.includes('Justificación:')
+            ? ultimoHitoTipologia.descripcion.split('Justificación:')[1]?.trim() || undefined
+            : undefined;
+
+      const tipologiaEvaluada =
+        Boolean(previaLocal?.datosAdicionales?.tipologiaEvaluada) ||
+        Boolean(evalRemota?.tipologiaEvaluada) ||
+        hitosTipologia.length > 0;
+
+      const prioridadEvaluada =
+        Boolean(previaLocal?.datosAdicionales?.prioridadEvaluada) ||
+        Boolean(evalRemota?.prioridadEvaluada) ||
+        reportesRemotos.length > 0;
+
+      const versionReportePrioridad =
+        evalRemota?.versionReportePrioridad ??
+        (typeof previaLocal?.datosAdicionales?.versionReportePrioridad === 'number'
+          ? previaLocal.datosAdicionales.versionReportePrioridad
+          : reportesRemotos.length > 0
+            ? reportesRemotos.length
+            : undefined);
+
       const misionLocal: MisionLocal = {
         id: d.id,
         incidenteId: d.incidente?.id || '',
@@ -224,6 +305,7 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         fechaInicio: d.fechaInicio || null,
         sincronizacionPendiente: false,
         datosAdicionales: {
+          ...(previaLocal?.datosAdicionales || {}),
           trabajo:
             d.descripcion ||
             d.incidente?.descripcion ||
@@ -231,6 +313,16 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
           titulo: d.titulo,
           estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION',
           estadoIncidente: d.incidente?.estado || 'VERIFICANDO',
+          reportesTerreno: reportesRemotos,
+          tipologiaEvaluada,
+          esReclasificacion:
+            ultimoHitoTipologia !== undefined
+              ? ultimoHitoTipologia.hito === 'TIPOLOGIA_RECLASIFICADA'
+              : Boolean(previaLocal?.datosAdicionales?.esReclasificacion),
+          justificacionTipologia:
+            justificacionDesdeHito ?? previaLocal?.datosAdicionales?.justificacionTipologia,
+          prioridadEvaluada,
+          ...(versionReportePrioridad !== undefined ? { versionReportePrioridad } : {}),
         },
         actualizadoEn: d.actualizadoEn,
       };
