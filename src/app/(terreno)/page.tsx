@@ -66,8 +66,8 @@ export default function TerrenoHomePage() {
           misionId={ultimaMisionAsignada.misionId}
           urlDetalle={
             esPatrulla
-              ? `/terreno/patrulla/misiones/${ultimaMisionAsignada.misionId}`
-              : `/terreno/cuadrilla/misiones/${ultimaMisionAsignada.misionId}`
+              ? `/patrulla/misiones/${ultimaMisionAsignada.misionId}`
+              : `/cuadrilla/misiones/${ultimaMisionAsignada.misionId}`
           }
           alCerrar={descartarUltimaMision}
         />

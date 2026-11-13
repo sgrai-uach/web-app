@@ -23,7 +23,7 @@ export const NuevaMisionBanner: React.FC<NuevaMisionBannerProps> = ({
   const router = useRouter();
 
   const destino =
-    urlDetalle || (misionId ? `/terreno/patrulla/misiones/${misionId}` : undefined);
+    urlDetalle || (misionId ? `/patrulla/misiones/${misionId}` : undefined);
 
   const handleVerMision = () => {
     if (destino) {

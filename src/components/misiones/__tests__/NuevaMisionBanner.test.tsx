@@ -33,14 +33,30 @@ describe('NuevaMisionBanner (H35 — Alerta Visual de Asignación)', () => {
       <NuevaMisionBanner
         codigoMision="INC-2026-0042"
         misionId="mis-42"
-        urlDetalle="/terreno/patrulla/misiones/mis-42"
+        urlDetalle="/patrulla/misiones/mis-42"
         alCerrar={alCerrar}
       />
     );
 
     fireEvent.click(screen.getByRole('button', { name: /ver misión asignada/i }));
 
-    expect(mockPush).toHaveBeenCalledWith('/terreno/patrulla/misiones/mis-42');
+    expect(mockPush).toHaveBeenCalledWith('/patrulla/misiones/mis-42');
+    expect(alCerrar).toHaveBeenCalledTimes(1);
+  });
+
+  it('navega a la ruta relativa por defecto /patrulla/misiones/{id} cuando no se especifica urlDetalle', () => {
+    const alCerrar = vi.fn();
+    render(
+      <NuevaMisionBanner
+        codigoMision="INC-2026-0042"
+        misionId="mis-42"
+        alCerrar={alCerrar}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /ver misión asignada/i }));
+
+    expect(mockPush).toHaveBeenCalledWith('/patrulla/misiones/mis-42');
     expect(alCerrar).toHaveBeenCalledTimes(1);
   });
 
