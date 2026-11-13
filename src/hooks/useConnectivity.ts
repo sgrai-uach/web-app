@@ -61,19 +61,59 @@ export function useConnectivity() {
         // Códigos 2xx o 409/422 que indiquen que el recurso ya fue procesado / idempotente
         const procesada = res.ok || res.status === 409 || res.status === 422;
 
-        if (procesada && accion.tipo === 'ACEPTAR_MISION') {
+        if (accion.tipo === 'ACEPTAR_MISION') {
           const match = accion.url.match(/\/api\/misiones\/([^/]+)\/aceptar/);
           const misionId = match?.[1];
           if (misionId) {
             try {
               const local = await obtenerMisionLocalPorId(misionId);
               if (local) {
-                let fechaInicioServidor = local.fechaInicio || new Date().toISOString();
+                // Idempotencia HU-36: Si el servidor retorna 200 o 409 (ya aceptada), consolidar EN_CURSO
+                if (res.ok || res.status === 409) {
+                  let fechaInicioServidor = local.fechaInicio || new Date().toISOString();
+                  if (res.ok) {
+                    try {
+                      const bodyJson = await res.clone().json();
+                      if (bodyJson?.data?.mision?.fechaInicio) {
+                        fechaInicioServidor = bodyJson.data.mision.fechaInicio;
+                      }
+                    } catch {
+                      // Ignorar si la respuesta no contiene JSON
+                    }
+                  }
+                  await guardarMisionLocal({
+                    ...local,
+                    estado: 'EN_CURSO',
+                    fechaInicio: fechaInicioServidor,
+                    sincronizacionPendiente: false,
+                    actualizadoEn: new Date().toISOString(),
+                  });
+                } else if (res.status === 422) {
+                  // Estado no procesable: quitar marca pendiente para evitar loop en outbox
+                  await guardarMisionLocal({
+                    ...local,
+                    sincronizacionPendiente: false,
+                    actualizadoEn: new Date().toISOString(),
+                  });
+                }
+              }
+            } catch {
+              // Ignorar fallos de lectura/escritura secundaria en IndexedDB
+            }
+          }
+        } else if (accion.tipo === 'RECHAZAR_MISION') {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/rechazar/);
+          const misionId = match?.[1];
+          if (misionId) {
+            try {
+              const local = await obtenerMisionLocalPorId(misionId);
+              if (local) {
+                let actualizadoServidor = local.actualizadoEn || new Date().toISOString();
                 if (res.ok) {
                   try {
                     const bodyJson = await res.clone().json();
-                    if (bodyJson?.data?.mision?.fechaInicio) {
-                      fechaInicioServidor = bodyJson.data.mision.fechaInicio;
+                    if (bodyJson?.data?.mision?.actualizadoEn) {
+                      actualizadoServidor = bodyJson.data.mision.actualizadoEn;
                     }
                   } catch {
                     // Ignorar si la respuesta no contiene JSON
@@ -81,10 +121,9 @@ export function useConnectivity() {
                 }
                 await guardarMisionLocal({
                   ...local,
-                  estado: 'EN_CURSO',
-                  fechaInicio: fechaInicioServidor,
+                  estado: res.status === 422 ? local.estado : 'RECHAZADA',
                   sincronizacionPendiente: false,
-                  actualizadoEn: new Date().toISOString(),
+                  actualizadoEn: actualizadoServidor,
                 });
               }
             } catch {
@@ -98,6 +137,7 @@ export function useConnectivity() {
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('sgrai:outbox-synced'));
+        window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
       }
     } catch (err) {
       console.warn('[OfflineQueue] Error durante la sincronización:', err);
