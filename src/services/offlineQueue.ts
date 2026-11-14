@@ -74,6 +74,17 @@ export async function guardarMisionesLocales(misiones: MisionLocal[]): Promise<v
   await tx.done;
 }
 
+export async function limpiarMisionesLocales(): Promise<void> {
+  const db = await getDB();
+  await db.clear('misiones');
+}
+
+export async function limpiarAlmacenamientoOffline(): Promise<void> {
+  const db = await getDB();
+  await db.clear('misiones');
+  await db.clear('outbox');
+}
+
 export async function guardarMisionLocal(mision: MisionLocal): Promise<void> {
   const db = await getDB();
   await db.put('misiones', mision);
