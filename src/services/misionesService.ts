@@ -1,5 +1,4 @@
-import apiClient, { DEV_PATRULLA_TOKEN } from '@/lib/api/client';
-import { getAuthCookie } from '@/lib/utils/cookieUtils';
+import apiClient from '@/lib/api/client';
 import type { paths } from '@/types/api-generated';
 import type { AceptarMisionPayload, MisionLocal } from '@/types/offline';
 import {
@@ -159,24 +158,41 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
     });
 
     if (!error && data && Array.isArray(data.data)) {
-      const remotas: MisionLocal[] = data.data.map((item: MisionApiItem) => ({
-        id: item.id,
-        incidenteId: item.incidenteId || '',
-        codigoIncidente: item.incidenteCodigo || item.codigo,
-        tipologia: limpiarTituloMision(item.titulo),
-        direccion:
-          item.descripcion ||
-          (item.delegacionNombre ? `Sector ${item.delegacionNombre}` : 'Valdivia'),
-        prioridad: item.prioridad,
-        estado: item.estado,
-        fechaDespacho: item.fechaInicio || item.creadoEn,
-        fechaInicio: item.fechaInicio || null,
-        datosAdicionales: {
+      const localesPrevias = (await obtenerMisionesLocales()) || [];
+      const mapaLocales = new Map(localesPrevias.map((m) => [m.id, m]));
+
+      const remotas: MisionLocal[] = data.data.map((item: MisionApiItem) => {
+        const previa = mapaLocales.get(item.id);
+        const mantenerOptimista = Boolean(
+          previa?.sincronizacionPendiente && item.estado === 'DESPACHADA'
+        );
+
+        const baseDatosAdicionales = {
           trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
           titulo: item.titulo,
-        },
-        actualizadoEn: item.actualizadoEn,
-      }));
+        };
+
+        return {
+          id: item.id,
+          incidenteId: item.incidenteId || '',
+          codigoIncidente: item.incidenteCodigo || item.codigo,
+          tipologia: limpiarTituloMision(item.titulo),
+          direccion:
+            item.descripcion ||
+            (item.delegacionNombre ? `Sector ${item.delegacionNombre}` : 'Valdivia'),
+          prioridad: item.prioridad,
+          estado: mantenerOptimista && previa ? previa.estado : item.estado,
+          fechaDespacho: item.fechaInicio || item.creadoEn,
+          fechaInicio:
+            mantenerOptimista && previa ? previa.fechaInicio : item.fechaInicio || null,
+          sincronizacionPendiente: mantenerOptimista,
+          datosAdicionales:
+            mantenerOptimista && previa?.datosAdicionales
+              ? { ...baseDatosAdicionales, ...previa.datosAdicionales }
+              : baseDatosAdicionales,
+          actualizadoEn: item.actualizadoEn,
+        };
+      });
 
       await limpiarMisionesLocales();
       if (remotas.length > 0) {
@@ -188,7 +204,7 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
     // Modo sin conexión o falla de red: continuar con almacenamiento local
   }
 
-  return obtenerMisionesLocales();
+  return (await obtenerMisionesLocales()) || [];
 }
 
 /**
@@ -206,6 +222,21 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
 
     if (!error && data && data.data) {
       const d: MisionDetalleApi = data.data;
+      const previa = await obtenerMisionLocalPorId(d.id);
+      const mantenerOptimista = Boolean(
+        previa?.sincronizacionPendiente && d.estado === 'DESPACHADA'
+      );
+
+      const datosRemotos = {
+        trabajo:
+          d.descripcion ||
+          d.incidente?.descripcion ||
+          'Sin instrucciones adicionales especificadas.',
+        titulo: d.titulo,
+        estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION',
+        estadoIncidente: d.incidente?.estado || 'VERIFICANDO',
+      };
+
       const misionLocal: MisionLocal = {
         id: d.id,
         incidenteId: d.incidente?.id || '',
@@ -219,19 +250,15 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
             ? { lat: d.incidente.latitud, lng: d.incidente.longitud }
             : undefined,
         prioridad: d.prioridad,
-        estado: d.estado,
+        estado: mantenerOptimista && previa ? previa.estado : d.estado,
         fechaDespacho: d.fechaInicio || d.creadoEn,
-        fechaInicio: d.fechaInicio || null,
-        sincronizacionPendiente: false,
-        datosAdicionales: {
-          trabajo:
-            d.descripcion ||
-            d.incidente?.descripcion ||
-            'Sin instrucciones adicionales especificadas.',
-          titulo: d.titulo,
-          estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION',
-          estadoIncidente: d.incidente?.estado || 'VERIFICANDO',
-        },
+        fechaInicio:
+          mantenerOptimista && previa ? previa.fechaInicio : d.fechaInicio || null,
+        sincronizacionPendiente: mantenerOptimista,
+        datosAdicionales:
+          mantenerOptimista && previa?.datosAdicionales
+            ? { ...datosRemotos, ...previa.datosAdicionales }
+            : datosRemotos,
         actualizadoEn: d.actualizadoEn,
       };
 
@@ -327,7 +354,22 @@ export async function aceptarMisionPatrulla(
       const status = response?.status ?? 500;
 
       // Regla de idempotencia HU-36: 409 Conflict indica que la misión ya estaba EN_CURSO
+      // únicamente cuando el mensaje del servidor confirma dicho estado
       if (status === 409) {
+        const msgConflict = (error as { message?: string } | undefined)?.message || '';
+        if (!/EN_CURSO/i.test(msgConflict)) {
+          try {
+            await obtenerDetalleMision(misionId);
+          } catch {
+            // Ignorar fallo secundario al sincronizar estado real
+          }
+          throw new MisionServiceError(
+            409,
+            msgConflict ||
+              'La misión no puede ser aceptada porque ya no se encuentra en estado DESPACHADA.'
+          );
+        }
+
         const ahoraIso = new Date().toISOString();
         const misionIdempotente: MisionLocal = {
           ...misionBase,
@@ -353,46 +395,23 @@ export async function aceptarMisionPatrulla(
         };
       }
 
-      // Si se está probando en modo de demostración local (DEV_PATRULLA_TOKEN) y la BD local
-      // de sgrai-api aún no tiene cargado el seed con el usuario/misión de prueba, completar la transición local
-      const tokenActual = typeof window !== 'undefined' ? getAuthCookie() : null;
-      const esModoDemoLocal =
-        Boolean(tokenActual) && tokenActual === (DEV_PATRULLA_TOKEN || 'dev-patrulla-token');
-      if (esModoDemoLocal && (status === 401 || status === 403 || status === 404)) {
-        const ahoraDemoIso = new Date().toISOString();
-        const misionDemo: MisionLocal = {
-          ...misionBase,
-          estado: 'EN_CURSO',
-          fechaInicio: misionBase.fechaInicio || ahoraDemoIso,
-          sincronizacionPendiente: false,
-          datosAdicionales: {
-            ...(misionBase.datosAdicionales || {}),
-            estadoPatrulla: 'EN_VERIFICACION',
-            estadoIncidente: 'VERIFICANDO',
-            hitoAceptacion: 'Misión Aceptada por Patrulla',
-          },
-          actualizadoEn: ahoraDemoIso,
-        };
-
-        await guardarMisionLocal(misionDemo);
-
-        return {
-          mision: misionDemo,
-          enColaOffline: false,
-          mensaje:
-            'Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación.',
-        };
-      }
-
-      // Errores de autorización o validación (400, 401, 403, 404) no se encolan en outbox
-      if (status === 400 || status === 401 || status === 403 || status === 404) {
+      // Errores de autorización o validación (400, 401, 403, 404, 422) no se encolan en outbox
+      if (
+        status === 400 ||
+        status === 401 ||
+        status === 403 ||
+        status === 404 ||
+        status === 422
+      ) {
         const msgError =
           (error as { message?: string } | undefined)?.message ||
-          (status === 403
-            ? 'No cuenta con permisos para aceptar esta misión.'
-            : status === 404
-              ? 'La misión solicitada no fue encontrada.'
-              : 'No fue posible procesar la aceptación de la misión.');
+          (status === 401
+            ? 'Sesión expirada o no autenticada.'
+            : status === 403
+              ? 'No cuenta con permisos para aceptar esta misión.'
+              : status === 404
+                ? 'La misión solicitada no fue encontrada.'
+                : 'No fue posible procesar la aceptación de la misión.');
         throw new MisionServiceError(status, msgError);
       }
     } catch (err) {

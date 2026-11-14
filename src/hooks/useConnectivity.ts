@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   contarAccionesPendientes,
   sincronizarColaOutbox,
   obtenerMisionLocalPorId,
   guardarMisionLocal,
 } from '@/services/offlineQueue';
+import { obtenerDetalleMision } from '@/services/misionesService';
 import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
-import { DEV_PATRULLA_TOKEN, DEV_PATRULLA_USER_ID } from '@/lib/api/client';
 
 export function useConnectivity() {
   const [online, setOnline] = useState<boolean>(() => {
@@ -20,19 +20,27 @@ export function useConnectivity() {
   });
   const [sincronizando, setSincronizando] = useState<boolean>(false);
   const [pendientes, setPendientes] = useState<number>(0);
+  const sincronizandoRef = useRef<boolean>(false);
 
-  const actualizarPendientes = useCallback(async () => {
+  const actualizarPendientes = useCallback(async (): Promise<number> => {
     try {
       const total = await contarAccionesPendientes();
       setPendientes(total);
+      return total;
     } catch {
-      // Ignorar si IndexedDB no está disponible en este momento
+      return 0;
     }
   }, []);
 
   const sincronizar = useCallback(async () => {
-    if (!navigator.onLine || sincronizando) return;
+    if (
+      (typeof navigator !== 'undefined' && !navigator.onLine) ||
+      sincronizandoRef.current
+    ) {
+      return;
+    }
 
+    sincronizandoRef.current = true;
     setSincronizando(true);
     try {
       const token = getAuthCookie();
@@ -42,12 +50,9 @@ export function useConnectivity() {
           : process.env.NEXT_PUBLIC_API_URL || '';
 
       await sincronizarColaOutbox(async (accion) => {
-        const authHeaders: Record<string, string> =
-          token === DEV_PATRULLA_TOKEN
-            ? { 'x-user-id': DEV_PATRULLA_USER_ID }
-            : token
-              ? { Authorization: `Bearer ${token}` }
-              : {};
+        const authHeaders: Record<string, string> = token
+          ? { Authorization: `Bearer ${token}` }
+          : {};
 
         const res = await fetch(`${apiUrl}${accion.url}`, {
           method: accion.metodo,
@@ -58,25 +63,52 @@ export function useConnectivity() {
           body: JSON.stringify(accion.payload),
         });
 
-        // Códigos 2xx o 409/422 que indiquen que el recurso ya fue procesado / idempotente
-        const procesada = res.ok || res.status === 409 || res.status === 422;
+        const esExito = res.ok;
+        let esIdempotenteEnCurso = false;
+        let esConflictoTerminal = false;
 
-        if (procesada && accion.tipo === 'ACEPTAR_MISION') {
+        if (res.status === 409) {
+          try {
+            const errJson = await res.clone().json();
+            const msg = typeof errJson?.message === 'string' ? errJson.message : '';
+            if (/EN_CURSO/i.test(msg)) {
+              esIdempotenteEnCurso = true;
+            } else {
+              esConflictoTerminal = true;
+            }
+          } catch {
+            esConflictoTerminal = true;
+          }
+        }
+
+        const esErrorIrrecuperable =
+          res.status === 400 ||
+          res.status === 403 ||
+          res.status === 404 ||
+          res.status === 422;
+
+        const procesada =
+          esExito || esIdempotenteEnCurso || esConflictoTerminal || esErrorIrrecuperable;
+
+        if (accion.tipo === 'ACEPTAR_MISION') {
           const match = accion.url.match(/\/api\/misiones\/([^/]+)\/aceptar/);
           const misionId = match?.[1];
           if (misionId) {
-            try {
-              const local = await obtenerMisionLocalPorId(misionId);
-              if (local) {
-                if (res.ok) {
-                  let fechaInicioServidor = local.fechaInicio || new Date().toISOString();
-                  try {
-                    const bodyJson = await res.clone().json();
-                    if (bodyJson?.data?.mision?.fechaInicio) {
-                      fechaInicioServidor = bodyJson.data.mision.fechaInicio;
+            if (esExito || esIdempotenteEnCurso) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  let fechaInicioServidor =
+                    local.fechaInicio || new Date().toISOString();
+                  if (esExito) {
+                    try {
+                      const bodyJson = await res.clone().json();
+                      if (bodyJson?.data?.mision?.fechaInicio) {
+                        fechaInicioServidor = bodyJson.data.mision.fechaInicio;
+                      }
+                    } catch {
+                      // Ignorar si la respuesta no contiene JSON
                     }
-                  } catch {
-                    // Ignorar si la respuesta no contiene JSON
                   }
                   await guardarMisionLocal({
                     ...local,
@@ -85,18 +117,24 @@ export function useConnectivity() {
                     sincronizacionPendiente: false,
                     actualizadoEn: new Date().toISOString(),
                   });
-                } else {
-                  // Conflicto o rechazo por backend (409/422, patrulla desactivada o misión reasignada).
-                  // Se limpia sincronizacionPendiente para no trabar la cola, pero no se promueve falsamente a EN_CURSO.
+                }
+              } catch {
+                // Ignorar fallos de lectura/escritura secundaria en IndexedDB
+              }
+            } else if (esConflictoTerminal || esErrorIrrecuperable) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
                   await guardarMisionLocal({
                     ...local,
                     sincronizacionPendiente: false,
                     actualizadoEn: new Date().toISOString(),
                   });
                 }
+                await obtenerDetalleMision(misionId);
+              } catch {
+                // Ignorar fallos al refrescar estado real
               }
-            } catch {
-              // Ignorar fallos de lectura/escritura secundaria en IndexedDB
             }
           }
         }
@@ -111,29 +149,42 @@ export function useConnectivity() {
       console.warn('[OfflineQueue] Error durante la sincronización:', err);
     } finally {
       await actualizarPendientes();
+      sincronizandoRef.current = false;
       setSincronizando(false);
     }
-  }, [sincronizando, actualizarPendientes]);
+  }, [actualizarPendientes]);
 
   useEffect(() => {
-    actualizarPendientes();
+    const verificarYSincronizar = async () => {
+      const total = await actualizarPendientes();
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator.onLine &&
+        total > 0 &&
+        !sincronizandoRef.current
+      ) {
+        await sincronizar();
+      }
+    };
+
+    void verificarYSincronizar();
 
     const handleOnline = () => {
       setOnline(true);
-      sincronizar();
+      void sincronizar();
     };
 
     const handleOffline = () => {
       setOnline(false);
-      actualizarPendientes();
+      void actualizarPendientes();
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Revisar periódicamente el outbox si hay mutaciones
+    // Revisar periódicamente el outbox y sincronizar si hay conexión activa y pendientes
     const interval = setInterval(() => {
-      actualizarPendientes();
+      void verificarYSincronizar();
     }, 15000);
 
     return () => {
@@ -148,6 +199,8 @@ export function useConnectivity() {
     status = 'syncing';
   } else if (!online) {
     status = 'offline';
+  } else if (pendientes > 0) {
+    status = 'syncing';
   }
 
   return {

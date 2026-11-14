@@ -2,9 +2,6 @@ import createClient from 'openapi-fetch';
 import type { paths } from '@/types/api-generated';
 import { getAuthCookie, removeAuthCookie } from '@/lib/utils/cookieUtils';
 
-export const DEV_PATRULLA_TOKEN = 'dev-patrulla-token';
-export const DEV_PATRULLA_USER_ID = '00000000-0000-4000-8000-000000000004';
-
 function extractUserIdFromJwt(token: string): string | null {
   try {
     const parts = token.split('.');
@@ -27,9 +24,6 @@ function extractUserIdFromJwt(token: string): string | null {
 export function handleUnauthorizedSession() {
   if (typeof window === 'undefined') return;
   const currentToken = getAuthCookie();
-  // Si está usando la sesión local de demostración en terreno, no destruir la sesión
-  if (currentToken === DEV_PATRULLA_TOKEN) return;
-
   const hadToken = Boolean(currentToken);
   removeAuthCookie();
 
@@ -44,9 +38,11 @@ export function handleUnauthorizedSession() {
         ? '/terreno/login'
         : '/login';
       try {
-        window.location.assign(
-          `${loginPath}?motivo=sesion_expirada&returnUrl=${returnUrl}`
-        );
+        const loginUrl = new URL(
+          `${loginPath}?motivo=sesion_expirada&returnUrl=${returnUrl}`,
+          window.location.origin
+        ).toString();
+        window.location.assign(loginUrl);
       } catch {
         // Ignorar excepciones en entornos jsdom
       }
@@ -68,12 +64,6 @@ const apiClient = createClient<paths>({
 apiClient.use({
   async onRequest({ request }) {
     const token = getAuthCookie();
-    if (token === DEV_PATRULLA_TOKEN) {
-      request.headers.set('x-user-id', DEV_PATRULLA_USER_ID);
-      request.headers.delete('Authorization');
-      return request;
-    }
-
     if (token) {
       request.headers.set('Authorization', `Bearer ${token}`);
       const userId = extractUserIdFromJwt(token);

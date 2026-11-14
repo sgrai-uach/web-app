@@ -33,4 +33,3 @@ export interface HistorialUnidadOperador {
   estadoAlMomento: 'ACTIVA' | 'DESACTIVADA';
   delegacion?: string | null;
 }
-
