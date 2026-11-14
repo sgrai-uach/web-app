@@ -1689,19 +1689,16 @@ export interface paths {
                                 delegacionNombre: string | null;
                                 /** @description Cantidad de misiones tácticas despachadas o generadas para este incidente */
                                 totalMisiones: number;
-                                /** @description Indica si el incidente posee una misión en estado PLANIFICADA o DESPACHADA pendiente de confirmación en terreno */
-                                tieneMisionDespachada?: boolean;
-                                /** @description Indica si el incidente posee una misión en estado EN_CURSO activa en terreno */
-                                tieneMisionEnCurso?: boolean;
+                                /**
+                                 * @description Último estado de trazabilidad de notificación de misión asociado al incidente (HU-35)
+                                 * @enum {string}
+                                 */
+                                trazabilidadNotificacion?: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
                                 /**
                                  * @description Indica si la patrulla verificadora completó el diagnóstico técnico en terreno
                                  * @default false
                                  */
                                 verificado: boolean;
-                                /** @description Indica si el incidente fue verificado o reclasificado en terreno */
-                                reclasificadoEnTerreno?: boolean;
-                                /** @description Motivo o justificación técnica de la evaluación en terreno */
-                                justificacionReclasificacion?: string | null;
                                 /** @description Fecha y hora de registro en formato ISO 8601 */
                                 creadoEn: string;
                                 /** @description Última fecha y hora de actualización en formato ISO 8601 */
@@ -1880,6 +1877,11 @@ export interface paths {
                                     prioridad: string;
                                     /** @description Justificación en caso de rechazo por la cuadrilla */
                                     justificacionRechazo: string | null;
+                                    /**
+                                     * @description Estado actual de entrega y lectura de la notificación de esta misión (HU-35)
+                                     * @enum {string}
+                                     */
+                                    trazabilidadNotificacion?: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
                                     /** @description Patrulla verificadora asignada */
                                     patrulla: {
                                         /** Format: uuid */
@@ -1919,18 +1921,6 @@ export interface paths {
                                     /** @description Nombre de la cuadrilla que tiene asignado el recurso */
                                     cuadrillaNombre: string | null;
                                 }[];
-                                /**
-                                 * @description Indica si la verificación presencial fue completada
-                                 * @default false
-                                 */
-                                verificado: boolean;
-                                /**
-                                 * @description Indica si fue verificado o reclasificado en terreno
-                                 * @default false
-                                 */
-                                reclasificadoEnTerreno: boolean;
-                                /** @description Justificación técnica en terreno */
-                                justificacionReclasificacion?: string | null;
                                 creadoEn: string;
                                 actualizadoEn: string;
                             };
@@ -1980,100 +1970,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/api/incidentes/{id}/tipologia": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Reclasificar tipología de incidente en terreno (HU-37)
-         * @description Permite a la patrulla verificadora reclasificar técnicamente la tipología del incidente tras la evaluación presencial en terreno, corrigiendo tipificaciones ciudadanas inexactas. Requiere que la misión asignada haya sido aceptada previamente (estado EN_CURSO) y justificación obligatoria del cambio. Actualiza atómicamente incidente.tipo_incidente_id y sincroniza incidente.tipo_afectacion, registra el hito en mision_hito ('Tipología reclasificada en terreno a: [Nombre del Tipo]. Justificación: [Motivo]') y emite el evento WebSocket 'incidente:actualizado' a la sala 'sala:encargados'. Requiere el permiso RBAC 'misiones:terreno:verificar'.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: {
-                    /** @description Token Bearer JWT de la patrulla verificadora */
-                    authorization?: string;
-                    /** @description ID de usuario para entornos de prueba */
-                    "x-user-id"?: string;
-                };
-                path: {
-                    /** @description Identificador UUID del incidente */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Datos requeridos para la reclasificación: nuevo tipo de incidente y justificación técnica */
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["ReclasificarTipologiaInput"];
-                };
-            };
-            responses: {
-                /** @description Tipología del incidente reclasificada exitosamente en terreno */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ReclasificarTipologiaResponse"];
-                    };
-                };
-                /** @description Datos de entrada inválidos o tipo de incidente inactivo */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description No autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description No autorizado / falta permiso misiones:terreno:verificar o pertenece a otra patrulla */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Incidente, tipo de incidente o misión no encontrados */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Conflicto: la misión no ha sido aceptada todavía (debe encontrarse en estado EN_CURSO) */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Error interno del servidor */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
         trace?: never;
     };
     "/api/personal": {
@@ -2449,6 +2345,100 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/incidentes/{id}/tipologia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Reclasificar tipología de incidente en terreno (HU-37)
+         * @description Permite a la patrulla verificadora reclasificar técnicamente la tipología del incidente tras la evaluación presencial en terreno, corrigiendo tipificaciones ciudadanas inexactas. Requiere que la misión asignada haya sido aceptada previamente (estado EN_CURSO) y justificación obligatoria del cambio. Actualiza atómicamente incidente.tipo_incidente_id y sincroniza incidente.tipo_afectacion, registra el hito en mision_hito ('Tipología reclasificada en terreno a: [Nombre del Tipo]. Justificación: [Motivo]') y emite el evento WebSocket 'incidente:actualizado' a la sala 'sala:encargados'. Requiere el permiso RBAC 'misiones:terreno:verificar'.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Token Bearer JWT de la patrulla verificadora */
+                    authorization?: string;
+                    /** @description ID de usuario para entornos de prueba */
+                    "x-user-id"?: string;
+                };
+                path: {
+                    /** @description Identificador UUID del incidente */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Datos requeridos para la reclasificación: nuevo tipo de incidente y justificación técnica */
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ReclasificarTipologiaInput"];
+                };
+            };
+            responses: {
+                /** @description Tipología del incidente reclasificada exitosamente en terreno */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReclasificarTipologiaResponse"];
+                    };
+                };
+                /** @description Datos de entrada inválidos o tipo de incidente inactivo */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autorizado / falta permiso misiones:terreno:verificar o pertenece a otra patrulla */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Incidente, tipo de incidente o misión no encontrados */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto: la misión no ha sido aceptada todavía (debe encontrarse en estado EN_CURSO) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         trace?: never;
     };
     "/api/personal/{id}": {
@@ -3308,6 +3298,11 @@ export interface paths {
                                 /** @description Justificación si la misión fue rechazada */
                                 justificacionRechazo?: string | null;
                                 /**
+                                 * @description Estado actual de entrega y lectura de la notificación de esta misión (HU-35)
+                                 * @enum {string}
+                                 */
+                                trazabilidadNotificacion?: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
+                                /**
                                  * Format: uuid
                                  * @description UUID de incidente asociado si aplica
                                  */
@@ -3378,11 +3373,16 @@ export interface paths {
         post: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description Token Bearer JWT de sesión */
+                    authorization?: string;
+                    /** @description UUID del usuario autenticado (entorno pruebas) */
+                    "x-user-id"?: string;
+                };
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: {
+            requestBody: {
                 content: {
                     "application/json": components["schemas"]["CrearMisionVerificacionInput"];
                 };
@@ -3402,136 +3402,54 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["MensajeGenericoResponse"];
+                    };
                 };
                 /** @description No autenticado o token ausente */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["MensajeGenericoResponse"];
+                    };
                 };
                 /** @description Acceso denegado. Se requiere permiso 'misiones:asignar'. */
                 403: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["MensajeGenericoResponse"];
+                    };
                 };
                 /** @description Incidente o patrulla no encontrado */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["MensajeGenericoResponse"];
+                    };
                 };
                 /** @description Conflicto: la patrulla seleccionada ya no se encuentra DISPONIBLE o el incidente no está en estado REPORTADO */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["MensajeGenericoResponse"];
+                    };
                 };
                 /** @description Error interno del servidor al crear y despachar la misión */
                 500: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/misiones/{id}/aceptar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Confirmar y aceptar misión asignada desde terreno (HU-36)
-         * @description Permite a la patrulla verificadora confirmar y aceptar la misión asignada desde su dispositivo móvil (PWA). Ejecuta una transición atómica actualizando mision.estado de DESPACHADA a EN_CURSO, fijando mision.fecha_inicio = CURRENT_TIMESTAMP y registrando el hito 'Misión Aceptada por Patrulla' (código 'MISION_ACEPTADA') en mision_hito. Mantiene patrulla_verificadora.estado en EN_VERIFICACION e incidente.estado en VERIFICANDO, y emite el evento WebSocket 'mision:actualizada' hacia la sala 'encargado'. Requiere el permiso RBAC 'misiones:terreno:verificar'.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: {
-                    /** @description Token Bearer JWT de sesión de la patrulla verificadora */
-                    authorization?: string;
-                    /** @description UUID del usuario autenticado con permiso misiones:terreno:verificar */
-                    "x-user-id"?: string;
-                };
-                path: {
-                    /** @description Identificador único UUID de la misión */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Coordenadas GPS opcionales al momento de confirmar la salida en la PWA */
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["AceptarMisionInput"];
-                };
-            };
-            responses: {
-                /** @description Misión aceptada exitosamente y hito registrado en bitácora */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
                     content: {
-                        "application/json": components["schemas"]["AceptarMisionResponse"];
+                        "application/json": components["schemas"]["MensajeGenericoResponse"];
                     };
-                };
-                /** @description El identificador de la misión no es un UUID válido o las coordenadas son inválidas */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description No autenticado o token de sesión inválido/expirado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Acceso denegado. Se requiere el permiso 'misiones:terreno:verificar' y pertenecer a la patrulla asignada */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description No se encontró ninguna misión con el identificador proporcionado */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Conflicto de estado: la misión no se encuentra en estado 'DESPACHADA' (ej. ya fue aceptada o cancelada) */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Error interno del servidor */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
                 };
             };
         };
@@ -3607,7 +3525,12 @@ export interface paths {
                                 prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
                                 /** @description Motivo documentado en caso de rechazo por la cuadrilla */
                                 justificacionRechazo: string | null;
-                                /** @description Fecha y hora de despliegue o inicio en terreno (ISO 8601) */
+                                /**
+                                 * @description Estado actual de entrega y lectura de la notificación de esta misión (HU-35)
+                                 * @enum {string}
+                                 */
+                                trazabilidadNotificacion?: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
+                                /** @description Fecha de inicio de trabajos en terreno (ISO 8601) */
                                 fechaInicio: string | null;
                                 /** @description Fecha y hora de cierre formal de la misión (ISO 8601) */
                                 fechaCierre: string | null;
@@ -3882,6 +3805,100 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/misiones/{id}/aceptar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirmar y aceptar misión asignada desde terreno (HU-36)
+         * @description Permite a la patrulla verificadora confirmar y aceptar la misión asignada desde su dispositivo móvil (PWA). Ejecuta una transición atómica actualizando mision.estado de DESPACHADA a EN_CURSO, fijando mision.fecha_inicio = CURRENT_TIMESTAMP y registrando el hito 'Misión Aceptada por Patrulla' (código 'MISION_ACEPTADA') en mision_hito. Mantiene patrulla_verificadora.estado en EN_VERIFICACION e incidente.estado en VERIFICANDO, y emite el evento WebSocket 'mision:actualizada' hacia la sala 'encargado'. Requiere el permiso RBAC 'misiones:terreno:verificar'.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Token Bearer JWT de sesión de la patrulla verificadora */
+                    authorization?: string;
+                    /** @description UUID del usuario autenticado con permiso misiones:terreno:verificar */
+                    "x-user-id"?: string;
+                };
+                path: {
+                    /** @description Identificador único UUID de la misión */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Coordenadas GPS opcionales al momento de confirmar la salida en la PWA */
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AceptarMisionInput"];
+                };
+            };
+            responses: {
+                /** @description Misión aceptada exitosamente y hito registrado en bitácora */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AceptarMisionResponse"];
+                    };
+                };
+                /** @description El identificador de la misión no es un UUID válido o las coordenadas son inválidas */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token de sesión inválido/expirado */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere el permiso 'misiones:terreno:verificar' y pertenecer a la patrulla asignada */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No se encontró ninguna misión con el identificador proporcionado */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto de estado: la misión no se encuentra en estado 'DESPACHADA' (ej. ya fue aceptada o cancelada) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -7374,7 +7391,12 @@ export interface paths {
         get: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description Token Bearer JWT de sesión */
+                    authorization?: string;
+                    /** @description UUID del usuario autenticado (entorno pruebas) */
+                    "x-user-id"?: string;
+                };
                 path: {
                     id: string;
                 };
@@ -7687,7 +7709,12 @@ export interface paths {
         delete: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description Token Bearer JWT de sesión */
+                    authorization?: string;
+                    /** @description UUID del usuario autenticado (entorno pruebas) */
+                    "x-user-id"?: string;
+                };
                 path: {
                     id: string;
                 };
@@ -7730,37 +7757,182 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["MensajeGenericoResponse"];
+                    };
                 };
                 /** @description No autenticado o token inválido */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["MensajeGenericoResponse"];
+                    };
                 };
                 /** @description Acceso denegado. Se requiere permiso 'cuadrillas:eliminar' o rol Administrador */
                 403: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["MensajeGenericoResponse"];
+                    };
                 };
                 /** @description Cuadrilla operativa no encontrada o ya desactivada */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["MensajeGenericoResponse"];
+                    };
                 };
                 /** @description Conflicto: la cuadrilla se encuentra en misión activa o posee misiones en curso */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["MensajeGenericoResponse"];
+                    };
                 };
                 /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MensajeGenericoResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terreno/notificaciones/{id}/estado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Confirmar acuse de recibo o lectura de notificación de misión (HU-35)
+         * @description Registra de forma idempotente la confirmación técnica automática ('RECIBIDA') o la interacción operativa ('LEIDA') emitida por sgrai-pwa. Emite el evento WebSocket 'notificacion:trazabilidad_actualizada' hacia la Central de Operaciones. Requiere permiso 'misiones:terreno:verificar' y pertenencia a la patrulla destinataria (salvo rol Administrador).
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identificador único UUID de la notificación de despacho */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Nuevo estado de confirmación reportado por el cliente de terreno
+                         * @example RECIBIDA
+                         * @enum {string}
+                         */
+                        estado: "RECIBIDA" | "LEIDA";
+                    };
+                };
+            };
+            responses: {
+                /** @description Estado de notificación actualizado exitosamente de forma idempotente */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Estado de notificación actualizado exitosamente. */
+                            message: string;
+                            /**
+                             * NotificacionMisionDetalle
+                             * @description Trazabilidad completa de la notificación de misión despachada
+                             */
+                            data: {
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador único de la notificación
+                                 */
+                                id: string;
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador de la misión asociada
+                                 */
+                                misionId: string;
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador de la patrulla destinataria
+                                 */
+                                patrullaId: string;
+                                /**
+                                 * @description Estado actual del ciclo de vida de la notificación
+                                 * @enum {string}
+                                 */
+                                estado: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
+                                /**
+                                 * @description Contador de emisiones hacia la patrulla
+                                 * @example 1
+                                 */
+                                intentosEnvio: number;
+                                /** @description Marca temporal UTC de registro en base de datos */
+                                creadaAt: string;
+                                /** @description Marca temporal UTC de emisión hacia la sala de la patrulla */
+                                enviadaAt: string | null;
+                                /** @description Marca temporal UTC del acuse de recibo técnico automático */
+                                recibidaAt: string | null;
+                                /** @description Marca temporal UTC del acuse de lectura operativa */
+                                leidaAt: string | null;
+                            };
+                        };
+                    };
+                };
+                /** @description Identificador no es UUID válido o cuerpo con estado distinto a 'RECIBIDA' o 'LEIDA' */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token ausente */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'misiones:terreno:verificar' y pertenecer a la patrulla asignada */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Notificación no encontrada */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor al actualizar acuse de notificación */
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -7769,6 +7941,150 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/terreno/misiones/pendientes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Consultar órdenes de misión pendientes de acuse para terreno (HU-35)
+         * @description Consulta las misiones asignadas a la patrulla del usuario autenticado cuyas notificaciones se encuentran en 'PENDIENTE_ENVIO' o 'ENVIADA'. Utilizado por sgrai-pwa al recuperar conectividad tras operar fuera de cobertura (Arquitectura Offline-First). Requiere permiso 'misiones:terreno:verificar'.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    patrullaId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Listado de misiones pendientes obtenido exitosamente */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Misiones pendientes obtenidas exitosamente. */
+                            message: string;
+                            data: {
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador de la notificación para envío de ACK
+                                 */
+                                notificacionId: string;
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador único de la misión
+                                 */
+                                misionId: string;
+                                /**
+                                 * @description Código oficial de la orden táctica
+                                 * @example MIS-2026-0001
+                                 */
+                                codigoMision: string;
+                                /** @description Título descriptivo de la misión */
+                                titulo: string;
+                                /** @description Instrucciones de trabajo en terreno */
+                                descripcion: string | null;
+                                /**
+                                 * @description Tipo de misión (ej. VERIFICACION)
+                                 * @example VERIFICACION
+                                 */
+                                tipoMision: string;
+                                /**
+                                 * @description Prioridad operativa (BAJA, MEDIA, ALTA, CRITICA)
+                                 * @example ALTA
+                                 */
+                                prioridad: string;
+                                /**
+                                 * @description Estado actual de la misión en el sistema
+                                 * @example DESPACHADA
+                                 */
+                                estadoMision: string;
+                                /**
+                                 * @description Estado de entrega de la notificación
+                                 * @example PENDIENTE_ENVIO
+                                 * @enum {string}
+                                 */
+                                estadoNotificacion: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador de la patrulla asignada
+                                 */
+                                patrullaId: string;
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador del incidente asociado si aplica
+                                 */
+                                incidenteId: string | null;
+                                /**
+                                 * @description Código del incidente atendido
+                                 * @example INC-2026-8869
+                                 */
+                                incidenteCodigo: string | null;
+                                /**
+                                 * @description Folio correlativo institucional
+                                 * @example FOL-8869
+                                 */
+                                incidenteFolio: string | null;
+                                /**
+                                 * @description Tipología de afectación preliminar
+                                 * @example Inundación
+                                 */
+                                tipoAfectacion: string | null;
+                                /**
+                                 * @description Dirección o punto de referencia en la comuna
+                                 * @example Av. Ramón Picarte 1500
+                                 */
+                                direccion: string | null;
+                                /** @description Latitud WGS84 del punto a atender */
+                                latitud: number | null;
+                                /** @description Longitud WGS84 del punto a atender */
+                                longitud: number | null;
+                                /** @description Fecha de generación de la orden */
+                                creadaAt: string;
+                                /** @description Fecha de emisión al canal */
+                                enviadaAt: string | null;
+                            }[];
+                            /** @example 1 */
+                            total: number;
+                        };
+                    };
+                };
+                /** @description No autenticado o token ausente */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'misiones:terreno:verificar' y pertenecer a una patrulla activa */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor al consultar misiones pendientes */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -8436,6 +8752,11 @@ export interface components {
                 /** @description Justificación si la misión fue rechazada */
                 justificacionRechazo?: string | null;
                 /**
+                 * @description Estado actual de entrega y lectura de la notificación de esta misión (HU-35)
+                 * @enum {string}
+                 */
+                trazabilidadNotificacion?: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
+                /**
                  * Format: uuid
                  * @description UUID de incidente asociado si aplica
                  */
@@ -8502,6 +8823,11 @@ export interface components {
             prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
             /** @description Justificación si la misión fue rechazada */
             justificacionRechazo?: string | null;
+            /**
+             * @description Estado actual de entrega y lectura de la notificación de esta misión (HU-35)
+             * @enum {string}
+             */
+            trazabilidadNotificacion?: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
             /**
              * Format: uuid
              * @description UUID de incidente asociado si aplica
@@ -9616,19 +9942,16 @@ export interface components {
                 delegacionNombre: string | null;
                 /** @description Cantidad de misiones tácticas despachadas o generadas para este incidente */
                 totalMisiones: number;
-                /** @description Indica si el incidente posee una misión en estado PLANIFICADA o DESPACHADA pendiente de confirmación en terreno */
-                tieneMisionDespachada?: boolean;
-                /** @description Indica si el incidente posee una misión en estado EN_CURSO activa en terreno */
-                tieneMisionEnCurso?: boolean;
+                /**
+                 * @description Último estado de trazabilidad de notificación de misión asociado al incidente (HU-35)
+                 * @enum {string}
+                 */
+                trazabilidadNotificacion?: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
                 /**
                  * @description Indica si la patrulla verificadora completó el diagnóstico técnico en terreno
                  * @default false
                  */
                 verificado: boolean;
-                /** @description Indica si el incidente fue verificado o reclasificado en terreno */
-                reclasificadoEnTerreno?: boolean;
-                /** @description Motivo o justificación técnica de la evaluación en terreno */
-                justificacionReclasificacion?: string | null;
                 /** @description Fecha y hora de registro en formato ISO 8601 */
                 creadoEn: string;
                 /** @description Última fecha y hora de actualización en formato ISO 8601 */
@@ -9735,6 +10058,11 @@ export interface components {
                     prioridad: string;
                     /** @description Justificación en caso de rechazo por la cuadrilla */
                     justificacionRechazo: string | null;
+                    /**
+                     * @description Estado actual de entrega y lectura de la notificación de esta misión (HU-35)
+                     * @enum {string}
+                     */
+                    trazabilidadNotificacion?: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
                     /** @description Patrulla verificadora asignada */
                     patrulla: {
                         /** Format: uuid */
@@ -9774,18 +10102,6 @@ export interface components {
                     /** @description Nombre de la cuadrilla que tiene asignado el recurso */
                     cuadrillaNombre: string | null;
                 }[];
-                /**
-                 * @description Indica si la verificación presencial fue completada
-                 * @default false
-                 */
-                verificado: boolean;
-                /**
-                 * @description Indica si fue verificado o reclasificado en terreno
-                 * @default false
-                 */
-                reclasificadoEnTerreno: boolean;
-                /** @description Justificación técnica en terreno */
-                justificacionReclasificacion?: string | null;
                 creadoEn: string;
                 actualizadoEn: string;
             };
@@ -10582,231 +10898,6 @@ export interface components {
             /** @example 1 */
             totalPaginas: number;
         };
-        TipoIncidenteCatalogoItem: {
-            /**
-             * Format: uuid
-             * @description Identificador único UUID del tipo de incidente
-             * @example 40000000-0000-4000-8000-000000000001
-             */
-            id: string;
-            /**
-             * @description Nombre canónico del tipo de incidente o afectación
-             * @example Inundación
-             */
-            nombre: string;
-            /**
-             * @description Descripción técnica o alcance del tipo de incidente
-             * @example Acumulación desmedida de agua por crecida de ríos o lluvias torrenciales
-             */
-            descripcion: string | null;
-            /**
-             * @description Indica si el tipo de incidente se encuentra habilitado para selección
-             * @example true
-             */
-            activo: boolean;
-        };
-        ListarTiposIncidenteResponse: {
-            /** @example Catálogo oficial de tipos de incidente obtenido exitosamente. */
-            message: string;
-            data: components["schemas"]["TipoIncidenteCatalogoItem"][];
-        };
-        ReclasificarTipologiaInput: {
-            /**
-             * Format: uuid
-             * @description UUID del nuevo tipo de incidente según el catálogo oficial
-             * @example 40000000-0000-4000-8000-000000000001
-             */
-            tipoIncidenteId?: string;
-            /**
-             * Format: uuid
-             * @description Alias en formato snake_case del UUID del nuevo tipo de incidente
-             * @example 40000000-0000-4000-8000-000000000001
-             */
-            tipo_incidente_id?: string;
-            /**
-             * @description Justificación técnica u operativa del cambio de tipología constatado en terreno
-             * @example Tras evaluación en terreno se constata desborde de cauce con ingreso masivo de agua a viviendas, no un anegamiento menor.
-             */
-            justificacion: string;
-            /**
-             * Format: uuid
-             * @description Identificador UUID de la misión táctica. Opcional: si se omite, el sistema resuelve la misión EN_CURSO asociada al incidente.
-             * @example 60000000-0000-4000-8000-000000000001
-             */
-            misionId?: string;
-            /**
-             * Format: uuid
-             * @description Alias en formato snake_case de misionId
-             * @example 60000000-0000-4000-8000-000000000001
-             */
-            mision_id?: string;
-        };
-        IncidenteReclasificadoResumen: {
-            /**
-             * Format: uuid
-             * @description Identificador único UUID del incidente
-             */
-            id: string;
-            /**
-             * @description Código interno del incidente
-             * @example INC-2026-001
-             */
-            codigo: string;
-            /**
-             * Format: uuid
-             * @description UUID del nuevo tipo de incidente
-             */
-            tipoIncidenteId: string;
-            /**
-             * @description Nombre canónico del nuevo tipo de incidente
-             * @example Inundación
-             */
-            tipoAfectacion: string;
-            /**
-             * @description Estado actual del incidente
-             * @example VERIFICANDO
-             */
-            estado: string;
-            /**
-             * @description Prioridad actual del incidente
-             * @example ALTA
-             */
-            prioridad: string;
-            /** @description Fecha y hora de actualización en formato ISO 8601 */
-            actualizadoEn: string;
-        };
-        MisionHitoTipologia: {
-            /**
-             * Format: uuid
-             * @description Identificador único UUID del hito en mision_hito
-             */
-            id: string;
-            /**
-             * Format: uuid
-             * @description Identificador de la misión asociada
-             */
-            misionId: string;
-            /**
-             * @description Código canónico del hito
-             * @example TIPOLOGIA_RECLASIFICADA
-             */
-            hito: string;
-            /**
-             * @description Glosa descriptiva del hito con el tipo de incidente y justificación
-             * @example Tipología reclasificada en terreno a: Inundación. Justificación: Desborde constatado.
-             */
-            descripcion: string;
-            /**
-             * Format: uuid
-             * @description UUID del evaluador en sesión que ejecutó la reclasificación
-             */
-            registradoPorId: string | null;
-            /** @description Fecha y hora de registro del hito (ISO 8601) */
-            creadoEn: string;
-        };
-        ReclasificarTipologiaResponse: {
-            /** @example Tipología del incidente reclasificada exitosamente en terreno. */
-            message: string;
-            data: {
-                incidente: components["schemas"]["IncidenteReclasificadoResumen"];
-                hito: components["schemas"]["MisionHitoTipologia"];
-            };
-        };
-        AceptarMisionInput: {
-            /**
-             * @description Coordenada GPS opcional de latitud (WGS84) al momento de aceptar la misión desde la PWA
-             * @example -39.819588
-             */
-            latitud?: number;
-            /**
-             * @description Coordenada GPS opcional de longitud (WGS84) al momento de aceptar la misión desde la PWA
-             * @example -73.245209
-             */
-            longitud?: number;
-        };
-        MisionHitoRegistrado: {
-            /**
-             * Format: uuid
-             * @description Identificador único UUID del hito registrado en mision_hito
-             */
-            id: string;
-            /**
-             * Format: uuid
-             * @description Identificador único UUID de la misión
-             */
-            misionId: string;
-            /**
-             * @description Código canónico del hito
-             * @example MISION_ACEPTADA
-             */
-            hito: string;
-            /**
-             * @description Glosa descriptiva del hito operativo
-             * @example Misión Aceptada por Patrulla
-             */
-            descripcion: string;
-            /**
-             * Format: uuid
-             * @description UUID del funcionario de patrulla en sesión que confirmó la salida
-             */
-            registradoPorId: string | null;
-            /** @description Latitud reportada al momento del hito */
-            latitud: number | null;
-            /** @description Longitud reportada al momento del hito */
-            longitud: number | null;
-            /** @description Fecha y hora del hito en formato ISO 8601 */
-            creadoEn: string;
-        };
-        AceptarMisionResponse: {
-            /** @example Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación. */
-            message: string;
-            data: {
-                mision: {
-                    /** Format: uuid */
-                    id: string;
-                    codigo: string;
-                    titulo: string;
-                    descripcion: string | null;
-                    /** @enum {string} */
-                    tipoMision: "VERIFICACION" | "ATENCION_CUADRILLA" | "PREVENCION" | "RECUPERACION" | "ASISTENCIA_SOCIAL";
-                    /**
-                     * @example EN_CURSO
-                     * @enum {string}
-                     */
-                    estado: "PLANIFICADA" | "DESPACHADA" | "EN_CURSO" | "COMPLETADA" | "CANCELADA" | "RECHAZADA";
-                    /** @enum {string} */
-                    prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
-                    /** Format: uuid */
-                    incidenteId: string | null;
-                    /** Format: uuid */
-                    patrullaId: string | null;
-                    /** @description Timestamp ISO 8601 fijado al momento de aceptar la misión */
-                    fechaInicio: string;
-                    actualizadoEn: string;
-                };
-                patrulla: {
-                    /** Format: uuid */
-                    id: string;
-                    nombre: string;
-                    /**
-                     * @description Se mantiene en EN_VERIFICACION durante el trayecto y evaluación
-                     * @example EN_VERIFICACION
-                     */
-                    estado: string;
-                } | null;
-                incidente: {
-                    /** Format: uuid */
-                    id: string;
-                    codigo: string;
-                    /**
-                     * @description Permanece en estado canónico VERIFICANDO (no 'En camino')
-                     * @example VERIFICANDO
-                     */
-                    estado: string;
-                } | null;
-                hito: components["schemas"]["MisionHitoRegistrado"];
-            };
-        };
         PuntoCriticoItem: {
             /**
              * Format: uuid
@@ -10877,6 +10968,231 @@ export interface components {
              * @example 2026-06-15T12:00:00.000Z
              */
             creadoEn: string;
+        };
+        AceptarMisionInput: {
+            /**
+             * @description Coordenada GPS opcional de latitud (WGS84) al momento de aceptar la misión desde la PWA
+             * @example -39.819588
+             */
+            latitud?: number;
+            /**
+             * @description Coordenada GPS opcional de longitud (WGS84) al momento de aceptar la misión desde la PWA
+             * @example -73.245209
+             */
+            longitud?: number;
+        };
+        AceptarMisionResponse: {
+            /** @example Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación. */
+            message: string;
+            data: {
+                mision: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    titulo: string;
+                    descripcion: string | null;
+                    /** @enum {string} */
+                    tipoMision: "VERIFICACION" | "ATENCION_CUADRILLA" | "PREVENCION" | "RECUPERACION" | "ASISTENCIA_SOCIAL";
+                    /**
+                     * @example EN_CURSO
+                     * @enum {string}
+                     */
+                    estado: "PLANIFICADA" | "DESPACHADA" | "EN_CURSO" | "COMPLETADA" | "CANCELADA" | "RECHAZADA";
+                    /** @enum {string} */
+                    prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+                    /** Format: uuid */
+                    incidenteId: string | null;
+                    /** Format: uuid */
+                    patrullaId: string | null;
+                    /** @description Timestamp ISO 8601 fijado al momento de aceptar la misión */
+                    fechaInicio: string;
+                    actualizadoEn: string;
+                };
+                patrulla: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /**
+                     * @description Se mantiene en EN_VERIFICACION durante el trayecto y evaluación
+                     * @example EN_VERIFICACION
+                     */
+                    estado: string;
+                } | null;
+                incidente: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    /**
+                     * @description Permanece en estado canónico VERIFICANDO (no 'En camino')
+                     * @example VERIFICANDO
+                     */
+                    estado: string;
+                } | null;
+                hito: components["schemas"]["MisionHitoRegistrado"];
+            };
+        };
+        IncidenteReclasificadoResumen: {
+            /**
+             * Format: uuid
+             * @description Identificador único UUID del incidente
+             */
+            id: string;
+            /**
+             * @description Código interno del incidente
+             * @example INC-2026-001
+             */
+            codigo: string;
+            /**
+             * Format: uuid
+             * @description UUID del nuevo tipo de incidente
+             */
+            tipoIncidenteId: string;
+            /**
+             * @description Nombre canónico del nuevo tipo de incidente
+             * @example Inundación
+             */
+            tipoAfectacion: string;
+            /**
+             * @description Estado actual del incidente
+             * @example VERIFICANDO
+             */
+            estado: string;
+            /**
+             * @description Prioridad actual del incidente
+             * @example ALTA
+             */
+            prioridad: string;
+            /** @description Fecha y hora de actualización en formato ISO 8601 */
+            actualizadoEn: string;
+        };
+        ListarTiposIncidenteResponse: {
+            /** @example Catálogo oficial de tipos de incidente obtenido exitosamente. */
+            message: string;
+            data: components["schemas"]["TipoIncidenteCatalogoItem"][];
+        };
+        MisionHitoRegistrado: {
+            /**
+             * Format: uuid
+             * @description Identificador único UUID del hito registrado en mision_hito
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Identificador único UUID de la misión
+             */
+            misionId: string;
+            /**
+             * @description Código canónico del hito
+             * @example MISION_ACEPTADA
+             */
+            hito: string;
+            /**
+             * @description Glosa descriptiva del hito operativo
+             * @example Misión Aceptada por Patrulla
+             */
+            descripcion: string;
+            /**
+             * Format: uuid
+             * @description UUID del funcionario de patrulla en sesión que confirmó la salida
+             */
+            registradoPorId: string | null;
+            /** @description Latitud reportada al momento del hito */
+            latitud: number | null;
+            /** @description Longitud reportada al momento del hito */
+            longitud: number | null;
+            /** @description Fecha y hora del hito en formato ISO 8601 */
+            creadoEn: string;
+        };
+        MisionHitoTipologia: {
+            /**
+             * Format: uuid
+             * @description Identificador único UUID del hito en mision_hito
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Identificador de la misión asociada
+             */
+            misionId: string;
+            /**
+             * @description Código canónico del hito
+             * @example TIPOLOGIA_RECLASIFICADA
+             */
+            hito: string;
+            /**
+             * @description Glosa descriptiva del hito con el tipo de incidente y justificación
+             * @example Tipología reclasificada en terreno a: Inundación. Justificación: Desborde constatado.
+             */
+            descripcion: string;
+            /**
+             * Format: uuid
+             * @description UUID del evaluador en sesión que ejecutó la reclasificación
+             */
+            registradoPorId: string | null;
+            /** @description Fecha y hora de registro del hito (ISO 8601) */
+            creadoEn: string;
+        };
+        ReclasificarTipologiaInput: {
+            /**
+             * Format: uuid
+             * @description UUID del nuevo tipo de incidente según el catálogo oficial
+             * @example 40000000-0000-4000-8000-000000000001
+             */
+            tipoIncidenteId?: string;
+            /**
+             * Format: uuid
+             * @description Alias en formato snake_case del UUID del nuevo tipo de incidente
+             * @example 40000000-0000-4000-8000-000000000001
+             */
+            tipo_incidente_id?: string;
+            /**
+             * @description Justificación técnica u operativa del cambio de tipología constatado en terreno
+             * @example Tras evaluación en terreno se constata desborde de cauce con ingreso masivo de agua a viviendas, no un anegamiento menor.
+             */
+            justificacion: string;
+            /**
+             * Format: uuid
+             * @description Identificador UUID de la misión táctica. Opcional: si se omite, el sistema resuelve la misión EN_CURSO asociada al incidente.
+             * @example 60000000-0000-4000-8000-000000000001
+             */
+            misionId?: string;
+            /**
+             * Format: uuid
+             * @description Alias en formato snake_case de misionId
+             * @example 60000000-0000-4000-8000-000000000001
+             */
+            mision_id?: string;
+        };
+        ReclasificarTipologiaResponse: {
+            /** @example Tipología del incidente reclasificada exitosamente en terreno. */
+            message: string;
+            data: {
+                incidente: components["schemas"]["IncidenteReclasificadoResumen"];
+                hito: components["schemas"]["MisionHitoTipologia"];
+            };
+        };
+        TipoIncidenteCatalogoItem: {
+            /**
+             * Format: uuid
+             * @description Identificador único UUID del tipo de incidente
+             * @example 40000000-0000-4000-8000-000000000001
+             */
+            id: string;
+            /**
+             * @description Nombre canónico del tipo de incidente o afectación
+             * @example Inundación
+             */
+            nombre: string;
+            /**
+             * @description Descripción técnica o alcance del tipo de incidente
+             * @example Acumulación desmedida de agua por crecida de ríos o lluvias torrenciales
+             */
+            descripcion: string | null;
+            /**
+             * @description Indica si el tipo de incidente se encuentra habilitado para selección
+             * @example true
+             */
+            activo: boolean;
         };
         CrearEventoRecuperacionInput: {
             /**
@@ -12472,6 +12788,45 @@ export interface components {
                     hito: string;
                     descripcion: string;
                     creadoEn: string;
+                };
+                /**
+                 * NotificacionMisionDetalle
+                 * @description Trazabilidad completa de la notificación de misión despachada
+                 */
+                notificacion?: {
+                    /**
+                     * Format: uuid
+                     * @description Identificador único de la notificación
+                     */
+                    id: string;
+                    /**
+                     * Format: uuid
+                     * @description Identificador de la misión asociada
+                     */
+                    misionId: string;
+                    /**
+                     * Format: uuid
+                     * @description Identificador de la patrulla destinataria
+                     */
+                    patrullaId: string;
+                    /**
+                     * @description Estado actual del ciclo de vida de la notificación
+                     * @enum {string}
+                     */
+                    estado: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
+                    /**
+                     * @description Contador de emisiones hacia la patrulla
+                     * @example 1
+                     */
+                    intentosEnvio: number;
+                    /** @description Marca temporal UTC de registro en base de datos */
+                    creadaAt: string;
+                    /** @description Marca temporal UTC de emisión hacia la sala de la patrulla */
+                    enviadaAt: string | null;
+                    /** @description Marca temporal UTC del acuse de recibo técnico automático */
+                    recibidaAt: string | null;
+                    /** @description Marca temporal UTC del acuse de lectura operativa */
+                    leidaAt: string | null;
                 };
             };
         };
