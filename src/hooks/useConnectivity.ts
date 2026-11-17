@@ -137,6 +137,38 @@ export function useConnectivity() {
               }
             }
           }
+        } else if (accion.tipo === 'RECHAZAR_MISION') {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/rechazar/);
+          const misionId = match?.[1];
+          if (misionId && (esExito || esConflictoTerminal || esErrorIrrecuperable)) {
+            try {
+              const local = await obtenerMisionLocalPorId(misionId);
+              if (local) {
+                let actualizadoServidor = local.actualizadoEn || new Date().toISOString();
+                if (esExito) {
+                  try {
+                    const bodyJson = await res.clone().json();
+                    if (bodyJson?.data?.mision?.actualizadoEn) {
+                      actualizadoServidor = bodyJson.data.mision.actualizadoEn;
+                    }
+                  } catch {
+                    // Ignorar si la respuesta no contiene JSON
+                  }
+                }
+                await guardarMisionLocal({
+                  ...local,
+                  estado: esExito ? 'RECHAZADA' : local.estado,
+                  sincronizacionPendiente: false,
+                  actualizadoEn: actualizadoServidor,
+                });
+              }
+              if (!esExito) {
+                await obtenerDetalleMision(misionId);
+              }
+            } catch {
+              // Ignorar fallos de lectura/escritura secundaria en IndexedDB
+            }
+          }
         }
 
         return procesada;

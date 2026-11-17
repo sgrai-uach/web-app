@@ -58,12 +58,22 @@ export function useTerrenoSocket(): void {
       }
     };
 
+    const manejarMisionRechazada = (data?: { misionId?: string; cuadrillaId?: string }) => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('sgrai:mision-rechazada', { detail: data })
+        );
+      }
+    };
+
     socket.on('patrulla:desactivada', manejarDesactivacion);
     socket.on('cuadrilla:desactivada', manejarDesactivacion);
+    socket.on('mision:rechazada', manejarMisionRechazada);
 
     return () => {
       socket.off('patrulla:desactivada', manejarDesactivacion);
       socket.off('cuadrilla:desactivada', manejarDesactivacion);
+      socket.off('mision:rechazada', manejarMisionRechazada);
       socket.emit('leave', roomName);
       socket.emit('salir', roomName);
       socket.disconnect();

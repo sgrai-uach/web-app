@@ -1,6 +1,7 @@
 import apiClient from '@/lib/api/client';
 import type { paths } from '@/types/api-generated';
-import type { AceptarMisionPayload, MisionLocal } from '@/types/offline';
+import type { AceptarMisionPayload, MisionLocal, RechazarMisionPayload } from '@/types/offline';
+import { rechazoMisionSchema, type RechazoMisionInput } from '@/lib/validations/misiones';
 import {
   guardarMisionesLocales,
   guardarMisionLocal,
@@ -452,4 +453,146 @@ export async function aceptarMisionPatrulla(
     mensaje:
       'Sin conexión: Misión aceptada localmente y guardada en cola para sincronizar al recuperar señal.',
   };
+}
+
+type RechazarMisionApiData =
+  paths['/api/misiones/{id}/rechazar']['post']['responses'][200]['content']['application/json'];
+
+export interface ResultadoRechazarMision {
+  exito: boolean;
+  mensaje: string;
+  modoOffline?: boolean;
+  mision?: RechazarMisionApiData['data']['mision'] | {
+    id: string;
+    codigo: string;
+    estado: string;
+    justificacionRechazo: string;
+  };
+}
+
+/**
+ * Ejecuta el rechazo motivado de una misión asignada (H41 Cuadrilla / H69 Patrulla).
+ * Valida la justificación (>= 5 chars) contra `rechazoMisionSchema` antes de enviar o encolar en IndexedDB.
+ * Si no hay conexión o falla el transporte, encola en el outbox para sincronización automática.
+ */
+export async function rechazarMision(
+  id: string,
+  datos: RechazoMisionInput
+): Promise<ResultadoRechazarMision> {
+  const datosValidados = rechazoMisionSchema.parse(datos);
+
+  const payloadApi: RechazarMisionPayload = {
+    justificacion_rechazo: datosValidados.justificacion_rechazo,
+    ...(datosValidados.latitud !== undefined && datosValidados.longitud !== undefined
+      ? { latitud: datosValidados.latitud, longitud: datosValidados.longitud }
+      : {}),
+  };
+
+  const estaOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+  const persistirRechazoLocal = async (
+    sincronizacionPendiente: boolean,
+    actualizadoEn?: string
+  ): Promise<MisionLocal | null> => {
+    const local = await obtenerMisionLocalPorId(id);
+    if (!local) return null;
+    const actualizado: MisionLocal = {
+      ...local,
+      estado: 'RECHAZADA',
+      sincronizacionPendiente,
+      actualizadoEn: actualizadoEn || new Date().toISOString(),
+      datosAdicionales: {
+        ...local.datosAdicionales,
+        justificacionRechazo: datosValidados.justificacion_rechazo,
+      },
+    };
+    await guardarMisionLocal(actualizado);
+    return actualizado;
+  };
+
+  if (estaOffline) {
+    await encolarAccionOutbox({
+      tipo: 'RECHAZAR_MISION',
+      url: `/api/misiones/${id}/rechazar`,
+      metodo: 'POST',
+      payload: payloadApi as Record<string, unknown>,
+    });
+
+    const local = await persistirRechazoLocal(true);
+
+    return {
+      exito: true,
+      mensaje:
+        'Rechazo registrado localmente. Se sincronizará automáticamente al recuperar la conexión.',
+      modoOffline: true,
+      mision: {
+        id,
+        codigo: local?.codigoIncidente || id,
+        estado: 'RECHAZADA',
+        justificacionRechazo: datosValidados.justificacion_rechazo,
+      },
+    };
+  }
+
+  try {
+    const { data, error, response } = await apiClient.POST('/api/misiones/{id}/rechazar', {
+      params: {
+        path: { id },
+      },
+      body: payloadApi,
+    });
+
+    if (error || !response.ok) {
+      const status = response?.status ?? 500;
+      const errorMsg =
+        (error as { message?: string } | undefined)?.message ||
+        (status === 400
+          ? 'Datos inválidos para el rechazo de la misión.'
+          : status === 401
+            ? 'Sesión expirada o no autenticada.'
+            : status === 403
+              ? 'No está autorizado para rechazar esta misión.'
+              : status === 404
+                ? 'La misión solicitada no fue encontrada.'
+                : status === 409
+                  ? 'La misión no se encuentra en estado DESPACHADA para ser rechazada.'
+                  : `Error al rechazar la misión (${status}).`);
+      throw new MisionServiceError(status, errorMsg);
+    }
+
+    await persistirRechazoLocal(false, data?.data?.mision?.actualizadoEn);
+
+    return {
+      exito: true,
+      mensaje: data?.message || 'Misión rechazada exitosamente.',
+      mision: data?.data?.mision,
+    };
+  } catch (err) {
+    if (err instanceof MisionServiceError) {
+      throw err;
+    }
+
+    // Falla de red / desconexión temporal: encolar en outbox
+    await encolarAccionOutbox({
+      tipo: 'RECHAZAR_MISION',
+      url: `/api/misiones/${id}/rechazar`,
+      metodo: 'POST',
+      payload: payloadApi as Record<string, unknown>,
+    });
+
+    const local = await persistirRechazoLocal(true);
+
+    return {
+      exito: true,
+      mensaje:
+        'Rechazo registrado localmente. Se sincronizará automáticamente al recuperar la conexión.',
+      modoOffline: true,
+      mision: {
+        id,
+        codigo: local?.codigoIncidente || id,
+        estado: 'RECHAZADA',
+        justificacionRechazo: datosValidados.justificacion_rechazo,
+      },
+    };
+  }
 }
