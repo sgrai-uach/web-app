@@ -2,7 +2,7 @@
 
 Este documento detalla los contratos HTTP y WebSocket consumidos por la aplicación de terreno (`sgrai-pwa`) desde el backend `sgrai-api`.
 
-Todos los tipos TypeScript de estos endpoints se derivan estrictamente de [src/types/api-generated.d.ts](file:///home/zetastormy/Development/SGRAI/web-app/src/types/api-generated.d.ts).
+Todos los tipos TypeScript de estos endpoints se derivan estrictamente de [`src/types/api-generated.d.ts`](../../src/types/api-generated.d.ts).
 
 ---
 

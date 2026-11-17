@@ -30,7 +30,7 @@ El formulario de evaluación calcula de forma reactiva la `prioridadSugerida` y 
 |---|---|
 | **Crítica (`CRITICA`)** | • Personas electrodependientes afectadas (`> 0`).<br>• Necesidad de evacuación inmediata del sector.<br>• Vivienda con compromiso **Grave / Inhabitable**.<br>• Peligro activo eléctrico, riesgo de colapso estructural/derrumbe o riesgo químico/sanitario. |
 | **Alta (`ALTA`)** | • Personas con discapacidad (`> 0`) o adultos mayores (`> 0`) afectados.<br>• Presencia de 2 o más niños en el grupo afectado.<br>• Aislamiento vial o corte de ruta de acceso.<br>• Vivienda con daño **Moderado**, 3 o más viviendas afectadas, o núcleo familiar de 6 o más integrantes. |
-| **Media (`MEDIA`)** | • Núcleo familiar afectado (`1 a 5` integrantes) o presencia de 1 niño.<br>• Vivienda afectada con daño **Leve** o mascotas afectadas (`> 0`).<br>• Solicitud de asistencia social (levantamiento FIBE) o apoyo táctico adicional. |
+| **Media (`MEDIA`)** | • Núcleo familiar afectado (`1 a 5` integrantes) o presencia de 1 niño.<br>• Vivienda afectada con daño **Leve** o mascotas afectadas (`> 0`).<br>• Solicitud de asistencia social (levantamiento FIBE). |
 | **Baja (`BAJA`)** | • Sin personas vulnerables, sin daños habitacionales (`Sin daño`) ni peligros activos constatados en el lugar. |
 
 ---
@@ -50,7 +50,7 @@ El formulario de evaluación calcula de forma reactiva la `prioridadSugerida` y 
      - Viviendas afectadas
    - Seleccione el **Nivel de compromiso de vivienda** (`Sin daño habitacional`, `Daño leve`, `Daño moderado` o `Grave / Inhabitable`).
 4. **Paso 2 — Peligros Activos y Requerimientos:**
-   - Active los interruptores táctiles (`Sí` / `No`) correspondientes a las amenazas presentes en el punto (`Riesgo eléctrico activo`, `Riesgo estructural / derrumbe`, `Riesgo químico o sanitario`, `Requiere evacuación inmediata`, `Aislamiento vial`, `Requiere asistencia social (FIBE)`, `Requiere apoyo táctico adicional`).
+   - Active los interruptores táctiles (`Sí` / `No`) correspondientes a las amenazas presentes en el punto (`Riesgo eléctrico activo`, `Riesgo estructural / derrumbe`, `Riesgo químico o sanitario`, `Requiere evacuación inmediata`, `Aislamiento vial`, `Requiere asistencia social (FIBE)`).
 5. **Paso 3 — Revisión de Prioridad Sugerida y Selección Canónica:**
    - Observe el recuadro **Prioridad Sugerida por el Sistema**, que exhibe el nivel calculado (`Baja`, `Media`, `Alta` o `Crítica`) junto con el listado de **factores gatillantes**.
    - En el selector táctil de cuatro niveles, la prioridad sugerida se encuentra pre-seleccionada por defecto.
