@@ -342,7 +342,11 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         datosAdicionales:
           mantenerOptimista && previa?.datosAdicionales
             ? { ...datosRemotos, ...previa.datosAdicionales }
-            : { ...(previaLocal?.datosAdicionales || {}), ...datosRemotos },
+            : {
+                ...(previaLocal?.datosAdicionales || {}),
+                ...datosRemotos,
+                ...(reportesRemotos.length > 0 ? { reportesPrioridad: undefined } : {}),
+              },
         actualizadoEn: d.actualizadoEn,
       };
 

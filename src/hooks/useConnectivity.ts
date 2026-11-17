@@ -115,6 +115,57 @@ export function useConnectivity() {
           }
         }
 
+        if (accion.tipo === 'AJUSTAR_PRIORIDAD') {
+          const match = accion.url.match(/\/api\/incidentes\/([^/]+)\/prioridad/);
+          const incidenteId = match?.[1];
+          const misionId = accion.payload?.misionId as string | undefined;
+          if (esExito || esConflictoTerminal || esErrorIrrecuperable) {
+            try {
+              let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+              if (!local && incidenteId) {
+                const todas = await obtenerMisionesLocales();
+                local = todas.find((m) => m.incidenteId === incidenteId);
+              }
+              if (local) {
+                let prioridadServidor = local.prioridad;
+                if (esExito) {
+                  try {
+                    const bodyJson = await res.clone().json();
+                    if (bodyJson?.data?.incidente?.prioridad) {
+                      prioridadServidor = bodyJson.data.incidente.prioridad;
+                    }
+                  } catch {
+                    // Ignorar si no hay JSON
+                  }
+                }
+                const reportesPrevios = Array.isArray(local.datosAdicionales?.reportesPrioridad)
+                  ? (local.datosAdicionales.reportesPrioridad as Array<Record<string, unknown>>).map(
+                      (rep) => ({
+                        ...rep,
+                        sincronizado: esExito ? true : rep.sincronizado,
+                      })
+                    )
+                  : local.datosAdicionales?.reportesPrioridad;
+
+                await guardarMisionLocal({
+                  ...local,
+                  prioridad: prioridadServidor,
+                  sincronizacionPendiente: false,
+                  actualizadoEn: new Date().toISOString(),
+                  datosAdicionales: {
+                    ...local.datosAdicionales,
+                    ...(reportesPrevios !== undefined
+                      ? { reportesPrioridad: reportesPrevios }
+                      : {}),
+                  },
+                });
+              }
+            } catch {
+              // Ignorar fallos de persistencia secundaria
+            }
+          }
+        }
+
         if (accion.tipo === 'ACEPTAR_MISION') {
           const match = accion.url.match(/\/api\/misiones\/([^/]+)\/aceptar/);
           const misionId = match?.[1];
