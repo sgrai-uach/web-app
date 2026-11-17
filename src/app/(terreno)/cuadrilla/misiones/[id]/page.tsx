@@ -26,9 +26,11 @@ import {
   RechazoMisionModal,
   type CoordenadasGPS,
 } from '@/components/misiones/RechazoMisionModal';
+import { CargaEvidenciaCard } from '@/components/misiones/CargaEvidenciaCard';
 import { obtenerDetalleMision, rechazarMision } from '@/services/misionesService';
+import { extraerAdjuntosDeMision } from '@/services/offlineQueue';
 import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
-import type { MisionLocal } from '@/types/offline';
+import type { AdjuntoLocal, MisionLocal } from '@/types/offline';
 import styles from './CuadrillaDetailPage.module.css';
 
 interface PageProps {
@@ -151,6 +153,8 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     typeof tienePermiso === 'function'
       ? tienePermiso('misiones:terreno:ejecutar')
       : false;
+  const tienePermisoEvidencia =
+    typeof tienePermiso === 'function' ? tienePermiso('reportes:crear') : false;
 
   const esRechazable = Boolean(
     unidadActiva &&
@@ -158,6 +162,24 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       tienePermisoEjecutar &&
       estadoNormalizado === 'DESPACHADA'
   );
+
+  const esMisionActivaParaEvidencia =
+    estadoNormalizado === 'EN_CURSO' ||
+    estadoNormalizado === 'EN_TERRENO' ||
+    estadoNormalizado === 'ACEPTADA';
+
+  const puedeAdjuntarEvidencia = Boolean(
+    unidadActiva &&
+      esCuadrilla &&
+      tienePermisoEvidencia &&
+      esMisionActivaParaEvidencia
+  );
+
+  const adjuntosMision = extraerAdjuntosDeMision(mision);
+  const reporteTerrenoIdMision =
+    typeof mision.datosAdicionales?.reporteTerrenoId === 'string'
+      ? mision.datosAdicionales.reporteTerrenoId
+      : undefined;
 
   const trabajoTexto =
     (mision.datosAdicionales?.trabajo as string) || mision.direccion;
@@ -201,6 +223,23 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     setModalRechazoAbierto(false);
     await actualizarPendientes();
     router.push('/cuadrilla/misiones');
+  };
+
+  const handleEvidenciaCargada = async (adjunto: AdjuntoLocal) => {
+    setMision((prev) => {
+      if (!prev) return null;
+      const actuales = extraerAdjuntosDeMision(prev);
+      const filtrados = actuales.filter((item) => item.id !== adjunto.id);
+      return {
+        ...prev,
+        datosAdicionales: {
+          ...prev.datosAdicionales,
+          adjuntos: [adjunto, ...filtrados],
+        },
+        actualizadoEn: new Date().toISOString(),
+      };
+    });
+    await actualizarPendientes();
   };
 
   return (
@@ -334,6 +373,17 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
           <span className={styles.rejectedInfoLabel}>Justificación de rechazo registrada</span>
           <span>{justificacionRegistrada}</span>
         </div>
+      )}
+
+      {(puedeAdjuntarEvidencia || adjuntosMision.length > 0) && (
+        <CargaEvidenciaCard
+          misionId={mision.id}
+          incidenteId={mision.incidenteId}
+          reporteTerrenoId={reporteTerrenoIdMision}
+          adjuntos={adjuntosMision}
+          soloLectura={!puedeAdjuntarEvidencia}
+          alAdjuntarEvidencia={handleEvidenciaCargada}
+        />
       )}
 
       {esSoloLectura && (

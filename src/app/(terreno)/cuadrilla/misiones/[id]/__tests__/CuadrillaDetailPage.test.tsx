@@ -156,4 +156,45 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
       expect(mockPush).toHaveBeenCalledWith('/cuadrilla/misiones');
     });
   });
+
+  it('muestra el módulo Evidencia Multimedia (H43) cuando la misión está EN_CURSO y el usuario tiene permiso reportes:crear', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      usuario: {
+        id: 'd0000000-0000-4000-8000-000000000001',
+        nombre: 'Juan Delegado',
+        unidadId: '50000000-0000-4000-8000-000000000001',
+        unidadNombre: 'Cuadrilla Vías y Canales 1',
+      },
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      esCuadrilla: true,
+      esPatrulla: false,
+      tienePermiso: (p: string) =>
+        p === 'misiones:terreno:ejecutar' || p === 'reportes:crear',
+    } as never);
+
+    vi.mocked(obtenerDetalleMision).mockResolvedValue({
+      ...misionDespachada,
+      estado: 'EN_CURSO',
+    });
+
+    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id }} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Evidencia Multimedia')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /Tomar Foto/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Grabar Video/i })).toBeInTheDocument();
+  });
+
+  it('oculta los controles de carga de evidencia si la misión está DESPACHADA o falta permiso reportes:crear', async () => {
+    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id }} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Evidencia Multimedia')).not.toBeInTheDocument();
+  });
 });
