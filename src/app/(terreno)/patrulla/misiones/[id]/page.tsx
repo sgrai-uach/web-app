@@ -357,9 +357,9 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                 <div className={styles.offlineQueueBanner} role="status">
                   <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
                   <span>
-                    Pendiente de sincronizar: La aceptación fue guardada en la cola
-                    local del dispositivo y se enviará automáticamente al recuperar
-                    conexión.
+                    Pendiente de sincronizar: Los cambios de esta misión fueron guardados
+                    en la cola local del dispositivo y se enviarán automáticamente al
+                    recuperar conexión.
                   </span>
                 </div>
               ) : (
@@ -451,6 +451,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                       <EvaluacionTipologiaCard
                         incidenteId={mision.incidenteId}
                         misionActual={mision}
+                        deshabilitado={!tienePermisoVerificar}
                         onTipologiaActualizada={(resultado) => {
                           if (resultado.mision) {
                             setMision(resultado.mision);
@@ -487,19 +488,18 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                         ) : null
                       }
                     >
-                      {seccionPrioridadAbierta && (
-                        <EvaluacionPrioridadCard
-                          incidenteId={mision.incidenteId}
-                          misionActual={mision}
-                          onPrioridadActualizada={(resultado) => {
-                            if (resultado.mision) {
-                              setMision(resultado.mision);
-                            }
-                            setSeccionPrioridadAbierta(false);
-                            void actualizarPendientes();
-                          }}
-                        />
-                      )}
+                      <EvaluacionPrioridadCard
+                        incidenteId={mision.incidenteId}
+                        misionActual={mision}
+                        deshabilitado={!tienePermisoVerificar}
+                        onPrioridadActualizada={(resultado) => {
+                          if (resultado.mision) {
+                            setMision(resultado.mision);
+                          }
+                          setSeccionPrioridadAbierta(false);
+                          void actualizarPendientes();
+                        }}
+                      />
                     </SeccionDesplegable>
                   </>
                 );
