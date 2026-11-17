@@ -30,7 +30,7 @@ El formulario de evaluación calcula de forma reactiva la `prioridadSugerida` y 
 |---|---|
 | **Crítica (`CRITICA`)** | • Personas electrodependientes afectadas (`> 0`).<br>• Necesidad de evacuación inmediata del sector.<br>• Vivienda con compromiso **Grave / Inhabitable**.<br>• Peligro activo eléctrico, riesgo de colapso estructural/derrumbe o riesgo químico/sanitario. |
 | **Alta (`ALTA`)** | • Personas con discapacidad (`> 0`) o adultos mayores (`> 0`) afectados.<br>• Presencia de 2 o más niños en el grupo afectado.<br>• Aislamiento vial o corte de ruta de acceso.<br>• Vivienda con daño **Moderado**, 3 o más viviendas afectadas, o núcleo familiar de 6 o más integrantes. |
-| **Media (`MEDIA`)** | • Núcleo familiar afectado (`1 a 5` integrantes) o presencia de 1 niño.<br>• Vivienda afectada con daño **Leve** o mascotas afectadas (`> 0`).<br>• Solicitud de asistencia social (levantamiento FIBE) o apoyo táctico adicional. |
+| **Media (`MEDIA`)** | • Núcleo familiar afectado (`1 a 5` integrantes) o presencia de 1 niño.<br>• Vivienda afectada con daño **Leve** o mascotas afectadas (`> 0`). |
 | **Baja (`BAJA`)** | • Sin personas vulnerables, sin daños habitacionales (`Sin daño`) ni peligros activos constatados en el lugar. |
 
 ---
@@ -50,7 +50,8 @@ El formulario de evaluación calcula de forma reactiva la `prioridadSugerida` y 
      - Viviendas afectadas
    - Seleccione el **Nivel de compromiso de vivienda** (`Sin daño habitacional`, `Daño leve`, `Daño moderado` o `Grave / Inhabitable`).
 4. **Paso 2 — Peligros Activos y Requerimientos:**
-   - Active los interruptores táctiles (`Sí` / `No`) correspondientes a las amenazas presentes en el punto (`Riesgo eléctrico activo`, `Riesgo estructural / derrumbe`, `Riesgo químico o sanitario`, `Requiere evacuación inmediata`, `Aislamiento vial`, `Requiere asistencia social (FIBE)`, `Requiere apoyo táctico adicional`).
+   - Active los interruptores táctiles (`Sí` / `No`) correspondientes a las amenazas presentes en el punto (`Riesgo eléctrico activo`, `Riesgo estructural / derrumbe`, `Riesgo químico o sanitario`, `Requiere evacuación inmediata`, `Aislamiento vial`).
+   - *(Nota: La casilla de solicitud de asistencia social / Ficha FIBE se gestiona en el Paso 3 — Informe técnico de verificación y cierre, H39).*
 5. **Paso 3 — Revisión de Prioridad Sugerida y Selección Canónica:**
    - Observe el recuadro **Prioridad Sugerida por el Sistema**, que exhibe el nivel calculado (`Baja`, `Media`, `Alta` o `Crítica`) junto con el listado de **factores gatillantes**.
    - En el selector táctil de cuatro niveles, la prioridad sugerida se encuentra pre-seleccionada por defecto.
@@ -59,8 +60,9 @@ El formulario de evaluación calcula de forma reactiva la `prioridadSugerida` y 
 6. **Paso 4 — Detalles Adicionales y Confirmación:**
    - Opcionalmente, complete el campo **Detalles adicionales del reporte** con referencias operativas para el Encargado del Centro de Mando.
    - Presione **"Confirmar prioridad y enviar reporte"** y verifique el resumen en el modal de confirmación antes de pulsar **"Confirmar y Enviar"**.
-7. **Edición y Reenvío Versionado (`Reporte #N+1`):**
-   - Una vez enviado el reporte, la sección muestra el **Resumen de Evaluación y Prioridad** con el distintivo `Reporte #1`.
+7. **Edición, Reenvío Versionado (`Reporte #N+1`) y Visibilidad entre Patrulleros:**
+   - Una vez enviado el reporte, la sección muestra el **Resumen de Evaluación y Prioridad** con el distintivo `Reporte #1`, indicando claramente en el campo **Registrado por** el nombre del funcionario que subió el reporte junto con la fecha y hora.
+   - Si otro integrante de la misma patrulla ingresa a la misión (o la tiene abierta en pantalla), el estado se sincroniza automáticamente vía WebSocket mostrando quién registró la evaluación previa.
    - Si las condiciones en terreno evolucionan, pulse **"Modificar y reenviar reporte"**. El formulario precargará los datos del último reporte y mostrará el aviso:
      > *"Enviando actualización (Reporte #2) — Los cambios quedarán registrados como un reporte distinto en el Centro de Mando y actualizarán la prioridad del incidente."*
 
