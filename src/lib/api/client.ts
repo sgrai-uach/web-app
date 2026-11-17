@@ -5,7 +5,7 @@ import { getAuthCookie, removeAuthCookie } from '@/lib/utils/cookieUtils';
 export const DEV_PATRULLA_TOKEN = 'dev-patrulla-token';
 export const DEV_PATRULLA_USER_ID = '00000000-0000-4000-8000-000000000004';
 
-function extractUserIdFromJwt(token: string): string | null {
+export function extractUserIdFromJwt(token: string): string | null {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;

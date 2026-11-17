@@ -10,7 +10,12 @@ import {
 } from '@/services/offlineQueue';
 import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
-import { DEV_PATRULLA_TOKEN, DEV_PATRULLA_USER_ID } from '@/lib/api/client';
+import {
+  DEV_PATRULLA_TOKEN,
+  DEV_PATRULLA_USER_ID,
+  extractUserIdFromJwt,
+  handleUnauthorizedSession,
+} from '@/lib/api/client';
 
 export function useConnectivity() {
   const [online, setOnline] = useState<boolean>(() => {
@@ -43,12 +48,16 @@ export function useConnectivity() {
           : process.env.NEXT_PUBLIC_API_URL || '';
 
       await sincronizarColaOutbox(async (accion) => {
-        const authHeaders: Record<string, string> =
-          token === DEV_PATRULLA_TOKEN
-            ? { 'x-user-id': DEV_PATRULLA_USER_ID }
-            : token
-              ? { Authorization: `Bearer ${token}` }
-              : {};
+        const authHeaders: Record<string, string> = {};
+        if (token === DEV_PATRULLA_TOKEN) {
+          authHeaders['x-user-id'] = DEV_PATRULLA_USER_ID;
+        } else if (token) {
+          authHeaders['Authorization'] = `Bearer ${token}`;
+          const userId = extractUserIdFromJwt(token);
+          if (userId) {
+            authHeaders['x-user-id'] = userId;
+          }
+        }
 
         const res = await fetch(`${apiUrl}${accion.url}`, {
           method: accion.metodo,
@@ -59,8 +68,23 @@ export function useConnectivity() {
           body: JSON.stringify(accion.payload),
         });
 
-        // Códigos 2xx o 409/422 que indiquen que el recurso ya fue procesado / idempotente
-        const procesada = res.ok || res.status === 409 || res.status === 422;
+        if (res.status === 401) {
+          handleUnauthorizedSession();
+          return false;
+        }
+
+        // Tolerancia idempotente a 409/422 exclusivamente para ACEPTAR_MISION
+        const esAceptacionIdempotente =
+          accion.tipo === 'ACEPTAR_MISION' && (res.status === 409 || res.status === 422);
+        const procesada = res.ok || esAceptacionIdempotente;
+
+        // Evitar bucle infinito en outbox ante errores permanentes 400/404 tras reintentos
+        if (!procesada && (res.status === 400 || res.status === 404) && accion.intentos >= 2) {
+          console.warn(
+            `[OfflineQueue] Acción ${accion.tipo} (${accion.id}) descartada tras error permanente HTTP ${res.status}.`
+          );
+          return true;
+        }
 
         if (procesada && accion.tipo === 'ACTUALIZAR_TIPOLOGIA') {
           const match = accion.url.match(/\/api\/incidentes\/([^/]+)\/tipologia/);

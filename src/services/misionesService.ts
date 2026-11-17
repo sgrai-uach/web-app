@@ -10,6 +10,7 @@ import {
   encolarAccionOutbox,
 } from '@/services/offlineQueue';
 import { limpiarTituloMision, formatearTipologia } from '@/lib/utils/formatters';
+import { obtenerCatalogoTiposIncidente } from '@/services/tipologiaService';
 
 type TipoMisionFiltro =
   | 'VERIFICACION'
@@ -183,6 +184,15 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
 
       if (remotas.length > 0) {
         await guardarMisionesLocales(remotas);
+        void obtenerCatalogoTiposIncidente().catch(() => {
+          // Precarga silenciosa del catálogo oficial para uso offline
+        });
+        const locales = await obtenerMisionesLocales();
+        if (Array.isArray(locales) && locales.length > 0) {
+          const localesPorId = new Map(locales.map((m) => [m.id, m]));
+          return remotas.map((r) => localesPorId.get(r.id) ?? r);
+        }
+        return remotas;
       }
       return remotas;
     }
