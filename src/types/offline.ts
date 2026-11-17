@@ -125,13 +125,12 @@ export interface ReportePrioridadTerrenoLocal {
   sincronizado: boolean;
 }
 
-export interface AsignarPrioridadPayload extends EvaluacionTerrenoPrioridadForm {
-  prioridad: PrioridadIncidente;
-  prioridadSugerida: PrioridadIncidente;
-  justificacionPrioridad: string;
-  factoresGatillantes: string[];
-  misionId?: string;
-  versionReporte: number;
-}
+export type CalcularPrioridadPayload = NonNullable<
+  paths['/api/incidentes/{id}/prioridad/calcular']['post']['requestBody']
+>['content']['application/json'];
+
+export type AsignarPrioridadPayload = NonNullable<
+  paths['/api/incidentes/{id}/prioridad']['patch']['requestBody']
+>['content']['application/json'];
 
 
