@@ -31,7 +31,6 @@ export const VALORES_INICIALES_EVALUACION_PRIORIDAD: EvaluacionTerrenoPrioridadF
       personasElectrodependientes: 0,
       mascotasAfectadas: 0,
       nivelCompromisoVivienda: 'SIN_DANO',
-      requiereAsistenciaSocial: false,
     },
   ],
   nucleoFamiliarTotal: 0,
@@ -47,7 +46,6 @@ export const VALORES_INICIALES_EVALUACION_PRIORIDAD: EvaluacionTerrenoPrioridadF
   riesgoQuimicoSanitario: false,
   aislamientoVial: false,
   requiereEvacuacion: false,
-  requiereAsistenciaSocial: false,
   requiereApoyoAdicional: false,
   detallesAdicionales: '',
 };
@@ -126,7 +124,6 @@ export const familiaAfectadaSchema = z
     personasElectrodependientes: contadorEnteroSchema,
     mascotasAfectadas: contadorEnteroSchema,
     nivelCompromisoVivienda: z.enum(NIVELES_COMPROMISO_VIVIENDA),
-    requiereAsistenciaSocial: z.boolean().default(false),
   })
   .superRefine(validarLimitesNucleoFamiliar);
 
@@ -147,7 +144,6 @@ const evaluacionTerrenoBaseSchema = z.object({
   riesgoQuimicoSanitario: z.boolean(),
   aislamientoVial: z.boolean(),
   requiereEvacuacion: z.boolean(),
-  requiereAsistenciaSocial: z.boolean(),
   requiereApoyoAdicional: z.boolean().optional().default(false),
   detallesAdicionales: z
     .string()
@@ -244,7 +240,6 @@ export function consolidarEvaluacionFamilias(
           personasElectrodependientes: evaluacion.personasElectrodependientes,
           mascotasAfectadas: evaluacion.mascotasAfectadas,
           nivelCompromisoVivienda: evaluacion.nivelCompromisoVivienda,
-          requiereAsistenciaSocial: evaluacion.requiereAsistenciaSocial,
         },
       ],
     };
@@ -256,7 +251,6 @@ export function consolidarEvaluacionFamilias(
   let totalDiscapacitados = 0;
   let totalElectrodependientes = 0;
   let totalMascotas = 0;
-  let requiereFibeGlobal = evaluacion.requiereAsistenciaSocial;
 
   const ordenCompromiso: Record<NivelCompromisoVivienda, number> = {
     SIN_DANO: 0,
@@ -273,9 +267,6 @@ export function consolidarEvaluacionFamilias(
     totalDiscapacitados += fam.personasDiscapacitadas;
     totalElectrodependientes += fam.personasElectrodependientes;
     totalMascotas += fam.mascotasAfectadas;
-    if (fam.requiereAsistenciaSocial) {
-      requiereFibeGlobal = true;
-    }
     if (ordenCompromiso[fam.nivelCompromisoVivienda] > ordenCompromiso[maxCompromiso]) {
       maxCompromiso = fam.nivelCompromisoVivienda;
     }
@@ -291,7 +282,6 @@ export function consolidarEvaluacionFamilias(
     mascotasAfectadas: totalMascotas,
     viviendasAfectadas: evaluacion.familias.length,
     nivelCompromisoVivienda: maxCompromiso,
-    requiereAsistenciaSocial: requiereFibeGlobal,
   };
 }
 
@@ -387,9 +377,6 @@ export function calcularPrioridadSugerida(
   }
   if (evaluacion.mascotasAfectadas > 0) {
     factoresMedios.push(`Mascotas afectadas (${evaluacion.mascotasAfectadas})`);
-  }
-  if (evaluacion.requiereAsistenciaSocial) {
-    factoresMedios.push('Requiere levantamiento social (FIBE)');
   }
 
   const todosLosFactores = [

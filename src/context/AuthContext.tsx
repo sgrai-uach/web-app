@@ -36,7 +36,7 @@ const PERFIL_DEMO_PATRULLA: UsuarioPerfilSesion = {
   unidadId: 'f1000000-0000-4000-8000-000000000050',
   unidadNombre: 'Patrulla Rápida Costa-1',
   unidadActiva: true,
-  permisos: ['misiones:terreno:verificar', 'misiones:terreno:reportar'],
+  permisos: ['misiones:terreno:verificar', 'misiones:terreno:reportar', 'reportes:crear'],
 };
 
 function leerPerfilGuardado(): UsuarioPerfilSesion | null {
@@ -277,7 +277,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (
         esPatrulla &&
         (permiso.startsWith('patrulla:') ||
-          (listaPermisos.length === 0 && permiso === 'misiones:terreno:verificar'))
+          (listaPermisos.length === 0 &&
+            (permiso === 'misiones:terreno:verificar' || permiso === 'reportes:crear')) ||
+          (permiso === 'reportes:crear' &&
+            (listaPermisos.includes('misiones:terreno:reportar') ||
+              listaPermisos.includes('misiones:terreno:verificar'))))
       ) {
         return true;
       }

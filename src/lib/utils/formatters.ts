@@ -9,6 +9,8 @@ import {
   ETIQUETAS_PRIORIDAD,
   ETIQUETAS_TIPOLOGIA,
   ETIQUETAS_ROL,
+  ETIQUETAS_DICTAMEN_ATENCION,
+  ETIQUETAS_ESTADO_TERRENO,
   limpiarTituloMision,
 } from './labels';
 
@@ -44,6 +46,20 @@ export function formatearTipologia(tipologia?: string | null): string {
  */
 export function formatearRol(rol?: string | null): string {
   return formatearEtiquetaSegura(rol, ETIQUETAS_ROL);
+}
+
+/**
+ * Convierte un código de dictamen de atención operativa a lenguaje natural.
+ */
+export function formatearDictamenAtencion(dictamen?: string | null): string {
+  return formatearEtiquetaSegura(dictamen, ETIQUETAS_DICTAMEN_ATENCION);
+}
+
+/**
+ * Convierte un estado constatado de terreno a lenguaje natural.
+ */
+export function formatearEstadoTerreno(estadoTerreno?: string | null): string {
+  return formatearEtiquetaSegura(estadoTerreno, ETIQUETAS_ESTADO_TERRENO);
 }
 
 /**

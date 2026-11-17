@@ -16,6 +16,7 @@ export const ETIQUETAS_ESTADO: Record<string, string> = {
   CERRADA: 'Cerrada',
   CANCELADA: 'Cancelada',
   RECHAZADA: 'Rechazada',
+  NO_ABORDABLE: 'No abordable',
   DISPONIBLE: 'Disponible',
   NO_DISPONIBLE: 'No disponible',
   EN_MANTENCION: 'En mantención',
@@ -69,6 +70,19 @@ export const ETIQUETAS_TIPO_MISION: Record<string, string> = {
   ASISTENCIA_SOCIAL: 'Asistencia social',
 };
 
+export const ETIQUETAS_DICTAMEN_ATENCION: Record<string, string> = {
+  REQUIERE_CUADRILLA: 'Requiere cuadrilla',
+  NO_ABORDABLE: 'No abordable',
+};
+
+export const ETIQUETAS_ESTADO_TERRENO: Record<string, string> = {
+  CRITICO: 'Crítico',
+  ESTABLE: 'Estable',
+  INACCESIBLE: 'Inaccesible',
+  CONTROLADO: 'Controlado',
+  FINALIZADO: 'Finalizado',
+};
+
 /**
  * Convierte un código o enum a texto legible en español natural con respaldo seguro.
  * Nunca muestra valores crudos en mayúsculas ni con guiones bajos.
@@ -94,6 +108,8 @@ export function formatearEtiquetaSegura(
   if (ETIQUETAS_TIPOLOGIA[normalizado]) return ETIQUETAS_TIPOLOGIA[normalizado];
   if (ETIQUETAS_ROL[normalizado]) return ETIQUETAS_ROL[normalizado];
   if (ETIQUETAS_TIPO_MISION[normalizado]) return ETIQUETAS_TIPO_MISION[normalizado];
+  if (ETIQUETAS_DICTAMEN_ATENCION[normalizado]) return ETIQUETAS_DICTAMEN_ATENCION[normalizado];
+  if (ETIQUETAS_ESTADO_TERRENO[normalizado]) return ETIQUETAS_ESTADO_TERRENO[normalizado];
 
   // Respaldo seguro: reemplaza guiones bajos por espacios y deja la primera letra en mayúscula
   const sinGuiones = limpio.replace(/_/g, ' ').toLowerCase();

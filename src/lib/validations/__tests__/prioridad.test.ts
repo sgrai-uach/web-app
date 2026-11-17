@@ -88,6 +88,18 @@ describe('Validaciones y cálculo de prioridad en terreno (H38)', () => {
         'Requiere apoyo operativo adicional'
       );
     });
+
+    it('no incluye Ficha FIBE (requiereAsistenciaSocial) en la evaluación ni factores de HU-38 tras su traslado a HU-39', () => {
+      expect(VALORES_INICIALES_EVALUACION_PRIORIDAD).not.toHaveProperty(
+        'requiereAsistenciaSocial'
+      );
+      const resultado = calcularPrioridadSugerida(
+        VALORES_INICIALES_EVALUACION_PRIORIDAD
+      );
+      expect(resultado.factoresGatillantes).not.toContain(
+        'Requiere levantamiento social (FIBE)'
+      );
+    });
   });
 
   describe('asignarPrioridadSchema', () => {
@@ -139,7 +151,6 @@ describe('Validaciones y cálculo de prioridad en terreno (H38)', () => {
         personasElectrodependientes: 0,
         mascotasAfectadas: 5,
         nivelCompromisoVivienda: 'SIN_DANO' as const,
-        requiereAsistenciaSocial: false,
       };
 
       const resEtario = familiaAfectadaSchema.safeParse(baseFamilia);
