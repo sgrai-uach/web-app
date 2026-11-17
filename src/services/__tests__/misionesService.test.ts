@@ -5,6 +5,7 @@ import {
   aceptarMisionPatrulla,
   validarPayloadAceptarMision,
   obtenerCoordenadasOpcionales,
+  rechazarMision,
   MisionServiceError,
 } from '../misionesService';
 import apiClient from '@/lib/api/client';
@@ -411,6 +412,132 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
 
       const coordsSinGps = await obtenerCoordenadasOpcionales(10);
       expect(coordsSinGps).toEqual({});
+    });
+  });
+
+  describe('rechazarMision (H41, H69)', () => {
+    it('rechaza localmente con Zod si la justificación tiene menos de 5 caracteres', async () => {
+      await expect(
+        rechazarMision('70000000-0000-4000-8000-000000000001', {
+          justificacion_rechazo: '  abc ',
+        })
+      ).rejects.toThrow();
+
+      expect(apiClient.POST).not.toHaveBeenCalled();
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('envía POST /api/misiones/{id}/rechazar y actualiza IndexedDB cuando responde 200 OK', async () => {
+      const misionId = '70000000-0000-4000-8000-000000000001';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: misionId,
+        incidenteId: '30000000-0000-4000-8000-000000000001',
+        codigoIncidente: 'INC-2026-0001',
+        tipologia: 'Árbol caído',
+        direccion: 'Av. Picarte 1100',
+        prioridad: 'ALTA',
+        estado: 'DESPACHADA',
+        fechaDespacho: '2026-11-16T22:00:00.000Z',
+        actualizadoEn: '2026-11-16T22:00:00.000Z',
+      });
+
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: {
+          message: 'Misión rechazada exitosamente.',
+          data: {
+            mision: {
+              id: misionId,
+              codigo: 'MIS-2026-0005',
+              tipoMision: 'ATENCION_CUADRILLA',
+              estado: 'RECHAZADA',
+              justificacionRechazo: 'Camión tolva presenta falla hidráulica.',
+              fechaCierre: '2026-11-16T23:15:00.000Z',
+              actualizadoEn: '2026-11-16T23:15:00.000Z',
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
+
+      const res = await rechazarMision(misionId, {
+        justificacion_rechazo: 'Camión tolva presenta falla hidráulica.',
+        latitud: -39.81422,
+        longitud: -73.24589,
+      });
+
+      expect(apiClient.POST).toHaveBeenCalledWith('/api/misiones/{id}/rechazar', {
+        params: { path: { id: misionId } },
+        body: {
+          justificacion_rechazo: 'Camión tolva presenta falla hidráulica.',
+          latitud: -39.81422,
+          longitud: -73.24589,
+        },
+      });
+      expect(res.exito).toBe(true);
+      expect(res.modoOffline).toBeUndefined();
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: misionId,
+          estado: 'RECHAZADA',
+          sincronizacionPendiente: false,
+        })
+      );
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('lanza MisionServiceError en 400/403/409 sin encolar en outbox', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: undefined,
+        error: { message: 'La misión no se encuentra en estado DESPACHADA.' },
+        response: new Response(null, { status: 409 }),
+      } as never);
+
+      await expect(
+        rechazarMision('70000000-0000-4000-8000-000000000001', {
+          justificacion_rechazo: 'Falla mecánica en ruta',
+        })
+      ).rejects.toThrow(MisionServiceError);
+
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('encola RECHAZAR_MISION en outbox y actualiza caché local ante falla de red', async () => {
+      const misionId = '70000000-0000-4000-8000-000000000001';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: misionId,
+        incidenteId: '30000000-0000-4000-8000-000000000001',
+        codigoIncidente: 'INC-2026-0001',
+        tipologia: 'Árbol caído',
+        direccion: 'Av. Picarte 1100',
+        prioridad: 'ALTA',
+        estado: 'DESPACHADA',
+        fechaDespacho: '2026-11-16T22:00:00.000Z',
+        actualizadoEn: '2026-11-16T22:00:00.000Z',
+      });
+      vi.mocked(apiClient.POST).mockRejectedValue(new TypeError('Failed to fetch'));
+
+      const res = await rechazarMision(misionId, {
+        justificacion_rechazo: 'Desperfecto eléctrico en camión',
+      });
+
+      expect(res.exito).toBe(true);
+      expect(res.modoOffline).toBe(true);
+      expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith({
+        tipo: 'RECHAZAR_MISION',
+        url: `/api/misiones/${misionId}/rechazar`,
+        metodo: 'POST',
+        payload: {
+          justificacion_rechazo: 'Desperfecto eléctrico en camión',
+        },
+      });
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: misionId,
+          estado: 'RECHAZADA',
+          sincronizacionPendiente: true,
+        })
+      );
     });
   });
 });
