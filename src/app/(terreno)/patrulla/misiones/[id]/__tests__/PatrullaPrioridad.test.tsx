@@ -175,11 +175,12 @@ describe('PatrullaMisionDetailPage — Evaluación en Terreno y Prioridad (H38)'
       ).toBeInTheDocument();
     });
 
-    // Activar riesgo estructural -> sugiere CRITICA
+    // Activar riesgo estructural + compromiso Grave / Inhabitable (25 + 45 = 70 pts) -> sugiere CRITICA
     const switchEstructural = screen.getByRole('switch', {
       name: /Riesgo estructural \/ derrumbe/i,
     });
     fireEvent.click(switchEstructural);
+    fireEvent.click(screen.getByRole('radio', { name: /Grave \/ Inhabitable/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId('badge-prioridad-sugerida')).toHaveTextContent(
@@ -232,6 +233,56 @@ describe('PatrullaMisionDetailPage — Evaluación en Terreno y Prioridad (H38)'
     expect(detailsElements.length).toBe(2);
     expect(detailsElements[0]?.hasAttribute('open')).toBe(false);
     expect(detailsElements[1]?.hasAttribute('open')).toBe(false);
+  });
+
+  it('deshabilita EvaluacionPrioridadCard cuando falta el permiso misiones:terreno:verificar y preserva el borrador al colapsar', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      ...vi.mocked(useAuth).mock.results[0]?.value,
+      usuario: {
+        id: '00000000-0000-4000-8000-000000000004',
+        rut: '15.555.555-5',
+        nombre: 'Cabo Patrulla',
+        email: 'patrulla@valdivia.cl',
+        rolId: 'rol-patrulla',
+        rolNombre: 'Patrulla Verificadora',
+        rolCodigo: 'PATRULLA_VERIFICADORA',
+        delegacionId: 'del-01',
+        delegacionNombre: 'Centro',
+        unidadId: 'f1000000-0000-4000-8000-000000000001',
+        unidadNombre: 'Patrulla 1',
+        unidadActiva: true,
+        permisos: [],
+      },
+      token: 'jwt-valido',
+      autenticado: true,
+      cargando: false,
+      esPatrulla: true,
+      esCuadrilla: false,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
+      tienePermiso: () => false,
+      tieneAlgunPermiso: () => false,
+    });
+
+    await act(async () => {
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <PatrullaMisionDetailPage
+            params={Promise.resolve({ id: misionTipologiaCompletadaMock.id })}
+          />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /Confirmar prioridad y enviar reporte/i })
+      ).toBeDisabled();
+    });
   });
 });
 

@@ -16,7 +16,7 @@ describe('Validaciones y cálculo de prioridad en terreno (H38)', () => {
       expect(resultado.prioridadSugerida).toBe('BAJA');
       expect(resultado.factoresGatillantes).toEqual(
         expect.arrayContaining([
-          expect.stringMatching(/Sin personas vulnerables/i),
+          expect.stringMatching(/Sin afectación humana directa/i),
         ])
       );
     });
@@ -24,6 +24,7 @@ describe('Validaciones y cálculo de prioridad en terreno (H38)', () => {
     it('sugiere prioridad MEDIA cuando hay núcleo familiar afectado o daño leve en vivienda', () => {
       const resultado = calcularPrioridadSugerida({
         ...VALORES_INICIALES_EVALUACION_PRIORIDAD,
+        familias: [],
         nucleoFamiliarTotal: 3,
         cantidadNinos: 1,
         viviendasAfectadas: 1,
@@ -33,19 +34,19 @@ describe('Validaciones y cálculo de prioridad en terreno (H38)', () => {
       expect(resultado.prioridadSugerida).toBe('MEDIA');
       expect(resultado.factoresGatillantes).toEqual(
         expect.arrayContaining([
-          expect.stringMatching(/Presencia de 1 niño/i),
-          expect.stringMatching(/Núcleo familiar afectado/i),
-          expect.stringMatching(/Vivienda con daño leve/i),
+          expect.stringMatching(/Personas afectadas en el núcleo/i),
+          expect.stringMatching(/Niños afectados/i),
+          expect.stringMatching(/Compromiso de vivienda LEVE/i),
         ])
       );
     });
 
-    it('sugiere prioridad ALTA cuando hay personas con discapacidad, adultos mayores o daño moderado', () => {
+    it('sugiere prioridad ALTA cuando hay personas vulnerables y daño moderado', () => {
       const resultado = calcularPrioridadSugerida({
         ...VALORES_INICIALES_EVALUACION_PRIORIDAD,
+        familias: [],
         nucleoFamiliarTotal: 4,
         cantidadAdultosMayores: 1,
-        personasDiscapacitadas: 1,
         aislamientoVial: true,
         nivelCompromisoVivienda: 'MODERADO',
       });
@@ -53,9 +54,9 @@ describe('Validaciones y cálculo de prioridad en terreno (H38)', () => {
       expect(resultado.prioridadSugerida).toBe('ALTA');
       expect(resultado.factoresGatillantes).toEqual(
         expect.arrayContaining([
-          expect.stringMatching(/Personas con discapacidad afectadas/i),
           expect.stringMatching(/Adultos mayores afectados/i),
           expect.stringMatching(/Aislamiento vial/i),
+          expect.stringMatching(/Compromiso de vivienda MODERADO/i),
         ])
       );
     });
@@ -63,6 +64,7 @@ describe('Validaciones y cálculo de prioridad en terreno (H38)', () => {
     it('sugiere prioridad CRITICA cuando hay personas electrodependientes, riesgo eléctrico o vivienda inhabitable', () => {
       const resultado = calcularPrioridadSugerida({
         ...VALORES_INICIALES_EVALUACION_PRIORIDAD,
+        familias: [],
         personasElectrodependientes: 1,
         riesgoElectrico: true,
         nivelCompromisoVivienda: 'GRAVE_INHABITABLE',
@@ -71,11 +73,31 @@ describe('Validaciones y cálculo de prioridad en terreno (H38)', () => {
       expect(resultado.prioridadSugerida).toBe('CRITICA');
       expect(resultado.factoresGatillantes).toEqual(
         expect.arrayContaining([
-          expect.stringMatching(/Personas electrodependientes afectadas/i),
-          expect.stringMatching(/Peligro eléctrico activo/i),
-          expect.stringMatching(/Vivienda con daño grave o inhabitable/i),
+          expect.stringMatching(/electrodependientes/i),
+          expect.stringMatching(/Riesgo eléctrico activo/i),
+          expect.stringMatching(/GRAVE \/ INHABITABLE/i),
         ])
       );
+    });
+
+    it('homologa riesgoEstructural aislado a MEDIA (25 pts) igual que sgrai-api y permite decrementar a 0 en familia única', () => {
+      const resEstructural = calcularPrioridadSugerida({
+        ...VALORES_INICIALES_EVALUACION_PRIORIDAD,
+        riesgoEstructural: true,
+      });
+      expect(resEstructural.prioridadSugerida).toBe('MEDIA');
+
+      const trasDecremento = calcularPrioridadSugerida({
+        ...VALORES_INICIALES_EVALUACION_PRIORIDAD,
+        personasElectrodependientes: 1,
+        familias: [
+          {
+            ...VALORES_INICIALES_EVALUACION_PRIORIDAD.familias[0],
+            personasElectrodependientes: 0,
+          },
+        ],
+      });
+      expect(trasDecremento.prioridadSugerida).toBe('BAJA');
     });
     it('no considera requiereApoyoAdicional en el cálculo de prioridad sugerida', () => {
       const resultado = calcularPrioridadSugerida({
