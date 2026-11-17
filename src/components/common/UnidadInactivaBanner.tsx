@@ -26,7 +26,7 @@ export const UnidadInactivaBanner: React.FC<UnidadInactivaBannerProps> = ({
           {nombreUnidad ? ` — ${nombreUnidad}` : ''}
         </h3>
         <p className={styles.message}>
-          Esta unidad ha sido retirada del servicio activo. Se encuentra en{' '}
+          Esta unidad ha sido retirada del servicio activo (§3.7 de baja lógica). Se encuentra en{' '}
           <strong>modo histórico de solo lectura</strong> para consulta de faenas anteriores. No es
           posible recibir nuevos despachos ni ejecutar acciones operativas.
         </p>

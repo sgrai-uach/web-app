@@ -7,7 +7,6 @@ import { Heading } from '@/components/ui/Heading';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
-import { guardarMisionesLocales } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { ordenarMisionesPorActualizacion } from '@/lib/utils/formatters';
@@ -21,7 +20,7 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaMisionesPage.module.css';
 
 function CuadrillaMisionesContenido() {
-  const { usuario, unidadActiva, tieneUnidadAsignada, actualizarUnidadAsignada } = useAuth();
+  const { usuario, unidadActiva, tieneUnidadAsignada, estadoAsignacion } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -41,57 +40,21 @@ function CuadrillaMisionesContenido() {
   const cargarMisiones = useCallback(async () => {
     setCargando(true);
     try {
-      let locales = await sincronizarMisiones({
+      if (!tieneUnidadAsignada || estadoAsignacion === 'SIN_ASIGNACION') {
+        setMisiones([]);
+        return;
+      }
+
+      const locales = await sincronizarMisiones({
         tipoMision: 'ATENCION_CUADRILLA',
+        cuadrillaId: usuario?.unidadId || undefined,
       });
-
-      if (!tieneUnidadAsignada && actualizarUnidadAsignada && locales.length > 0) {
-        const conUnidad = locales.find(
-          (m) => m.datosAdicionales?.cuadrillaId || m.datosAdicionales?.cuadrillaNombre
-        );
-        if (conUnidad) {
-          const uId = conUnidad.datosAdicionales?.cuadrillaId as string | undefined;
-          const uNombre = conUnidad.datosAdicionales?.cuadrillaNombre as string | undefined;
-          if (uId || uNombre) {
-            actualizarUnidadAsignada(uId || uNombre || '', uNombre || uId || '', true);
-          }
-        }
-      }
-
-      if (!unidadActiva && locales.length === 0) {
-        const historicas: MisionLocal[] = [
-          {
-            id: 'mision-hist-01',
-            incidenteId: 'inc-089',
-            codigoIncidente: 'INC-2026-00089',
-            tipologia: 'Caída de árbol',
-            direccion: 'Av. Ramón Picarte 1100, Valdivia',
-            prioridad: 'ALTA',
-            estado: 'FINALIZADA',
-            fechaDespacho: '2026-10-20T14:30:00Z',
-            actualizadoEn: '2026-10-20T17:45:00Z',
-          },
-          {
-            id: 'mision-hist-02',
-            incidenteId: 'inc-042',
-            codigoIncidente: 'INC-2026-00042',
-            tipologia: 'Inundación vial',
-            direccion: 'Calle General Lagos 750, Valdivia',
-            prioridad: 'MEDIA',
-            estado: 'FINALIZADA',
-            fechaDespacho: '2026-10-15T09:00:00Z',
-            actualizadoEn: '2026-10-15T12:30:00Z',
-          },
-        ];
-        await guardarMisionesLocales(historicas);
-        locales = historicas;
-      }
 
       setMisiones(locales);
     } finally {
       setCargando(false);
     }
-  }, [unidadActiva, tieneUnidadAsignada, actualizarUnidadAsignada]);
+  }, [tieneUnidadAsignada, estadoAsignacion, usuario?.unidadId]);
 
   useEffect(() => {
     cargarMisiones();
@@ -196,7 +159,9 @@ function CuadrillaMisionesContenido() {
               Sin registros disponibles
             </p>
             <p style={{ fontSize: '0.875rem', margin: 0 }}>
-              {!unidadActiva
+              {!tieneUnidadAsignada
+                ? 'El funcionario no posee una cuadrilla asignada. Solicite su asignación en el Centro de Mando.'
+                : !unidadActiva
                 ? 'No se encontraron faenas históricas registradas para esta cuadrilla.'
                 : 'La cuadrilla se encuentra disponible para despacho.'}
             </p>

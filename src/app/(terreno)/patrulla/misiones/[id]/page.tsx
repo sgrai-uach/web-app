@@ -40,7 +40,13 @@ interface PageProps {
 
 export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const { id: misionId } = use(params);
-  const { usuario, unidadActiva, tieneUnidadAsignada, tienePermiso } = useAuth();
+  const {
+    usuario,
+    unidadActiva,
+    tieneUnidadAsignada,
+    estadoAsignacion,
+    tienePermiso,
+  } = useAuth();
   const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
@@ -54,29 +60,14 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     setCargando(true);
     try {
       const encontrada = await obtenerDetalleMision(misionId);
-      if (encontrada) {
-        setMision(encontrada);
-        if (encontrada.datosAdicionales?.tipologiaEvaluada) {
-          setSeccionCategorizacionAbierta(false);
-        }
-      } else {
-        setMision({
-          id: misionId,
-          incidenteId: '',
-          codigoIncidente: `INC-2026-${misionId.substring(0, 5).toUpperCase()}`,
-          tipologia: 'Caída de árbol',
-          direccion: 'Av. Alemania 600, Valdivia',
-          coordenadas: { lat: -39.81, lng: -73.24 },
-          prioridad: 'ALTA',
-          estado: unidadActiva ? 'DESPACHADA' : 'FINALIZADA',
-          fechaDespacho: '2026-10-18T11:00:00Z',
-          actualizadoEn: '2026-10-18T11:45:00Z',
-        });
+      if (encontrada?.datosAdicionales?.tipologiaEvaluada) {
+        setSeccionCategorizacionAbierta(false);
       }
+      setMision(encontrada || null);
     } finally {
       setCargando(false);
     }
-  }, [misionId, unidadActiva]);
+  }, [misionId]);
 
   useEffect(() => {
     void cargarDetalle();
@@ -117,10 +108,44 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     }
   };
 
-  if (cargando || !mision) {
+  if (cargando) {
     return (
       <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
         Cargando misión...
+      </div>
+    );
+  }
+
+  if (!mision) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.topBar}>
+          <Link href="/patrulla/misiones" className={styles.backLink}>
+            <ArrowLeft size={16} aria-hidden="true" />
+            <span>Misiones</span>
+          </Link>
+          <ConnectionStatusBadge
+            status={status}
+            pendingCount={pendientes}
+            onRetry={sincronizar}
+          />
+        </div>
+        <div
+          style={{
+            backgroundColor: 'var(--color-white)',
+            border: '1px solid var(--color-border)',
+            padding: 'var(--space-6)',
+            textAlign: 'center',
+          }}
+          role="alert"
+        >
+          <p style={{ fontWeight: 700, margin: '0 0 var(--space-2) 0' }}>
+            Misión no encontrada
+          </p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: 0 }}>
+            La misión solicitada no existe, fue removida o no se encuentra disponible en caché local.
+          </p>
+        </div>
       </div>
     );
   }
@@ -161,7 +186,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       <div className={styles.topBar}>
         <Link href="/patrulla/misiones" className={styles.backLink}>
           <ArrowLeft size={16} aria-hidden="true" />
-          <span>{unidadActiva ? 'Misiones' : 'Historial'}</span>
+          <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Misiones'}</span>
         </Link>
         <ConnectionStatusBadge
           status={status}

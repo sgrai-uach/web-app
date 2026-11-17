@@ -7,7 +7,6 @@ import { Heading } from '@/components/ui/Heading';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
-import { guardarMisionesLocales } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { ordenarMisionesPorActualizacion } from '@/lib/utils/formatters';
@@ -21,7 +20,7 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaMisionesPage.module.css';
 
 function PatrullaMisionesContenido() {
-  const { usuario, unidadActiva, tieneUnidadAsignada, actualizarUnidadAsignada } = useAuth();
+  const { usuario, unidadActiva, tieneUnidadAsignada, estadoAsignacion } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -41,78 +40,21 @@ function PatrullaMisionesContenido() {
   const cargarMisiones = useCallback(async () => {
     setCargando(true);
     try {
-      let locales = await sincronizarMisiones({
+      if (!tieneUnidadAsignada || estadoAsignacion === 'SIN_ASIGNACION') {
+        setMisiones([]);
+        return;
+      }
+
+      const locales = await sincronizarMisiones({
         tipoMision: 'VERIFICACION',
+        patrullaId: usuario?.unidadId || undefined,
       });
-
-      if (!tieneUnidadAsignada && actualizarUnidadAsignada && locales.length > 0) {
-        const conUnidad = locales.find(
-          (m) => m.datosAdicionales?.patrullaId || m.datosAdicionales?.patrullaNombre
-        );
-        if (conUnidad) {
-          const uId = conUnidad.datosAdicionales?.patrullaId as string | undefined;
-          const uNombre = conUnidad.datosAdicionales?.patrullaNombre as string | undefined;
-          if (uId || uNombre) {
-            actualizarUnidadAsignada(uId || uNombre || '', uNombre || uId || '', true);
-          }
-        }
-      }
-
-      if (!unidadActiva && locales.length === 0) {
-        const historicas: MisionLocal[] = [
-          {
-            id: 'patrulla-hist-01',
-            incidenteId: 'inc-102',
-            codigoIncidente: 'INC-2026-00102',
-            tipologia: 'Caída de árbol',
-            direccion: 'Av. Alemania 600, Valdivia',
-            prioridad: 'ALTA',
-            estado: 'FINALIZADA',
-            fechaDespacho: '2026-10-18T11:00:00Z',
-            actualizadoEn: '2026-10-18T11:45:00Z',
-          },
-          {
-            id: 'patrulla-hist-02',
-            incidenteId: 'inc-067',
-            codigoIncidente: 'INC-2026-00067',
-            tipologia: 'Deslizamiento',
-            direccion: 'Camino a Niebla Km 4, Valdivia',
-            prioridad: 'CRITICA',
-            estado: 'FINALIZADA',
-            fechaDespacho: '2026-10-14T16:20:00Z',
-            actualizadoEn: '2026-10-14T17:10:00Z',
-          },
-        ];
-        await guardarMisionesLocales(historicas);
-        locales = historicas;
-      } else if (unidadActiva && locales.length === 0) {
-        const inicialesActivas: MisionLocal[] = [
-          {
-            id: '60000000-0000-4000-8000-000000000001',
-            incidenteId: 'a0000000-0000-4000-8000-000000000001',
-            codigoIncidente: 'INC-2026-0001',
-            tipologia: 'Caída de árbol',
-            direccion: 'Av. Ramón Picarte 1200, Valdivia',
-            coordenadas: { lat: -39.819588, lng: -73.245209 },
-            prioridad: 'ALTA',
-            estado: 'DESPACHADA',
-            fechaDespacho: '2026-11-01T20:30:00Z',
-            datosAdicionales: {
-              trabajo: 'Evaluar caída de árbol sobre calzada y riesgo de tendido eléctrico.',
-              titulo: 'Verificación de Incidente INC-2026-0001',
-            },
-            actualizadoEn: '2026-11-01T20:30:00Z',
-          },
-        ];
-        await guardarMisionesLocales(inicialesActivas);
-        locales = inicialesActivas;
-      }
 
       setMisiones(locales);
     } finally {
       setCargando(false);
     }
-  }, [unidadActiva, tieneUnidadAsignada, actualizarUnidadAsignada]);
+  }, [tieneUnidadAsignada, estadoAsignacion, usuario?.unidadId]);
 
   useEffect(() => {
     cargarMisiones();

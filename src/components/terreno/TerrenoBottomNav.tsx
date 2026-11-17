@@ -9,7 +9,7 @@ import styles from './TerrenoBottomNav.module.css';
 
 export function TerrenoBottomNav() {
   const pathname = usePathname() || '/';
-  const { esCuadrilla, unidadActiva } = useAuth();
+  const { esCuadrilla, estadoAsignacion } = useAuth();
 
   const esRutaInicio = pathname === '/' || pathname === '/terreno';
   const esRutaMisiones =
@@ -17,11 +17,12 @@ export function TerrenoBottomNav() {
   const esRutaPerfil = pathname.startsWith('/perfil');
 
   const misionesHref = esCuadrilla ? '/cuadrilla/misiones' : '/patrulla/misiones';
-  const misionesLabel = !unidadActiva
-    ? 'Historial'
-    : esCuadrilla
-    ? 'Faenas'
-    : 'Misiones';
+  const misionesLabel =
+    estadoAsignacion === 'DESACTIVADA'
+      ? 'Historial'
+      : esCuadrilla
+      ? 'Faenas'
+      : 'Misiones';
   const MisionesIcon = esCuadrilla ? HardHat : Compass;
 
   return (

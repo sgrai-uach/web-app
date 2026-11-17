@@ -20,7 +20,12 @@ interface PageProps {
 
 export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const { id: misionId } = use(params);
-  const { usuario, unidadActiva, tieneUnidadAsignada } = useAuth();
+  const {
+    usuario,
+    unidadActiva,
+    tieneUnidadAsignada,
+    estadoAsignacion,
+  } = useAuth();
 
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
@@ -33,18 +38,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       if (encontrada) {
         setMision(encontrada);
       } else {
-        setMision({
-          id: misionId,
-          incidenteId: `inc-${misionId}`,
-          codigoIncidente: `INC-2026-${misionId.substring(0, 5).toUpperCase()}`,
-          tipologia: 'Caída de árbol',
-          direccion: 'Av. Ramón Picarte 1100, Valdivia',
-          coordenadas: { lat: -39.82, lng: -73.23 },
-          prioridad: 'ALTA',
-          estado: 'FINALIZADA',
-          fechaDespacho: '2026-10-20T14:30:00Z',
-          actualizadoEn: '2026-10-20T17:45:00Z',
-        });
+        setMision(null);
       }
     } finally {
       setCargando(false);
@@ -78,7 +72,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     <div className={styles.container}>
       <Link href="/cuadrilla/misiones" className={styles.backLink}>
         <ArrowLeft size={16} aria-hidden="true" />
-        <span>Historial</span>
+        <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}</span>
       </Link>
 
       {!tieneUnidadAsignada ? (
