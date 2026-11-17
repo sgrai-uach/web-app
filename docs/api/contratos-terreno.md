@@ -143,6 +143,84 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 
 ---
 
+### 2.2 Evaluar Terreno y Asignar/Modificar Prioridad del Incidente (H38)
+- **Historia:** H38
+- **Método:** `PATCH`
+- **Ruta:** `/api/incidentes/{id}/prioridad` (y cálculo auxiliar en `POST /api/incidentes/{id}/prioridad/calcular`)
+- **Permiso RBAC requerido:** `misiones:terreno:verificar`
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+#### Request Body (`PATCH /api/incidentes/{id}/prioridad`)
+```json
+{
+  "prioridad": "CRITICA",
+  "prioridadSugerida": "ALTA",
+  "justificacionPrioridad": "Se constata riesgo eléctrico activo sobre acceso único de vivienda con adultos mayores.",
+  "nucleoFamiliarTotal": 4,
+  "cantidadNinos": 1,
+  "cantidadAdultosMayores": 2,
+  "personasDiscapacitadas": 0,
+  "personasElectrodependientes": 0,
+  "mascotasAfectadas": 1,
+  "viviendasAfectadas": 1,
+  "nivelCompromisoVivienda": "MODERADO",
+  "riesgoElectrico": true,
+  "riesgoEstructural": false,
+  "riesgoQuimicoSanitario": false,
+  "aislamientoVial": false,
+  "requiereEvacuacion": false,
+  "detallesAdicionales": "Se requiere coordinación con empresa eléctrica y cuadrilla de despeje.",
+  "factoresGatillantes": [
+    "Peligro eléctrico activo en terreno",
+    "Adultos mayores afectados (2)"
+  ],
+  "versionReporte": 1,
+  "misionId": "60000000-0000-4000-8000-000000000001"
+}
+```
+
+#### Reglas de Validación y Versionado
+- Si `prioridad !== prioridadSugerida`, el campo `justificacionPrioridad` es obligatorio y debe tener al menos **5 caracteres**.
+- Cada envío o rectificación incrementa `versionReporte` (`1`, `2`, `...`), registrando un reporte distinguible en el Centro de Mando (con datos de `evaluador` visibles para toda la patrulla) y emitiendo los eventos WebSocket `incidente:actualizado` y `mision:actualizada`.
+
+---
+
+### 2.3 Enviar Informe Técnico de Verificación y Cerrar Misión (H39 / H86)
+- **Historia:** H39 (fusión H39 / H86)
+- **Método:** `POST`
+- **Ruta:** `/api/misiones/{id}/reporte`
+- **Permiso RBAC requerido:** `reportes:crear`
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+#### Request Body (`POST /api/misiones/{id}/reporte`)
+```json
+{
+  "dictamen": "REQUIERE_CUADRILLA",
+  "motivo_no_abordable": null,
+  "resumen_tecnico": "Se constata obstrucción completa de sumidero y socavón en berma norte; requiere cuadrilla vial con motobomba.",
+  "estado_terreno": "CRITICO",
+  "personas_afectadas": 4,
+  "danos_estimados": "Anegamiento de primer nivel en 2 viviendas y daño en cerco perimetral.",
+  "observaciones": "Acceso despejado para camión aljibe por calle paralela.",
+  "requiere_asistencia_social": true,
+  "adjuntoIds": [],
+  "adjuntos": [],
+  "latitud": -39.819588,
+  "longitud": -73.245209
+}
+```
+
+#### Reglas de Validación y Transacción Atómica
+- `dictamen`: obligatorio (`'REQUIERE_CUADRILLA'` o `'NO_ABORDABLE'`).
+- `resumen_tecnico`: obligatorio, mínimo **10 caracteres**.
+- `motivo_no_abordable`: obligatorio cuando `dictamen === 'NO_ABORDABLE'`, mínimo **15 caracteres**. Transiciona `incidente.estado = 'NO_ABORDABLE'` registrando `fecha_cierre` y motivo.
+- `personas_afectadas`: entero `>= 0`, precargado automáticamente desde el último reporte de prioridad (HU-38) mediante `evaluaciones.personasAfectadasPrevias` / `reportesTerreno` y editable por la patrulla.
+- `requiere_asistencia_social`: casilla Ficha FIBE (trasladada desde HU-38); si es `true`, marca `incidente.requiere_asistencia_social = true`.
+- `adjuntoIds` / `adjuntos`: sección preparada para integración con evidencia fotográfica (HU-43).
+- Al recibir `201 Created`, la misión pasa a `COMPLETADA` (`fecha_cierre`), la patrulla pasa a `DISPONIBLE` y se emiten los eventos WebSocket `mision:actualizada`, `incidente:actualizado` y `patrulla:actualizada` / `patrulla:liberada`, sincronizando el estado y autoría (`evaluador`) para todo el personal de la patrulla.
+
+---
+
 ## 3. Protocolo WebSocket en Tiempo Real
 
 - **Librería cliente:** `socket.io-client`

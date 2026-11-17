@@ -1,0 +1,95 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  font-family: inherit;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  border-radius: var(--radius-none, 0px);
+  border: 1px solid transparent;
+  letter-spacing: 0.02em;
+  box-sizing: border-box;
+  vertical-align: middle;
+  user-select: none;
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.interactive {
+  cursor: pointer;
+  transition: filter 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.interactive:hover {
+  filter: brightness(0.95);
+}
+
+.interactive:focus-visible {
+  outline: 2px solid var(--color-primary-teal, #1B6F7D);
+  outline-offset: 1px;
+}
+
+.sm {
+  height: 20px;
+  padding: 0 8px;
+  font-size: 0.6875rem; /* 11px */
+}
+
+.md {
+  height: 24px;
+  padding: 0 10px;
+  font-size: 0.75rem; /* 12px */
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Variantes semánticas unificadas (web y web-app) */
+.neutral {
+  background-color: var(--color-bg-light, #ECEFF3);
+  color: var(--color-charcoal, #3B3F45);
+  border-color: #CBD5E1;
+}
+
+.info {
+  background-color: var(--color-info-bg, #E0F2F1);
+  color: var(--color-primary-teal-dark, #14505A);
+  border-color: var(--color-primary-teal, #1B6F7D);
+}
+
+.success {
+  background-color: var(--color-success-bg, #E8F5E9);
+  color: var(--color-success, #2E7D32);
+  border-color: #A5D6A7;
+}
+
+.warning {
+  background-color: var(--color-warning-bg, #FFF3E0);
+  color: var(--color-warning, #E65100);
+  border-color: #FFCC80;
+}
+
+.danger {
+  background-color: var(--color-danger-bg, #FFEBEE);
+  color: var(--color-danger, #D32F2F);
+  border-color: #EF9A9A;
+}
+
+.teal {
+  background-color: var(--color-info-bg, #E0F2F1);
+  color: var(--color-primary-teal, #1B6F7D);
+  border-color: var(--color-primary-teal, #1B6F7D);
+}
+
+.solidTeal {
+  background-color: var(--color-primary-teal, #1B6F7D);
+  color: var(--color-white, #FFFFFF);
+  border-color: var(--color-primary-teal-dark, #14505A);
+}
+
