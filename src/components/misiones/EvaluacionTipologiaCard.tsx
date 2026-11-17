@@ -1,24 +1,30 @@
 'use client';
 
 import React, { useState, useEffect, useId, useRef, useLayoutEffect } from 'react';
-import {
-  CheckCircle,
-  AlertTriangle,
-  WifiOff,
-  CheckCircle2,
-  ClipboardCheck,
-  Edit3,
-} from 'lucide-react';
+import { CheckCircle, CheckCircle2, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { ModalConfirmacionTipologia } from './ModalConfirmacionTipologia';
+import {
+  AlertaFeedbackReporte,
+  BloqueFormularioReporte,
+  CampoResumenReporte,
+  ResumenReporteTerreno,
+  formatearAutorReporte,
+  type FeedbackReporteState,
+} from './ReporteTerrenoBase';
 import {
   obtenerCatalogoTiposIncidente,
   reclasificarTipologiaEnTerreno,
   type ResultadoReclasificacionTipologia,
 } from '@/services/tipologiaService';
-import type { TipoIncidenteCatalogoItem, MisionLocal } from '@/types/offline';
+import type {
+  EvaluadorReporteTerreno,
+  TipoIncidenteCatalogoItem,
+  MisionLocal,
+} from '@/types/offline';
 import styles from './EvaluacionTipologiaCard.module.css';
 
 const JUSTIFICACION_MIN = 5;
@@ -28,6 +34,7 @@ const TEXTAREA_ALTURA_MAX_PX = 240;
 export interface EvaluacionTipologiaCardProps {
   incidenteId: string;
   misionActual: MisionLocal;
+  usuarioActualId?: string;
   onTipologiaActualizada?: (resultado: ResultadoReclasificacionTipologia) => void;
   deshabilitado?: boolean;
 }
@@ -55,14 +62,33 @@ export function EvaluacionTipologiaCard({
   const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
   const [modalConfirmacionAbierto, setModalConfirmacionAbierto] = useState<boolean>(false);
   const [modoEdicion, setModoEdicion] = useState<boolean>(false);
-  const [feedback, setFeedback] = useState<{
-    tipo: 'success' | 'offline' | 'error';
-    texto: string;
-  } | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackReporteState | null>(null);
 
   const tipologiaOriginal = (misionActual?.tipologia || '').trim();
   const yaEvaluada = Boolean(misionActual?.datosAdicionales?.tipologiaEvaluada);
   const mostrarResumen = yaEvaluada && !modoEdicion;
+
+  const evaluadorRaw = misionActual?.datosAdicionales?.evaluadorTipologia;
+  const evaluadorTipologia: EvaluadorReporteTerreno | undefined =
+    evaluadorRaw &&
+    typeof evaluadorRaw === 'object' &&
+    typeof (evaluadorRaw as EvaluadorReporteTerreno).nombre === 'string' &&
+    (evaluadorRaw as EvaluadorReporteTerreno).nombre.trim().length > 0
+      ? (evaluadorRaw as EvaluadorReporteTerreno)
+      : undefined;
+
+  const fechaEvaluacionTipologia =
+    typeof misionActual?.datosAdicionales?.fechaEvaluacionTipologia === 'string'
+      ? misionActual.datosAdicionales.fechaEvaluacionTipologia
+      : undefined;
+
+  const esReclasificacionResumen = Boolean(
+    misionActual?.datosAdicionales?.esReclasificacion
+  );
+  const registradoPorResumen = formatearAutorReporte(
+    evaluadorTipologia,
+    fechaEvaluacionTipologia
+  );
 
   // Carga inicial del catálogo de tipos (con fallback offline y protección de desmontaje)
   useEffect(() => {
@@ -196,148 +222,127 @@ export function EvaluacionTipologiaCard({
 
   return (
     <div className={styles.container} role="group" aria-label="Categorización del incidente">
-      <div className={styles.infoRow}>
-        <span className={styles.infoLabel}>Tipo registrado</span>
-        <span className={styles.infoValue}>
-          {misionActual.tipologia || 'Sin clasificación'}
-        </span>
-      </div>
-
-      {feedback && (
-        <div
-          className={`${styles.alertBox} ${
-            feedback.tipo === 'success'
-              ? styles.alertSuccess
-              : feedback.tipo === 'offline'
-                ? styles.alertOffline
-                : styles.alertError
-          }`}
-          role="status"
-        >
-          {feedback.tipo === 'success' && (
-            <CheckCircle size={18} aria-hidden="true" className={styles.alertIcon} />
-          )}
-          {feedback.tipo === 'offline' && (
-            <WifiOff size={18} aria-hidden="true" className={styles.alertIcon} />
-          )}
-          {feedback.tipo === 'error' && (
-            <AlertTriangle size={18} aria-hidden="true" className={styles.alertIcon} />
-          )}
-          <span>{feedback.texto}</span>
+      {!mostrarResumen && (
+        <div className={styles.infoRow}>
+          <span className={styles.infoLabel}>Tipo registrado</span>
+          <span className={styles.infoValue}>
+            {misionActual.tipologia || 'Sin clasificación'}
+          </span>
         </div>
       )}
 
-      {errorValidacion && (
-        <div className={`${styles.alertBox} ${styles.alertError}`} role="alert">
-          <AlertTriangle size={18} aria-hidden="true" className={styles.alertIcon} />
-          <span>{errorValidacion}</span>
-        </div>
-      )}
+      <AlertaFeedbackReporte
+        feedback={feedback}
+        errorValidacion={errorValidacion}
+      />
 
       {/* Vista de Resumen cuando ya fue evaluada y no está en modo edición */}
       {mostrarResumen ? (
-        <div className={styles.resumenCard} data-testid="resumen-tipologia">
-          <div className={styles.resumenHeader}>
-            <span className={styles.resumenTitulo}>
-              <ClipboardCheck size={16} aria-hidden="true" />
-              <span>Resumen de Evaluación en Terreno</span>
-            </span>
-          </div>
-
-          <div className={styles.resumenGrid}>
-            <div className={styles.resumenItem}>
-              <span className={styles.resumenLabel}>Tipología Constatada</span>
-              <span className={styles.resumenValor}>
-                {misionActual.tipologia || 'Sin clasificar'}
-              </span>
-            </div>
-
-            <div className={styles.resumenItem}>
-              <span className={styles.resumenLabel}>Dictamen Operativo</span>
-              <span className={styles.resumenValor}>
-                {misionActual.datosAdicionales?.esReclasificacion
-                  ? 'Reclasificación en terreno'
-                  : 'Ratificación presencial (sin variaciones)'}
-              </span>
-            </div>
-
-            {Boolean(misionActual.datosAdicionales?.justificacionTipologia) && (
-              <div className={styles.resumenItem}>
-                <span className={styles.resumenLabel}>Justificación Técnica</span>
-                <div className={styles.resumenJustificacion}>
-                  {String(misionActual.datosAdicionales?.justificacionTipologia)}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {!deshabilitado && (
-            <Button
-              type="button"
-              variant="outline"
-              size="md"
-              icon={<Edit3 size={16} />}
-              onClick={() => setModoEdicion(true)}
-              className={styles.btnModificar}
+        <ResumenReporteTerreno
+          testId="resumen-tipologia"
+          titulo="Resumen de Evaluación en Terreno"
+          chip={
+            <Chip
+              variant={esReclasificacionResumen ? 'teal' : 'info'}
+              size="sm"
             >
-              Modificar categorización
-            </Button>
+              {esReclasificacionResumen ? 'Reclasificada' : 'Ratificada'}
+            </Chip>
+          }
+          registradoPor={registradoPorResumen}
+          textoModificar="Modificar categorización"
+          deshabilitado={deshabilitado}
+          onModificar={() => {
+            if (
+              misionActual.datosAdicionales?.esReclasificacion &&
+              typeof misionActual.datosAdicionales?.justificacionTipologia === 'string'
+            ) {
+              setJustificacion(misionActual.datosAdicionales.justificacionTipologia);
+            }
+            setModoEdicion(true);
+          }}
+        >
+          <CampoResumenReporte
+            label="Tipología Constatada"
+            valor={misionActual.tipologia || 'Sin clasificar'}
+          />
+
+          <CampoResumenReporte
+            label="Dictamen Operativo"
+            valor={
+              esReclasificacionResumen
+                ? 'Reclasificación en terreno'
+                : 'Ratificación presencial (sin variaciones)'
+            }
+          />
+
+          {Boolean(misionActual.datosAdicionales?.justificacionTipologia) && (
+            <CampoResumenReporte
+              label="Justificación Técnica"
+              valor={String(misionActual.datosAdicionales?.justificacionTipologia)}
+              esBloqueTexto
+            />
           )}
-        </div>
+        </ResumenReporteTerreno>
       ) : (
         /* Formulario de Evaluación / Modificación */
         <form onSubmit={handlePreConfirmar} className={styles.form} noValidate>
-          <Select
-            id={selectId}
-            label="Tipo de incidente"
-            requiredIndicator
-            value={tipoSeleccionadoId}
-            onChange={(e) => {
-              setTipoSeleccionadoId(e.target.value);
-              setErrorValidacion(null);
-            }}
-            disabled={deshabilitado || guardando || cargandoCatalogo}
-            helperText={tipoActualSeleccionado?.descripcion || undefined}
-            options={catalogo.map((t) => ({
-              value: t.id,
-              label: t.nombre,
-            }))}
-          />
+          <BloqueFormularioReporte
+            icono={<Tag size={16} aria-hidden="true" />}
+            titulo="1. Clasificación en Terreno"
+          >
+            <Select
+              id={selectId}
+              label="Tipo de incidente"
+              requiredIndicator
+              value={tipoSeleccionadoId}
+              onChange={(e) => {
+                setTipoSeleccionadoId(e.target.value);
+                setErrorValidacion(null);
+              }}
+              disabled={deshabilitado || guardando || cargandoCatalogo}
+              helperText={tipoActualSeleccionado?.descripcion || undefined}
+              options={catalogo.map((t) => ({
+                value: t.id,
+                label: t.nombre,
+              }))}
+            />
 
-          {!esCambio ? (
-            <div className={styles.ratificacionNotice} role="note">
-              <CheckCircle2 size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
-              <span>
-                Tipología original constatada. No se requiere justificación adicional para ratificar.
-              </span>
-            </div>
-          ) : (
-            <div className={styles.fieldGroup}>
-              <Textarea
-                ref={textareaRef}
-                id={textareaId}
-                label="Justificación del cambio"
-                requiredIndicator
-                rows={4}
-                maxLength={JUSTIFICACION_MAX}
-                value={justificacion}
-                onChange={(e) => {
-                  setJustificacion(e.target.value);
-                  setErrorValidacion(null);
-                }}
-                placeholder="Describa los antecedentes constatados en terreno que fundamentan la nueva tipología"
-                disabled={deshabilitado || guardando}
-                aria-describedby={`${textareaId}-counter`}
-                className={styles.justificacion}
-              />
-              <div id={`${textareaId}-counter`} className={styles.counterRow}>
-                <span>Mínimo {JUSTIFICACION_MIN} caracteres</span>
-                <span className={contadorClase || undefined}>
-                  {longitudJustificacion} / {JUSTIFICACION_MAX}
+            {!esCambio ? (
+              <div className={styles.ratificacionNotice} role="note">
+                <CheckCircle2 size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+                <span>
+                  Tipología original constatada. No se requiere justificación adicional para ratificar.
                 </span>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className={styles.fieldGroup}>
+                <Textarea
+                  ref={textareaRef}
+                  id={textareaId}
+                  label="Justificación del cambio"
+                  requiredIndicator
+                  rows={4}
+                  maxLength={JUSTIFICACION_MAX}
+                  value={justificacion}
+                  onChange={(e) => {
+                    setJustificacion(e.target.value);
+                    setErrorValidacion(null);
+                  }}
+                  placeholder="Describa los antecedentes constatados en terreno que fundamentan la nueva tipología"
+                  disabled={deshabilitado || guardando}
+                  aria-describedby={`${textareaId}-counter`}
+                  className={styles.justificacion}
+                />
+                <div id={`${textareaId}-counter`} className={styles.counterRow}>
+                  <span>Mínimo {JUSTIFICACION_MIN} caracteres</span>
+                  <span className={contadorClase || undefined}>
+                    {longitudJustificacion} / {JUSTIFICACION_MAX}
+                  </span>
+                </div>
+              </div>
+            )}
+          </BloqueFormularioReporte>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <Button

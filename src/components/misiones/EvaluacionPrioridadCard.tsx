@@ -4,10 +4,7 @@ import React, { useState, useEffect, useId, useMemo } from 'react';
 import {
   CheckCircle,
   AlertTriangle,
-  WifiOff,
   CheckCircle2,
-  ClipboardCheck,
-  Edit3,
   Plus,
   Minus,
   Users,
@@ -25,6 +22,13 @@ import { Chip } from '@/components/ui/Chip';
 import { Textarea } from '@/components/ui/Textarea';
 import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { ModalConfirmacionPrioridad } from './ModalConfirmacionPrioridad';
+import {
+  AlertaFeedbackReporte,
+  CampoResumenReporte,
+  ResumenReporteTerreno,
+  formatearAutorReporte,
+  type FeedbackReporteState,
+} from './ReporteTerrenoBase';
 import {
   VALORES_INICIALES_EVALUACION_PRIORIDAD,
   PRIORIDADES_CANONICAS,
@@ -57,6 +61,7 @@ const DETALLES_MAX = 1000;
 export interface EvaluacionPrioridadCardProps {
   incidenteId: string;
   misionActual: MisionLocal;
+  usuarioActualId?: string;
   onPrioridadActualizada?: (resultado: ResultadoAsignacionPrioridad) => void;
   deshabilitado?: boolean;
 }
@@ -70,7 +75,6 @@ interface SwitchPeligroConfig {
     | 'riesgoQuimicoSanitario'
     | 'aislamientoVial'
     | 'requiereEvacuacion'
-    | 'requiereAsistenciaSocial'
   >;
   etiqueta: string;
   esCritico?: boolean;
@@ -100,10 +104,6 @@ const SWITCHES_PELIGRO: SwitchPeligroConfig[] = [
   {
     campo: 'aislamientoVial',
     etiqueta: 'Aislamiento vial / corte de ruta',
-  },
-  {
-    campo: 'requiereAsistenciaSocial',
-    etiqueta: 'Requiere asistencia social (FIBE)',
   },
 ];
 
@@ -157,7 +157,6 @@ export function EvaluacionPrioridadCard({
               personasElectrodependientes: evalBase.personasElectrodependientes,
               mascotasAfectadas: evalBase.mascotasAfectadas,
               nivelCompromisoVivienda: evalBase.nivelCompromisoVivienda,
-              requiereAsistenciaSocial: evalBase.requiereAsistenciaSocial,
             },
           ];
         }
@@ -211,10 +210,7 @@ export function EvaluacionPrioridadCard({
   const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
   const [modalConfirmacionAbierto, setModalConfirmacionAbierto] =
     useState<boolean>(false);
-  const [feedback, setFeedback] = useState<{
-    tipo: 'success' | 'offline' | 'error';
-    texto: string;
-  } | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackReporteState | null>(null);
 
   // Sincronizar formulario si llega un último reporte nuevo desde misionActual
   useEffect(() => {
@@ -232,7 +228,6 @@ export function EvaluacionPrioridadCard({
             personasElectrodependientes: evalBase.personasElectrodependientes,
             mascotasAfectadas: evalBase.mascotasAfectadas,
             nivelCompromisoVivienda: evalBase.nivelCompromisoVivienda,
-            requiereAsistenciaSocial: evalBase.requiereAsistenciaSocial,
           },
         ];
       }
@@ -385,7 +380,6 @@ export function EvaluacionPrioridadCard({
         personasElectrodependientes: 0,
         mascotasAfectadas: 0,
         nivelCompromisoVivienda: 'SIN_DANO',
-        requiereAsistenciaSocial: false,
       };
       return {
         ...prev,
@@ -511,82 +505,91 @@ export function EvaluacionPrioridadCard({
       role="group"
       aria-label="Evaluación en terreno y prioridad"
     >
-      <div className={styles.infoRow}>
-        <div className={styles.infoCol}>
-          <span className={styles.infoLabel}>Prioridad vigente del incidente</span>
-          <span className={styles.infoValue}>
-            {formatearPrioridad(misionActual.prioridad)}
-          </span>
-        </div>
-        {ultimoReporte && (
-          <Chip variant="teal" size="sm">
-            Reporte #{ultimoReporte.versionReporte}
-          </Chip>
-        )}
-      </div>
-
-      {feedback && (
-        <div
-          className={`${styles.alertBox} ${
-            feedback.tipo === 'success'
-              ? styles.alertSuccess
-              : feedback.tipo === 'offline'
-                ? styles.alertOffline
-                : styles.alertError
-          }`}
-          role="status"
-        >
-          {feedback.tipo === 'success' && (
-            <CheckCircle size={18} aria-hidden="true" className={styles.alertIcon} />
-          )}
-          {feedback.tipo === 'offline' && (
-            <WifiOff size={18} aria-hidden="true" className={styles.alertIcon} />
-          )}
-          {feedback.tipo === 'error' && (
-            <AlertTriangle size={18} aria-hidden="true" className={styles.alertIcon} />
-          )}
-          <span>{feedback.texto}</span>
-        </div>
-      )}
-
-      {errorValidacion && (
-        <div className={`${styles.alertBox} ${styles.alertError}`} role="alert">
-          <AlertTriangle size={18} aria-hidden="true" className={styles.alertIcon} />
-          <span>{errorValidacion}</span>
-        </div>
-      )}
-
-      {/* Vista Resumen cuando ya existe una evaluación y no está en modo edición */}
-      {mostrarResumen && ultimoReporte ? (
-        <div className={styles.resumenCard} data-testid="resumen-prioridad">
-          <div className={styles.resumenHeader}>
-            <span className={styles.resumenTitulo}>
-              <ClipboardCheck size={16} aria-hidden="true" />
-              <span>Resumen de Evaluación y Prioridad</span>
+      {!mostrarResumen && (
+        <div className={styles.infoRow}>
+          <div className={styles.infoCol}>
+            <span className={styles.infoLabel}>Prioridad vigente del incidente</span>
+            <span className={styles.infoValue}>
+              {formatearPrioridad(misionActual.prioridad)}
             </span>
+          </div>
+          {ultimoReporte && (
             <Chip variant="teal" size="sm">
               Reporte #{ultimoReporte.versionReporte}
             </Chip>
-          </div>
+          )}
+        </div>
+      )}
 
-          <div className={styles.resumenGrid}>
-            <div className={styles.resumenItem}>
-              <span className={styles.resumenLabel}>Prioridad Sugerida por Sistema</span>
-              <span className={styles.resumenValor}>
-                {formatearPrioridad(ultimoReporte.prioridadSugerida)}
-              </span>
-            </div>
+      <AlertaFeedbackReporte
+        feedback={feedback}
+        errorValidacion={errorValidacion}
+      />
 
-            <div className={styles.resumenItem}>
-              <span className={styles.resumenLabel}>Prioridad Asignada en Terreno</span>
-              <span className={styles.resumenValor}>
-                {formatearPrioridad(ultimoReporte.prioridadAsignada)}
-              </span>
-            </div>
+      {/* Vista Resumen cuando ya existe una evaluación y no está en modo edición */}
+      {mostrarResumen && ultimoReporte ? (
+        <ResumenReporteTerreno
+          testId="resumen-prioridad"
+          titulo="Resumen de Evaluación y Prioridad"
+          chip={
+            <Chip variant="teal" size="sm">
+              Reporte #{ultimoReporte.versionReporte}
+            </Chip>
+          }
+          registradoPor={formatearAutorReporte(
+            ultimoReporte.evaluador,
+            ultimoReporte.creadoEn,
+            'Operador de Patrulla'
+          )}
+          textoModificar="Modificar y reenviar reporte"
+          deshabilitado={deshabilitado}
+          onModificar={() => {
+            const evalBase = { ...ultimoReporte.evaluacion };
+            if (!evalBase.familias || evalBase.familias.length === 0) {
+              evalBase.familias = [
+                {
+                  id: 'fam-1',
+                  referencia: '',
+                  nucleoFamiliarTotal: evalBase.nucleoFamiliarTotal,
+                  cantidadNinos: evalBase.cantidadNinos,
+                  cantidadAdultosMayores: evalBase.cantidadAdultosMayores,
+                  personasDiscapacitadas: evalBase.personasDiscapacitadas,
+                  personasElectrodependientes: evalBase.personasElectrodependientes,
+                  mascotasAfectadas: evalBase.mascotasAfectadas,
+                  nivelCompromisoVivienda: evalBase.nivelCompromisoVivienda,
+                },
+              ];
+            }
+            setEvaluacion(evalBase);
+            if (
+              ultimoReporte.prioridadAsignada !==
+              ultimoReporte.prioridadSugerida
+            ) {
+              setPrioridadManual(ultimoReporte.prioridadAsignada);
+              setJustificacionPrioridad(
+                ultimoReporte.justificacionPrioridad || ''
+              );
+            } else {
+              setPrioridadManual(null);
+              setJustificacionPrioridad('');
+            }
+            setModoEdicion(true);
+          }}
+        >
+          <CampoResumenReporte
+            label="Prioridad Sugerida por Sistema"
+            valor={formatearPrioridad(ultimoReporte.prioridadSugerida)}
+          />
 
-            <div className={styles.resumenItem}>
-              <span className={styles.resumenLabel}>Catastro de Afectación</span>
-              <span className={styles.resumenValor}>
+          <CampoResumenReporte
+            label="Prioridad Asignada en Terreno"
+            valor={formatearPrioridad(ultimoReporte.prioridadAsignada)}
+          />
+
+          <CampoResumenReporte
+            label="Catastro de Afectación"
+            valor={
+              <>
                 {ultimoReporte.evaluacion.nucleoFamiliarTotal} personas (
                 {ultimoReporte.evaluacion.cantidadNinos} niños,{' '}
                 {ultimoReporte.evaluacion.cantidadAdultosMayores} adultos mayores,{' '}
@@ -600,73 +603,26 @@ export function EvaluacionPrioridadCard({
                   ]
                 }
                 )
-              </span>
-            </div>
+              </>
+            }
+          />
 
-            {ultimoReporte.justificacionPrioridad && (
-              <div className={styles.resumenItem}>
-                <span className={styles.resumenLabel}>Justificación de Prioridad</span>
-                <div className={styles.resumenJustificacion}>
-                  {ultimoReporte.justificacionPrioridad}
-                </div>
-              </div>
-            )}
-
-            {ultimoReporte.evaluacion.detallesAdicionales && (
-              <div className={styles.resumenItem}>
-                <span className={styles.resumenLabel}>Detalles Adicionales</span>
-                <div className={styles.resumenJustificacion}>
-                  {ultimoReporte.evaluacion.detallesAdicionales}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {!deshabilitado && (
-            <Button
-              type="button"
-              variant="outline"
-              size="md"
-              icon={<Edit3 size={16} />}
-              onClick={() => {
-                const evalBase = { ...ultimoReporte.evaluacion };
-                if (!evalBase.familias || evalBase.familias.length === 0) {
-                  evalBase.familias = [
-                    {
-                      id: 'fam-1',
-                      referencia: '',
-                      nucleoFamiliarTotal: evalBase.nucleoFamiliarTotal,
-                      cantidadNinos: evalBase.cantidadNinos,
-                      cantidadAdultosMayores: evalBase.cantidadAdultosMayores,
-                      personasDiscapacitadas: evalBase.personasDiscapacitadas,
-                      personasElectrodependientes: evalBase.personasElectrodependientes,
-                      mascotasAfectadas: evalBase.mascotasAfectadas,
-                      nivelCompromisoVivienda: evalBase.nivelCompromisoVivienda,
-                      requiereAsistenciaSocial: evalBase.requiereAsistenciaSocial,
-                    },
-                  ];
-                }
-                setEvaluacion(evalBase);
-                if (
-                  ultimoReporte.prioridadAsignada !==
-                  ultimoReporte.prioridadSugerida
-                ) {
-                  setPrioridadManual(ultimoReporte.prioridadAsignada);
-                  setJustificacionPrioridad(
-                    ultimoReporte.justificacionPrioridad || ''
-                  );
-                } else {
-                  setPrioridadManual(null);
-                  setJustificacionPrioridad('');
-                }
-                setModoEdicion(true);
-              }}
-              className={styles.btnModificar}
-            >
-              Modificar y reenviar reporte
-            </Button>
+          {ultimoReporte.justificacionPrioridad && (
+            <CampoResumenReporte
+              label="Justificación de Prioridad"
+              valor={ultimoReporte.justificacionPrioridad}
+              esBloqueTexto
+            />
           )}
-        </div>
+
+          {ultimoReporte.evaluacion.detallesAdicionales && (
+            <CampoResumenReporte
+              label="Detalles Adicionales"
+              valor={ultimoReporte.evaluacion.detallesAdicionales}
+              esBloqueTexto
+            />
+          )}
+        </ResumenReporteTerreno>
       ) : (
         <form onSubmit={handlePreConfirmar} className={styles.form} noValidate>
           {siguienteVersionReporte > 1 && (

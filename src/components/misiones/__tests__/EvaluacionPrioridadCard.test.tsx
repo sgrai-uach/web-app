@@ -209,7 +209,6 @@ describe('EvaluacionPrioridadCard (H38)', () => {
                   personasElectrodependientes: 0,
                   mascotasAfectadas: 0,
                   nivelCompromisoVivienda: 'MODERADO',
-                  requiereAsistenciaSocial: false,
                 },
               ],
               nucleoFamiliarTotal: 4,
@@ -265,7 +264,7 @@ describe('EvaluacionPrioridadCard (H38)', () => {
     ).toBeInTheDocument();
   });
 
-  it('no renderiza la opción eliminada "Requiere apoyo táctico adicional"', () => {
+  it('no renderiza ni apoyo adicional ni Ficha FIBE (trasladada a HU-39) en evaluación de prioridad', () => {
     render(
       <EvaluacionPrioridadCard
         incidenteId={misionMock.incidenteId}
@@ -278,6 +277,56 @@ describe('EvaluacionPrioridadCard (H38)', () => {
         name: /Requiere apoyo táctico adicional/i,
       })
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('switch', {
+        name: /Requiere asistencia social \(FIBE\)/i,
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it('muestra en el resumen quién subió el reporte cuando fue registrado por otro integrante de la patrulla', () => {
+    const misionConReporteCompanero: MisionLocal = {
+      ...misionMock,
+      prioridad: 'ALTA',
+      datosAdicionales: {
+        prioridadEvaluada: true,
+        versionReportePrioridad: 1,
+        reportesTerreno: [
+          {
+            id: 'rep-prio-p1',
+            tipoReporte: 'EVALUACION_PRIORIDAD',
+            versionReporte: 1,
+            prioridadSugerida: 'ALTA',
+            prioridadAsignada: 'ALTA',
+            personasAfectadas: 3,
+            detallesEvaluacion: {
+              ...VALORES_INICIALES_EVALUACION_PRIORIDAD,
+              nucleoFamiliarTotal: 3,
+              cantidadAdultosMayores: 1,
+            },
+            evaluador: {
+              id: 'usr-p1',
+              nombre: 'Personal 1',
+              email: 'p1@valdivia.cl',
+            },
+            creadoEn: '2026-11-16T00:25:00Z',
+          },
+        ],
+      },
+    };
+
+    render(
+      <EvaluacionPrioridadCard
+        incidenteId={misionConReporteCompanero.incidenteId}
+        misionActual={misionConReporteCompanero}
+        usuarioActualId="usr-p2"
+      />
+    );
+
+    expect(screen.queryByTestId('aviso-autor-prioridad')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Prioridad vigente del incidente$/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/^Registrado por$/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Personal 1 \(p1@valdivia\.cl\) ·/i)).toHaveLength(1);
   });
 
   it('impide añadir más integrantes que el tamaño del núcleo familiar y permite mascotas independientes', () => {
