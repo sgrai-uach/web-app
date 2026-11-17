@@ -60,6 +60,18 @@ function CuadrillaMisionesContenido() {
     cargarMisiones();
   }, [cargarMisiones]);
 
+  useEffect(() => {
+    const refrescar = () => {
+      void cargarMisiones();
+    };
+    window.addEventListener('sgrai:outbox-synced', refrescar);
+    window.addEventListener('sgrai:mision-rechazada', refrescar);
+    return () => {
+      window.removeEventListener('sgrai:outbox-synced', refrescar);
+      window.removeEventListener('sgrai:mision-rechazada', refrescar);
+    };
+  }, [cargarMisiones]);
+
   const cambiarFiltro = (nuevoFiltro: FiltroEstado) => {
     const params = new URLSearchParams(searchParams.toString());
     if (nuevoFiltro === 'todas') {
