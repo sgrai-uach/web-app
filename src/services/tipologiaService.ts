@@ -1,5 +1,5 @@
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
-import { DEV_PATRULLA_TOKEN, DEV_PATRULLA_USER_ID, handleUnauthorizedSession } from '@/lib/api/client';
+import { handleUnauthorizedSession } from '@/lib/api/client';
 import {
   guardarCatalogoLocal,
   obtenerCatalogoLocal,
@@ -68,9 +68,6 @@ function resolveApiUrl(): string {
 
 function buildAuthHeaders(): Record<string, string> {
   const token = getAuthCookie();
-  if (token === DEV_PATRULLA_TOKEN) {
-    return { 'x-user-id': DEV_PATRULLA_USER_ID };
-  }
   if (token) {
     return { Authorization: `Bearer ${token}` };
   }

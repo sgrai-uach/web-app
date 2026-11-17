@@ -1,9 +1,4 @@
-import { getAuthCookie } from '@/lib/utils/cookieUtils';
-import {
-  DEV_PATRULLA_TOKEN,
-  DEV_PATRULLA_USER_ID,
-  handleUnauthorizedSession,
-} from '@/lib/api/client';
+import apiClient from '@/lib/api/client';
 import {
   encolarAccionOutbox,
   guardarMisionLocal,
@@ -18,30 +13,14 @@ import {
   type ResultadoCalculoPrioridad,
 } from '@/lib/validations/prioridad';
 import type {
+  AsignarPrioridadPayload,
+  CalcularPrioridadPayload,
   EvaluacionTerrenoPrioridadForm,
   MisionLocal,
   NivelCompromisoVivienda,
   PrioridadIncidente,
   ReportePrioridadTerrenoLocal,
 } from '@/types/offline';
-
-function resolveApiUrl(): string {
-  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
-    return '';
-  }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
-}
-
-function buildAuthHeaders(): Record<string, string> {
-  const token = getAuthCookie();
-  if (token === DEV_PATRULLA_TOKEN) {
-    return { 'x-user-id': DEV_PATRULLA_USER_ID };
-  }
-  if (token) {
-    return { Authorization: `Bearer ${token}` };
-  }
-  return {};
-}
 
 function esPrioridadValida(val: unknown): val is PrioridadIncidente {
   return (
@@ -57,33 +36,47 @@ function esNivelCompromisoValido(val: unknown): val is NivelCompromisoVivienda {
   );
 }
 
-/**
- * Extrae el historial de reportes de evaluación de prioridad desde `mision.datosAdicionales`,
- * normalizando tanto reportes locales como `reportesTerreno` provenientes de la API.
- */
-export function obtenerReportesPrioridadMision(
-  mision?: MisionLocal | null
-): ReportePrioridadTerrenoLocal[] {
-  if (!mision?.datosAdicionales) return [];
-
-  const locales = mision.datosAdicionales.reportesPrioridad;
-  if (Array.isArray(locales) && locales.length > 0) {
-    return [...(locales as ReportePrioridadTerrenoLocal[])].sort(
-      (a, b) => a.versionReporte - b.versionReporte
-    );
+function extraerMensajeError(errorBody: unknown, fallback: string): string {
+  if (
+    typeof errorBody === 'object' &&
+    errorBody !== null &&
+    'message' in errorBody &&
+    typeof (errorBody as { message?: unknown }).message === 'string'
+  ) {
+    return (errorBody as { message: string }).message;
   }
+  return fallback;
+}
 
-  const remotos = mision.datosAdicionales.reportesTerreno;
-  if (Array.isArray(remotos) && remotos.length > 0) {
-    const mapeados: ReportePrioridadTerrenoLocal[] = remotos.map((raw, idx) => {
-      const r = (raw || {}) as Record<string, unknown>;
-      const version =
-        typeof r.versionReporte === 'number' && r.versionReporte > 0
-          ? r.versionReporte
-          : idx + 1;
+function mapearReportesRemotos(
+  remotos: unknown[],
+  mision: MisionLocal
+): ReportePrioridadTerrenoLocal[] {
+  const mapeados: ReportePrioridadTerrenoLocal[] = remotos.map((raw, idx) => {
+    const r = (raw || {}) as Record<string, unknown>;
+    const detalle =
+      typeof r.detallesEvaluacion === 'object' && r.detallesEvaluacion !== null
+        ? (r.detallesEvaluacion as Record<string, unknown>)
+        : r;
+    const riesgos =
+      typeof detalle.riesgosActivos === 'object' && detalle.riesgosActivos !== null
+        ? (detalle.riesgosActivos as Record<string, unknown>)
+        : detalle;
 
-      const familiasCargadas = Array.isArray(r.familias) && r.familias.length > 0
-        ? (r.familias as Record<string, unknown>[]).map((f, fIdx) => ({
+    const version =
+      typeof r.versionReporte === 'number' && r.versionReporte > 0
+        ? r.versionReporte
+        : idx + 1;
+
+    const familiasRaw = Array.isArray(detalle.familias)
+      ? detalle.familias
+      : Array.isArray(r.familias)
+        ? r.familias
+        : null;
+
+    const familiasCargadas =
+      familiasRaw && familiasRaw.length > 0
+        ? (familiasRaw as Record<string, unknown>[]).map((f, fIdx) => ({
             id: typeof f.id === 'string' ? f.id : `fam-${fIdx + 1}`,
             referencia: typeof f.referencia === 'string' ? f.referencia : '',
             nucleoFamiliarTotal: Number(f.nucleoFamiliarTotal ?? f.personasAfectadas ?? 0),
@@ -102,118 +95,154 @@ export function obtenerReportesPrioridadMision(
               id: 'fam-1',
               referencia: '',
               nucleoFamiliarTotal:
-                typeof r.nucleoFamiliarTotal === 'number'
-                  ? r.nucleoFamiliarTotal
-                  : typeof r.personasAfectadas === 'number'
-                    ? r.personasAfectadas
+                typeof detalle.nucleoFamiliarTotal === 'number'
+                  ? detalle.nucleoFamiliarTotal
+                  : typeof detalle.personasAfectadas === 'number'
+                    ? detalle.personasAfectadas
                     : VALORES_INICIALES_EVALUACION_PRIORIDAD.nucleoFamiliarTotal,
               cantidadNinos:
-                typeof r.cantidadNinos === 'number'
-                  ? r.cantidadNinos
+                typeof detalle.cantidadNinos === 'number'
+                  ? detalle.cantidadNinos
                   : VALORES_INICIALES_EVALUACION_PRIORIDAD.cantidadNinos,
               cantidadAdultosMayores:
-                typeof r.cantidadAdultosMayores === 'number'
-                  ? r.cantidadAdultosMayores
+                typeof detalle.cantidadAdultosMayores === 'number'
+                  ? detalle.cantidadAdultosMayores
                   : VALORES_INICIALES_EVALUACION_PRIORIDAD.cantidadAdultosMayores,
               personasDiscapacitadas:
-                typeof r.personasDiscapacitadas === 'number'
-                  ? r.personasDiscapacitadas
+                typeof detalle.personasDiscapacitadas === 'number'
+                  ? detalle.personasDiscapacitadas
                   : VALORES_INICIALES_EVALUACION_PRIORIDAD.personasDiscapacitadas,
               personasElectrodependientes:
-                typeof r.personasElectrodependientes === 'number'
-                  ? r.personasElectrodependientes
+                typeof detalle.personasElectrodependientes === 'number'
+                  ? detalle.personasElectrodependientes
                   : VALORES_INICIALES_EVALUACION_PRIORIDAD.personasElectrodependientes,
               mascotasAfectadas:
-                typeof r.mascotasAfectadas === 'number'
-                  ? r.mascotasAfectadas
+                typeof detalle.mascotasAfectadas === 'number'
+                  ? detalle.mascotasAfectadas
                   : VALORES_INICIALES_EVALUACION_PRIORIDAD.mascotasAfectadas,
-              nivelCompromisoVivienda: esNivelCompromisoValido(r.nivelCompromisoVivienda)
-                ? (r.nivelCompromisoVivienda.toUpperCase() as NivelCompromisoVivienda)
+              nivelCompromisoVivienda: esNivelCompromisoValido(
+                detalle.nivelCompromisoVivienda
+              )
+                ? (String(
+                    detalle.nivelCompromisoVivienda
+                  ).toUpperCase() as NivelCompromisoVivienda)
                 : VALORES_INICIALES_EVALUACION_PRIORIDAD.nivelCompromisoVivienda,
-              requiereAsistenciaSocial: Boolean(r.requiereAsistenciaSocial),
+              requiereAsistenciaSocial: Boolean(detalle.requiereAsistenciaSocial),
             },
           ];
 
-      const evalBase: EvaluacionTerrenoPrioridadForm = {
-        familias: familiasCargadas,
-        nucleoFamiliarTotal:
-          typeof r.nucleoFamiliarTotal === 'number'
-            ? r.nucleoFamiliarTotal
-            : typeof r.personasAfectadas === 'number'
-              ? r.personasAfectadas
-              : VALORES_INICIALES_EVALUACION_PRIORIDAD.nucleoFamiliarTotal,
-        cantidadNinos:
-          typeof r.cantidadNinos === 'number'
-            ? r.cantidadNinos
-            : VALORES_INICIALES_EVALUACION_PRIORIDAD.cantidadNinos,
-        cantidadAdultosMayores:
-          typeof r.cantidadAdultosMayores === 'number'
-            ? r.cantidadAdultosMayores
-            : VALORES_INICIALES_EVALUACION_PRIORIDAD.cantidadAdultosMayores,
-        personasDiscapacitadas:
-          typeof r.personasDiscapacitadas === 'number'
-            ? r.personasDiscapacitadas
-            : VALORES_INICIALES_EVALUACION_PRIORIDAD.personasDiscapacitadas,
-        personasElectrodependientes:
-          typeof r.personasElectrodependientes === 'number'
-            ? r.personasElectrodependientes
-            : VALORES_INICIALES_EVALUACION_PRIORIDAD.personasElectrodependientes,
-        mascotasAfectadas:
-          typeof r.mascotasAfectadas === 'number'
-            ? r.mascotasAfectadas
-            : VALORES_INICIALES_EVALUACION_PRIORIDAD.mascotasAfectadas,
-        viviendasAfectadas:
-          typeof r.viviendasAfectadas === 'number'
-            ? r.viviendasAfectadas
-            : VALORES_INICIALES_EVALUACION_PRIORIDAD.viviendasAfectadas,
-        nivelCompromisoVivienda: esNivelCompromisoValido(r.nivelCompromisoVivienda)
-          ? (r.nivelCompromisoVivienda.toUpperCase() as NivelCompromisoVivienda)
-          : VALORES_INICIALES_EVALUACION_PRIORIDAD.nivelCompromisoVivienda,
-        riesgoElectrico: Boolean(r.riesgoElectrico),
-        riesgoEstructural: Boolean(r.riesgoEstructural),
-        riesgoQuimicoSanitario: Boolean(r.riesgoQuimicoSanitario),
-        aislamientoVial: Boolean(r.aislamientoVial),
-        requiereEvacuacion: Boolean(r.requiereEvacuacion),
-        requiereAsistenciaSocial: Boolean(r.requiereAsistenciaSocial),
-        requiereApoyoAdicional: Boolean(r.requiereApoyoAdicional),
-        detallesAdicionales:
-          typeof r.detallesAdicionales === 'string'
-            ? r.detallesAdicionales
-            : typeof r.observaciones === 'string'
-              ? r.observaciones
-              : '',
-      };
-
-      const calculoBase = calcularPrioridadSugerida(evalBase);
-      const prioSugerida = esPrioridadValida(r.prioridadSugerida)
-        ? (r.prioridadSugerida.toUpperCase() as PrioridadIncidente)
-        : calculoBase.prioridadSugerida;
-      const prioAsignada = esPrioridadValida(r.prioridadAsignada || r.prioridad)
-        ? (String(r.prioridadAsignada || r.prioridad).toUpperCase() as PrioridadIncidente)
-        : esPrioridadValida(mision.prioridad)
-          ? (mision.prioridad.toUpperCase() as PrioridadIncidente)
-          : prioSugerida;
-
-      return {
-        id: typeof r.id === 'string' ? r.id : undefined,
-        versionReporte: version,
-        evaluacion: evalBase,
-        prioridadSugerida: prioSugerida,
-        prioridadAsignada: prioAsignada,
-        factoresGatillantes: Array.isArray(r.factoresGatillantes)
-          ? (r.factoresGatillantes as string[])
-          : calculoBase.factoresGatillantes,
-        justificacionPrioridad:
-          typeof r.justificacionPrioridad === 'string'
-            ? r.justificacionPrioridad
+    const evalBase: EvaluacionTerrenoPrioridadForm = {
+      familias: familiasCargadas,
+      nucleoFamiliarTotal:
+        typeof detalle.nucleoFamiliarTotal === 'number'
+          ? detalle.nucleoFamiliarTotal
+          : typeof detalle.personasAfectadas === 'number'
+            ? detalle.personasAfectadas
+            : VALORES_INICIALES_EVALUACION_PRIORIDAD.nucleoFamiliarTotal,
+      cantidadNinos:
+        typeof detalle.cantidadNinos === 'number'
+          ? detalle.cantidadNinos
+          : VALORES_INICIALES_EVALUACION_PRIORIDAD.cantidadNinos,
+      cantidadAdultosMayores:
+        typeof detalle.cantidadAdultosMayores === 'number'
+          ? detalle.cantidadAdultosMayores
+          : VALORES_INICIALES_EVALUACION_PRIORIDAD.cantidadAdultosMayores,
+      personasDiscapacitadas:
+        typeof detalle.personasDiscapacitadas === 'number'
+          ? detalle.personasDiscapacitadas
+          : VALORES_INICIALES_EVALUACION_PRIORIDAD.personasDiscapacitadas,
+      personasElectrodependientes:
+        typeof detalle.personasElectrodependientes === 'number'
+          ? detalle.personasElectrodependientes
+          : VALORES_INICIALES_EVALUACION_PRIORIDAD.personasElectrodependientes,
+      mascotasAfectadas:
+        typeof detalle.mascotasAfectadas === 'number'
+          ? detalle.mascotasAfectadas
+          : VALORES_INICIALES_EVALUACION_PRIORIDAD.mascotasAfectadas,
+      viviendasAfectadas:
+        typeof detalle.viviendasAfectadas === 'number'
+          ? detalle.viviendasAfectadas
+          : VALORES_INICIALES_EVALUACION_PRIORIDAD.viviendasAfectadas,
+      nivelCompromisoVivienda: esNivelCompromisoValido(detalle.nivelCompromisoVivienda)
+        ? (String(
+            detalle.nivelCompromisoVivienda
+          ).toUpperCase() as NivelCompromisoVivienda)
+        : VALORES_INICIALES_EVALUACION_PRIORIDAD.nivelCompromisoVivienda,
+      riesgoElectrico: Boolean(riesgos.riesgoElectrico ?? detalle.riesgoElectrico),
+      riesgoEstructural: Boolean(riesgos.riesgoEstructural ?? detalle.riesgoEstructural),
+      riesgoQuimicoSanitario: Boolean(
+        riesgos.riesgoQuimicoSanitario ?? detalle.riesgoQuimicoSanitario
+      ),
+      aislamientoVial: Boolean(riesgos.aislamientoVial ?? detalle.aislamientoVial),
+      requiereEvacuacion: Boolean(detalle.requiereEvacuacion),
+      requiereAsistenciaSocial: Boolean(detalle.requiereAsistenciaSocial),
+      requiereApoyoAdicional: Boolean(detalle.requiereApoyoAdicional),
+      detallesAdicionales:
+        typeof detalle.detallesAdicionales === 'string'
+          ? detalle.detallesAdicionales
+          : typeof r.observaciones === 'string'
+            ? r.observaciones
             : '',
-        creadoEn:
-          typeof r.creadoEn === 'string' ? r.creadoEn : new Date().toISOString(),
-        sincronizado: true,
-      };
-    });
+    };
 
-    return mapeados.sort((a, b) => a.versionReporte - b.versionReporte);
+    const calculoBase = calcularPrioridadSugerida(evalBase);
+    const prioSugerida = esPrioridadValida(r.prioridadSugerida)
+      ? (r.prioridadSugerida.toUpperCase() as PrioridadIncidente)
+      : calculoBase.prioridadSugerida;
+    const prioAsignada = esPrioridadValida(r.prioridadAsignada || r.prioridad)
+      ? (String(r.prioridadAsignada || r.prioridad).toUpperCase() as PrioridadIncidente)
+      : esPrioridadValida(mision.prioridad)
+        ? (mision.prioridad.toUpperCase() as PrioridadIncidente)
+        : prioSugerida;
+
+    return {
+      id: typeof r.id === 'string' ? r.id : undefined,
+      versionReporte: version,
+      evaluacion: evalBase,
+      prioridadSugerida: prioSugerida,
+      prioridadAsignada: prioAsignada,
+      factoresGatillantes: Array.isArray(r.factoresGatillantes)
+        ? (r.factoresGatillantes as string[])
+        : calculoBase.factoresGatillantes,
+      justificacionPrioridad:
+        typeof r.justificacionPrioridad === 'string'
+          ? r.justificacionPrioridad
+          : typeof detalle.justificacionPrioridad === 'string'
+            ? detalle.justificacionPrioridad
+            : '',
+      creadoEn:
+        typeof r.creadoEn === 'string' ? r.creadoEn : new Date().toISOString(),
+      sincronizado: true,
+    };
+  });
+
+  return mapeados.sort((a, b) => a.versionReporte - b.versionReporte);
+}
+
+/**
+ * Extrae el historial de reportes de evaluación de prioridad desde `mision.datosAdicionales`.
+ * Prioriza `reportesTerreno` sincronizados desde la API cuando no hay mutaciones pendientes.
+ */
+export function obtenerReportesPrioridadMision(
+  mision?: MisionLocal | null
+): ReportePrioridadTerrenoLocal[] {
+  if (!mision?.datosAdicionales) return [];
+
+  const locales = mision.datosAdicionales.reportesPrioridad;
+  const remotos = mision.datosAdicionales.reportesTerreno;
+
+  if (!mision.sincronizacionPendiente && Array.isArray(remotos) && remotos.length > 0) {
+    return mapearReportesRemotos(remotos, mision);
+  }
+
+  if (Array.isArray(locales) && locales.length > 0) {
+    return [...(locales as ReportePrioridadTerrenoLocal[])].sort(
+      (a, b) => a.versionReporte - b.versionReporte
+    );
+  }
+
+  if (Array.isArray(remotos) && remotos.length > 0) {
+    return mapearReportesRemotos(remotos, mision);
   }
 
   return [];
@@ -232,8 +261,8 @@ export function obtenerUltimoReportePrioridad(
 
 /**
  * Calcula la prioridad sugerida y sus factores gatillantes (HU-38).
- * Ejecuta primero el motor determinista local y, si hay conexión, consulta opcionalmente
- * `POST /api/incidentes/{id}/prioridad/calcular` sin bloquear la experiencia en terreno.
+ * Ejecuta primero el motor determinista local y, si hay conexión, consulta
+ * `POST /api/incidentes/{id}/prioridad/calcular` vía `apiClient`.
  */
 export async function solicitarCalculoPrioridad(
   incidenteId: string,
@@ -247,33 +276,17 @@ export async function solicitarCalculoPrioridad(
   }
 
   try {
-    const apiUrl = resolveApiUrl();
-    const res = await fetch(
-      `${apiUrl}/api/incidentes/${incidenteId}/prioridad/calcular`,
+    const { data, error } = await apiClient.POST(
+      '/api/incidentes/{id}/prioridad/calcular',
       {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...buildAuthHeaders(),
-        },
-        body: JSON.stringify(evaluacion),
+        params: { path: { id: incidenteId } },
+        body: evaluacion as unknown as CalcularPrioridadPayload,
       }
     );
 
-    if (res.ok) {
-      const body = (await res.json().catch(() => ({}))) as {
-        data?: {
-          prioridadSugerida?: string;
-          factoresGatillantes?: string[];
-        };
-        prioridadSugerida?: string;
-        factoresGatillantes?: string[];
-      };
-
-      const prioRaw =
-        body?.data?.prioridadSugerida || body?.prioridadSugerida;
-      const factoresRaw =
-        body?.data?.factoresGatillantes || body?.factoresGatillantes;
+    if (!error && data?.data) {
+      const prioRaw = data.data.prioridadSugerida;
+      const factoresRaw = data.data.factoresGatillantes;
 
       if (esPrioridadValida(prioRaw)) {
         return {
@@ -304,9 +317,6 @@ export interface ResultadoAsignacionPrioridad {
 
 /**
  * Envía el reporte de evaluación en terreno y asigna o modifica la prioridad del incidente (HU-38).
- * - Valida que si `prioridad !== prioridadSugerida`, `justificacionPrioridad` tenga al menos 5 caracteres.
- * - Incrementa automáticamente `versionReporte` cuando existen reportes previos para dejar trazabilidad en el Centro de Mando.
- * - En modo offline o ante caída de red, encola la mutación `AJUSTAR_PRIORIDAD` en IndexedDB (`outbox`).
  */
 export async function asignarPrioridadEnTerreno(
   incidenteId: string,
@@ -343,10 +353,11 @@ export async function asignarPrioridadEnTerreno(
       ? misionActual.id
       : undefined);
 
-  const payloadMutacion: Record<string, unknown> = {
+  const payloadMutacion: AsignarPrioridadPayload = {
     prioridad: validado.prioridad,
     prioridadSugerida: validado.prioridadSugerida,
     justificacionPrioridad: justificacionFinal,
+    familias: validado.familias,
     nucleoFamiliarTotal: validado.nucleoFamiliarTotal,
     cantidadNinos: validado.cantidadNinos,
     cantidadAdultosMayores: validado.cantidadAdultosMayores,
@@ -363,19 +374,18 @@ export async function asignarPrioridadEnTerreno(
     requiereAsistenciaSocial: validado.requiereAsistenciaSocial,
     requiereApoyoAdicional: validado.requiereApoyoAdicional,
     detallesAdicionales: validado.detallesAdicionales,
-    factoresGatillantes: factoresCalculados,
-    versionReporte,
-    misionId: misionUuidValido,
+    ...(misionUuidValido ? { misionId: misionUuidValido } : {}),
   };
 
   const ahoraIso = new Date().toISOString();
 
   const construirReporteLocal = (
     sincronizado: boolean,
-    idRemoto?: string
+    idRemoto?: string,
+    versionConfirmada?: number
   ): ReportePrioridadTerrenoLocal => ({
-    id: idRemoto || `rep-prio-v${versionReporte}-${Date.now()}`,
-    versionReporte,
+    id: idRemoto || `rep-prio-v${versionConfirmada ?? versionReporte}-${Date.now()}`,
+    versionReporte: versionConfirmada ?? versionReporte,
     evaluacion: {
       familias: validado.familias || [],
       nucleoFamiliarTotal: validado.nucleoFamiliarTotal,
@@ -420,7 +430,7 @@ export async function asignarPrioridadEnTerreno(
         prioridadEvaluada: true,
         prioridadSugerida: validado.prioridadSugerida,
         justificacionPrioridad: justificacionFinal,
-        versionReportePrioridad: versionReporte,
+        versionReportePrioridad: reporte.versionReporte,
         ultimoReportePrioridad: reporte,
         reportesPrioridad: nuevaListaReportes,
       },
@@ -434,7 +444,7 @@ export async function asignarPrioridadEnTerreno(
       tipo: 'AJUSTAR_PRIORIDAD',
       url: `/api/incidentes/${incidenteId}/prioridad`,
       metodo: 'PATCH',
-      payload: payloadMutacion,
+      payload: payloadMutacion as Record<string, unknown>,
     });
 
     const reporteOffline = construirReporteLocal(false);
@@ -454,96 +464,71 @@ export async function asignarPrioridadEnTerreno(
   }
 
   try {
-    const apiUrl = resolveApiUrl();
-    const res = await fetch(`${apiUrl}/api/incidentes/${incidenteId}/prioridad`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...buildAuthHeaders(),
-      },
-      body: JSON.stringify(payloadMutacion),
-    });
+    const { data, error, response } = await apiClient.PATCH(
+      '/api/incidentes/{id}/prioridad',
+      {
+        params: { path: { id: incidenteId } },
+        body: payloadMutacion,
+      }
+    );
 
-    const body = (await res.json().catch(() => ({}))) as {
-      message?: string;
-      data?: {
-        incidente?: {
-          id?: string;
-          prioridad?: string;
-          actualizadoEn?: string;
-        };
-        reporte?: {
-          id?: string;
-          versionReporte?: number;
-        };
-        hito?: unknown;
-      };
-    };
-
-    if (res.ok) {
-      const reporteOnline = construirReporteLocal(true, body?.data?.reporte?.id);
+    if (!error && data) {
+      const versionConfirmada =
+        data.data?.reporteTerreno?.versionReporte ?? versionReporte;
+      const reporteOnline = construirReporteLocal(
+        true,
+        data.data?.reporteTerreno?.id,
+        versionConfirmada
+      );
       const misionActualizada = await actualizarMisionConReporte(
         reporteOnline,
         false,
-        body?.data?.incidente?.actualizadoEn
+        data.data?.incidente?.actualizadoEn
       );
 
       return {
         ok: true,
         offline: false,
-        versionReporte,
+        versionReporte: versionConfirmada,
         reporte: reporteOnline,
         mision: misionActualizada,
-        data: body?.data,
+        data: data.data,
         mensaje:
-          body?.message ||
-          (versionReporte > 1
-            ? `Actualización enviada al Centro de Mando (Reporte #${versionReporte}) y prioridad actualizada exitosamente.`
+          data.message ||
+          (versionConfirmada > 1
+            ? `Actualización enviada al Centro de Mando (Reporte #${versionConfirmada}) y prioridad actualizada exitosamente.`
             : 'Evaluación de terreno enviada al Centro de Mando y prioridad actualizada exitosamente.'),
       };
     }
 
-    // Soporte para modo demostración local (DEV_PATRULLA_TOKEN) cuando el backend local no tiene el incidente cargado
-    const tokenActual = typeof window !== 'undefined' ? getAuthCookie() : null;
-    const esModoDemoLocal =
-      Boolean(tokenActual) && tokenActual === (DEV_PATRULLA_TOKEN || 'dev-patrulla-token');
-    if (esModoDemoLocal && (res.status === 401 || res.status === 403 || res.status === 404)) {
-      const reporteDemo = construirReporteLocal(true);
-      const misionActualizada = await actualizarMisionConReporte(reporteDemo, false);
-      return {
-        ok: true,
-        offline: false,
-        versionReporte,
-        reporte: reporteDemo,
-        mision: misionActualizada,
-        mensaje:
-          versionReporte > 1
-            ? `Actualización enviada al Centro de Mando (Reporte #${versionReporte}) y prioridad actualizada exitosamente.`
-            : 'Evaluación de terreno enviada al Centro de Mando y prioridad actualizada exitosamente.',
-      };
-    }
-
-    if (res.status === 401) {
-      handleUnauthorizedSession();
+    const status = response?.status ?? 500;
+    if (status === 401) {
       throw new Error('Sesión expirada o no autorizada.');
     }
 
-    if (res.status === 403) {
+    if (status === 403) {
       throw new Error(
-        body?.message ||
+        extraerMensajeError(
+          error,
           'No posee los permisos requeridos (misiones:terreno:verificar) para asignar o modificar la prioridad.'
+        )
       );
     }
 
-    if (res.status === 409) {
+    if (status === 409) {
       throw new Error(
-        body?.message ||
+        extraerMensajeError(
+          error,
           'La misión debe haber sido aceptada previamente (en curso) para evaluar y asignar prioridad.'
+        )
       );
     }
 
     throw new Error(
-      body?.message || `Error del servidor (${res.status}) al actualizar la prioridad del incidente.`
+      extraerMensajeError(
+        error,
+        `Error del servidor (${status}) al actualizar la prioridad del incidente.`
+      )
     );
   } catch (err) {
     if (err instanceof TypeError || (err instanceof Error && err.message.includes('fetch'))) {
@@ -551,7 +536,7 @@ export async function asignarPrioridadEnTerreno(
         tipo: 'AJUSTAR_PRIORIDAD',
         url: `/api/incidentes/${incidenteId}/prioridad`,
         metodo: 'PATCH',
-        payload: payloadMutacion,
+        payload: payloadMutacion as Record<string, unknown>,
       });
 
       const reporteOffline = construirReporteLocal(false);
@@ -573,4 +558,3 @@ export async function asignarPrioridadEnTerreno(
     throw err;
   }
 }
-
