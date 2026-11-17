@@ -3,6 +3,9 @@ import {
   guardarMisionesLocales,
   obtenerMisionesLocales,
   obtenerMisionLocalPorId,
+  guardarMisionLocal,
+  limpiarAlmacenamientoOffline,
+  obtenerEvaluacionMisionCache,
   guardarCatalogoLocal,
   obtenerCatalogoLocal,
   encolarAccionOutbox,
@@ -83,5 +86,54 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
     expect(resultado.exitosas).toBeGreaterThanOrEqual(1);
     const listaActual = await obtenerAccionesOutbox();
     expect(listaActual.some((a) => a.id === accion1.id)).toBe(false);
+  });
+
+  it('preserva evaluaciones cacheadas de misión ante limpiarAlmacenamientoOffline y las refusiona al guardar misiones', async () => {
+    const misionConEvaluaciones: MisionLocal = {
+      ...misionEjemplo,
+      id: 'mision-cambio-usuario',
+      tipologia: 'Inundación',
+      estado: 'EN_CURSO',
+      datosAdicionales: {
+        tipologiaEvaluada: true,
+        esReclasificacion: true,
+        justificacionTipologia: 'Desborde verificado en terreno.',
+        evaluadorTipologia: {
+          id: 'usr-patrulla-1',
+          nombre: 'Patrulla Uno',
+          email: 'patrulla@valdivia.cl',
+        },
+        prioridadEvaluada: true,
+        versionReportePrioridad: 1,
+      },
+    };
+
+    await guardarMisionLocal(misionConEvaluaciones);
+    expect(obtenerEvaluacionMisionCache('mision-cambio-usuario')?.tipologiaEvaluada).toBe(true);
+
+    // Simula logout() del primer usuario
+    await limpiarAlmacenamientoOffline();
+    expect(await obtenerMisionLocalPorId('mision-cambio-usuario')).toBeUndefined();
+    expect(obtenerEvaluacionMisionCache('mision-cambio-usuario')?.prioridadEvaluada).toBe(true);
+
+    // Simula login de patrulla2@valdivia.cl y sincronización resumida desde GET /api/misiones
+    await guardarMisionesLocales([
+      {
+        ...misionEjemplo,
+        id: 'mision-cambio-usuario',
+        tipologia: 'Caída de árbol',
+        estado: 'EN_CURSO',
+      },
+    ]);
+
+    const restaurada = await obtenerMisionLocalPorId('mision-cambio-usuario');
+    expect(restaurada?.tipologia).toBe('Inundación');
+    expect(restaurada?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+    expect(restaurada?.datosAdicionales?.prioridadEvaluada).toBe(true);
+    expect(restaurada?.datosAdicionales?.evaluadorTipologia).toEqual({
+      id: 'usr-patrulla-1',
+      nombre: 'Patrulla Uno',
+      email: 'patrulla@valdivia.cl',
+    });
   });
 });

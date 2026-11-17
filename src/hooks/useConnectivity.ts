@@ -122,6 +122,46 @@ export function useConnectivity() {
             }
           }
         }
+        if (procesada && accion.tipo === 'AJUSTAR_PRIORIDAD') {
+          const misionId = accion.payload?.misionId as string | undefined;
+          const match = accion.url.match(/\/api\/incidentes\/([^/]+)\/prioridad/);
+          const incidenteId = match?.[1];
+          try {
+            let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+            if (!local && incidenteId) {
+              const todas = await obtenerMisionesLocales();
+              local = todas.find((m) => m.incidenteId === incidenteId);
+            }
+            if (local) {
+              await guardarMisionLocal({
+                ...local,
+                sincronizacionPendiente: false,
+                actualizadoEn: new Date().toISOString(),
+              });
+            }
+          } catch {
+            // Ignorar fallos de persistencia secundaria
+          }
+        }
+        if (procesada && accion.tipo === 'ENVIAR_REPORTE') {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/reporte/);
+          const misionId = match?.[1];
+          if (misionId) {
+            try {
+              const local = await obtenerMisionLocalPorId(misionId);
+              if (local) {
+                await guardarMisionLocal({
+                  ...local,
+                  ...(res.ok ? { estado: 'COMPLETADA' } : {}),
+                  sincronizacionPendiente: false,
+                  actualizadoEn: new Date().toISOString(),
+                });
+              }
+            } catch {
+              // Ignorar fallos de persistencia secundaria
+            }
+          }
+        }
 
         return procesada;
       });

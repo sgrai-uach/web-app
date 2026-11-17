@@ -58,12 +58,45 @@ export function useTerrenoSocket(): void {
       }
     };
 
+    const manejarSincronizacionMision = (data?: unknown) => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('sgrai:mision-sincronizada', { detail: data })
+        );
+      }
+    };
+
+    const manejarVisibilidad = () => {
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible'
+      ) {
+        manejarSincronizacionMision();
+      }
+    };
+
     socket.on('patrulla:desactivada', manejarDesactivacion);
     socket.on('cuadrilla:desactivada', manejarDesactivacion);
+    socket.on('mision:actualizada', manejarSincronizacionMision);
+    socket.on('incidente:actualizado', manejarSincronizacionMision);
+    socket.on('patrulla:actualizada', manejarSincronizacionMision);
+    socket.on('patrulla:liberada', manejarSincronizacionMision);
+    socket.on('mision:asignada', manejarSincronizacionMision);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', manejarVisibilidad);
+    }
 
     return () => {
       socket.off('patrulla:desactivada', manejarDesactivacion);
       socket.off('cuadrilla:desactivada', manejarDesactivacion);
+      socket.off('mision:actualizada', manejarSincronizacionMision);
+      socket.off('incidente:actualizado', manejarSincronizacionMision);
+      socket.off('patrulla:actualizada', manejarSincronizacionMision);
+      socket.off('patrulla:liberada', manejarSincronizacionMision);
+      socket.off('mision:asignada', manejarSincronizacionMision);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', manejarVisibilidad);
+      }
       socket.emit('leave', roomName);
       socket.emit('salir', roomName);
       socket.disconnect();
