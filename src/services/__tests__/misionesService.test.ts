@@ -317,6 +317,74 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
       });
     });
 
+    it('lanza MisionServiceError en 409 Conflict cuando el estado remoto es CANCELADA y no fuerza EN_CURSO (BUG-H36-PWA-03)', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: undefined,
+        error: {
+          message:
+            "La misión no puede ser aceptada porque su estado actual es 'CANCELADA'.",
+        },
+        response: new Response(null, { status: 409 }),
+      } as never);
+
+      await expect(
+        aceptarMisionPatrulla(misionDespachada.id, {
+          misionActual: misionDespachada,
+          coordenadas: {},
+        })
+      ).rejects.toThrow(MisionServiceError);
+
+      expect(offlineQueue.guardarMisionLocal).not.toHaveBeenCalled();
+    });
+
+    it('preserva el estado optimista EN_CURSO en obtenerDetalleMision cuando hay sincronizacionPendiente y el servidor responde DESPACHADA (BUG-H36-PWA-02)', async () => {
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        ...misionDespachada,
+        estado: 'EN_CURSO',
+        fechaInicio: '2026-11-01T21:05:00.000Z',
+        sincronizacionPendiente: true,
+        datosAdicionales: {
+          hitoAceptacion: 'Misión Aceptada por Patrulla (Pendiente de sincronizar)',
+        },
+      });
+
+      vi.mocked(apiClient.GET).mockResolvedValue({
+        data: {
+          message: 'OK',
+          data: {
+            id: misionDespachada.id,
+            codigo: 'MIS-2026-0001',
+            titulo: 'Verificación de Incidente',
+            descripcion: 'Evaluar árbol',
+            tipoMision: 'VERIFICACION',
+            estado: 'DESPACHADA',
+            prioridad: 'ALTA',
+            justificacionRechazo: null,
+            fechaInicio: null,
+            fechaCierre: null,
+            creadoEn: '2026-11-01T20:45:00.000Z',
+            actualizadoEn: '2026-11-01T20:45:00.000Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: null,
+            prevencion: null,
+            cuadrilla: null,
+            patrulla: null,
+            bitacoraTiempos: [],
+            reportesTerreno: [],
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle = await obtenerDetalleMision(misionDespachada.id);
+
+      expect(detalle?.estado).toBe('EN_CURSO');
+      expect(detalle?.sincronizacionPendiente).toBe(true);
+      expect(detalle?.fechaInicio).toBe('2026-11-01T21:05:00.000Z');
+    });
+
     it('lanza MisionServiceError en 403 Forbidden sin encolar en outbox', async () => {
       vi.mocked(apiClient.POST).mockResolvedValue({
         data: undefined,
