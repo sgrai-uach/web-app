@@ -1,5 +1,5 @@
-import { getAuthCookie } from '@/lib/utils/cookieUtils';
-import { DEV_PATRULLA_TOKEN, DEV_PATRULLA_USER_ID, handleUnauthorizedSession } from '@/lib/api/client';
+import { z } from 'zod';
+import apiClient from '@/lib/api/client';
 import {
   guardarCatalogoLocal,
   obtenerCatalogoLocal,
@@ -10,10 +10,25 @@ import {
   reclasificarTipologiaSchema,
   type ReclasificarTipologiaInput,
 } from '@/lib/validations/tipologia';
-import type { TipoIncidenteCatalogoItem, MisionLocal } from '@/types/offline';
+import type {
+  TipoIncidenteCatalogoItem,
+  MisionLocal,
+  ReclasificarTipologiaPayload,
+} from '@/types/offline';
 
 export const CLAVE_CATALOGO_TIPOS = 'tipos_incidente';
 
+const uuidSchema = z.string().uuid({
+  message: 'El identificador del incidente debe ser un UUID válido.',
+});
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Catálogo oficial de contingencia sincronizado 1:1 con los 11 registros activos
+ * de la tabla `tipo_incidente` en PostgreSQL (migración 003_catalogos_informante_avisos).
+ */
 export const CATALOGO_TIPOS_PREDETERMINADO: TipoIncidenteCatalogoItem[] = [
   {
     id: '40000000-0000-4000-8000-000000000001',
@@ -23,83 +38,116 @@ export const CATALOGO_TIPOS_PREDETERMINADO: TipoIncidenteCatalogoItem[] = [
   },
   {
     id: '40000000-0000-4000-8000-000000000002',
-    nombre: 'Anegamiento de calzada',
-    descripcion: 'Acumulación de aguas lluvia que obstaculiza el tránsito vehicular o peatonal',
+    nombre: 'Deslizamiento de tierra',
+    descripcion: 'Movimiento de masa de suelo o laderas en zonas de riesgo',
     activo: true,
   },
   {
     id: '40000000-0000-4000-8000-000000000003',
     nombre: 'Caída de árbol',
-    descripcion: 'Obstrucción de vías o afectación a viviendas y tendido eléctrico',
+    descripcion: 'Obstrucción de vías o afectación a viviendas y tendido eléctrico por caída de árboles',
     activo: true,
   },
   {
     id: '40000000-0000-4000-8000-000000000004',
-    nombre: 'Derrumbe / Remoción en masa',
-    descripcion: 'Desprendimiento de ladera, deslizamiento de tierra o socavón en terreno',
+    nombre: 'Anegamiento de calzada',
+    descripcion: 'Saturación de sumideros y acumulación de aguas lluvias en vías públicas',
     activo: true,
   },
   {
     id: '40000000-0000-4000-8000-000000000005',
-    nombre: 'Incendio estructural',
-    descripcion: 'Siniestro que compromete viviendas, recintos comunitarios o infraestructura',
+    nombre: 'Incendio estructural / forestal',
+    descripcion: 'Focos de fuego en estructuras o vegetación urbana/rural',
     activo: true,
   },
   {
     id: '40000000-0000-4000-8000-000000000006',
-    nombre: 'Desborde de cauce',
-    descripcion: 'Aumento de caudal de ríos, esteros o canales que rebasa su lecho habitual',
+    nombre: 'Otro',
+    descripcion: 'Cualquier otro incidente que requiera atención de emergencia municipal',
     activo: true,
   },
   {
-    id: '40000000-0000-4000-8000-000000000007',
-    nombre: 'Corte de suministros críticos',
-    descripcion: 'Interrupción masiva y prolongada de agua potable, electricidad o comunicaciones',
+    id: 'a0000000-0000-4000-8000-000000000001',
+    nombre: 'Anegamiento',
+    descripcion: 'Acumulación de aguas lluvias en vías o propiedades',
+    activo: true,
+  },
+  {
+    id: 'a0000000-0000-4000-8000-000000000003',
+    nombre: 'Corte de energía',
+    descripcion: 'Interrupción del suministro eléctrico o peligro por cables caídos',
+    activo: true,
+  },
+  {
+    id: 'a0000000-0000-4000-8000-000000000004',
+    nombre: 'Deslizamiento',
+    descripcion: 'Movimiento de laderas, socavón o remoción de terreno',
+    activo: true,
+  },
+  {
+    id: 'a0000000-0000-4000-8000-000000000005',
+    nombre: 'Daño estructural',
+    descripcion: 'Colapso parcial o daño grave en techumbre, muros o edificaciones',
+    activo: true,
+  },
+  {
+    id: 'a0000000-0000-4000-8000-000000000006',
+    nombre: 'Corte de agua potable',
+    descripcion: 'Corte o rotura matriz en la red de agua potable',
     activo: true,
   },
 ];
 
-function resolveApiUrl(): string {
-  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
-    return '';
-  }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
+function isCatalogoItem(item: unknown): item is TipoIncidenteCatalogoItem {
+  return (
+    typeof item === 'object' &&
+    item !== null &&
+    'id' in item &&
+    'nombre' in item &&
+    typeof (item as TipoIncidenteCatalogoItem).id === 'string' &&
+    typeof (item as TipoIncidenteCatalogoItem).nombre === 'string'
+  );
 }
 
-function buildAuthHeaders(): Record<string, string> {
-  const token = getAuthCookie();
-  if (token === DEV_PATRULLA_TOKEN) {
-    return { 'x-user-id': DEV_PATRULLA_USER_ID };
+/**
+ * Resuelve el nombre de una tipología desde IndexedDB o catálogo predeterminado
+ * sin disparar peticiones HTTP redundantes.
+ */
+async function resolverNombreTipologiaLocal(tipoIncidenteId: string): Promise<string> {
+  try {
+    const guardados = await obtenerCatalogoLocal<TipoIncidenteCatalogoItem>(CLAVE_CATALOGO_TIPOS);
+    if (guardados && Array.isArray(guardados)) {
+      const encontrado = guardados.find((t) => t.id === tipoIncidenteId);
+      if (encontrado?.nombre) return encontrado.nombre;
+    }
+  } catch {
+    // Continuar con catálogo predeterminado
   }
-  if (token) {
-    return { Authorization: `Bearer ${token}` };
-  }
-  return {};
+
+  const predeterminado = CATALOGO_TIPOS_PREDETERMINADO.find((t) => t.id === tipoIncidenteId);
+  return predeterminado?.nombre || 'Reclasificada';
 }
 
 /**
  * Obtiene el catálogo oficial de tipos de incidente (HU-37).
- * Consulta la API y persiste el resultado en IndexedDB. En caso de corte de red,
- * lee la copia local de IndexedDB o utiliza el catálogo predeterminado de contingencia.
+ * Consulta la API vía `apiClient` y persiste el resultado en IndexedDB.
+ * En caso de corte de red, lee la copia local de IndexedDB o utiliza el catálogo predeterminado.
  */
 export async function obtenerCatalogoTiposIncidente(): Promise<TipoIncidenteCatalogoItem[]> {
   const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
   if (isOnline) {
     try {
-      const apiUrl = resolveApiUrl();
-      const res = await fetch(`${apiUrl}/api/incidentes/tipos?catalogo=true`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...buildAuthHeaders(),
+      const { data, error } = await apiClient.GET('/api/incidentes/tipos', {
+        params: {
+          query: { catalogo: 'true' },
         },
       });
 
-      if (res.ok) {
-        const body = (await res.json()) as { data?: TipoIncidenteCatalogoItem[] };
-        if (body?.data && Array.isArray(body.data) && body.data.length > 0) {
-          const activos = body.data.filter((t) => t.activo !== false);
+      if (!error && data && Array.isArray(data.data)) {
+        const items = data.data.filter(isCatalogoItem);
+        if (items.length > 0) {
+          const activos = items.filter((t) => t.activo !== false);
           try {
             await guardarCatalogoLocal(CLAVE_CATALOGO_TIPOS, activos);
           } catch {
@@ -113,7 +161,6 @@ export async function obtenerCatalogoTiposIncidente(): Promise<TipoIncidenteCata
     }
   }
 
-  // Fallback offline a IndexedDB
   try {
     const guardados = await obtenerCatalogoLocal<TipoIncidenteCatalogoItem>(CLAVE_CATALOGO_TIPOS);
     if (guardados && Array.isArray(guardados) && guardados.length > 0) {
@@ -134,53 +181,61 @@ export interface ResultadoReclasificacionTipologia {
   data?: unknown;
 }
 
+function extraerMensajeError(errorBody: unknown, fallback: string): string {
+  if (
+    typeof errorBody === 'object' &&
+    errorBody !== null &&
+    'message' in errorBody &&
+    typeof (errorBody as { message?: unknown }).message === 'string'
+  ) {
+    return (errorBody as { message: string }).message;
+  }
+  return fallback;
+}
+
 /**
  * Reclasifica la tipología del incidente tras la evaluación presencial en terreno (HU-37).
- * Valida que la justificación cumpla >= 5 caracteres. En modo offline encola la mutación
- * en el outbox de IndexedDB para despacho posterior.
+ * Valida `incidenteId` como UUID, sanea `misionId` antes del parse Zod y valida que la
+ * justificación cumpla >= 5 caracteres en reclasificaciones.
  */
 export async function reclasificarTipologiaEnTerreno(
   incidenteId: string,
   input: ReclasificarTipologiaInput,
   misionActual?: MisionLocal
 ): Promise<ResultadoReclasificacionTipologia> {
-  const validado = reclasificarTipologiaSchema.parse(input);
-  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  const incidenteIdValido = uuidSchema.parse(incidenteId);
 
-  // Resolver nombre de la nueva tipología desde catálogo en memoria o predeterminado
-  let nuevoNombre = 'Reclasificada';
-  try {
-    const tipos = await obtenerCatalogoTiposIncidente();
-    const encontrado = tipos.find((t) => t.id === validado.tipoIncidenteId);
-    if (encontrado) nuevoNombre = encontrado.nombre;
-  } catch {
-    // Usar nombre genérico si no se resuelve
-  }
+  const misionIdCandidato = input.misionId ?? misionActual?.id;
+  const misionIdLimpio =
+    typeof misionIdCandidato === 'string' && UUID_REGEX.test(misionIdCandidato)
+      ? misionIdCandidato
+      : undefined;
+
+  const validado = reclasificarTipologiaSchema.parse({
+    ...input,
+    misionId: misionIdLimpio,
+  });
+
+  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  const nuevoNombre = await resolverNombreTipologiaLocal(validado.tipoIncidenteId);
 
   const justificacionFinal =
     validado.justificacion && validado.justificacion.trim().length >= 5
       ? validado.justificacion.trim()
       : 'Tipología constatada y ratificada en terreno sin variaciones.';
 
-  const misionUuidValido =
-    validado.misionId ||
-    (misionActual?.id && /^[0-9a-fA-F-]{36}$/.test(misionActual.id)
-      ? misionActual.id
-      : undefined);
-
-  const payloadMutacion = {
+  const payloadMutacion: ReclasificarTipologiaPayload = {
     tipoIncidenteId: validado.tipoIncidenteId,
     justificacion: justificacionFinal,
-    misionId: misionUuidValido,
+    ...(validado.misionId ? { misionId: validado.misionId } : {}),
   };
 
   if (!isOnline) {
-    // FLUJO OFFLINE: Encolar en Outbox de IndexedDB
     await encolarAccionOutbox({
       tipo: 'ACTUALIZAR_TIPOLOGIA',
-      url: `/api/incidentes/${incidenteId}/tipologia`,
+      url: `/api/incidentes/${incidenteIdValido}/tipologia`,
       metodo: 'PATCH',
-      payload: payloadMutacion,
+      payload: payloadMutacion as Record<string, unknown>,
     });
 
     let misionActualizada: MisionLocal | undefined = undefined;
@@ -211,23 +266,19 @@ export async function reclasificarTipologiaEnTerreno(
     };
   }
 
-  // FLUJO ONLINE: Enviar petición PATCH a la API
   try {
-    const apiUrl = resolveApiUrl();
-    const res = await fetch(`${apiUrl}/api/incidentes/${incidenteId}/tipologia`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...buildAuthHeaders(),
-      },
-      body: JSON.stringify(payloadMutacion),
-    });
+    const { data, error, response } = await apiClient.PATCH(
+      '/api/incidentes/{id}/tipologia',
+      {
+        params: {
+          path: { id: incidenteIdValido },
+        },
+        body: payloadMutacion,
+      }
+    );
 
-    const body = await res.json().catch(() => ({}));
-
-    if (res.ok) {
-      const tipologiaServidor =
-        body?.data?.incidente?.tipoAfectacion || nuevoNombre;
+    if (!error && data) {
+      const tipologiaServidor = data.data?.incidente?.tipoAfectacion || nuevoNombre;
 
       let misionActualizada: MisionLocal | undefined = undefined;
       if (misionActual) {
@@ -235,7 +286,7 @@ export async function reclasificarTipologiaEnTerreno(
           ...misionActual,
           tipologia: tipologiaServidor,
           sincronizacionPendiente: false,
-          actualizadoEn: body?.data?.incidente?.actualizadoEn || new Date().toISOString(),
+          actualizadoEn: data.data?.incidente?.actualizadoEn || new Date().toISOString(),
           datosAdicionales: {
             ...misionActual.datosAdicionales,
             tipologiaEvaluada: true,
@@ -243,7 +294,7 @@ export async function reclasificarTipologiaEnTerreno(
             justificacionTipologia: justificacionFinal,
             fechaEvaluacionTipologia: new Date().toISOString(),
             esReclasificacion: Boolean(validado.esCambio),
-            hitoReclasificacion: body?.data?.hito,
+            hitoReclasificacion: data.data?.hito,
           },
         };
         await guardarMisionLocal(misionActualizada);
@@ -252,40 +303,49 @@ export async function reclasificarTipologiaEnTerreno(
       return {
         ok: true,
         offline: false,
-        mensaje: body?.message || 'Tipología del incidente reclasificada exitosamente en terreno.',
+        mensaje:
+          data.message || 'Tipología del incidente reclasificada exitosamente en terreno.',
         mision: misionActualizada,
-        data: body?.data,
+        data: data.data,
       };
     }
 
-    if (res.status === 401) {
-      handleUnauthorizedSession();
+    const status = response?.status ?? 500;
+    if (status === 401) {
       throw new Error('Sesión expirada o no autorizada.');
     }
 
-    if (res.status === 403) {
+    if (status === 403) {
       throw new Error(
-        body?.message || 'No posee los permisos requeridos (misiones:terreno:verificar) para reclasificar la tipología.'
+        extraerMensajeError(
+          error,
+          'No posee los permisos requeridos (misiones:terreno:verificar) para reclasificar la tipología.'
+        )
       );
     }
 
-    if (res.status === 409) {
+    if (status === 409) {
       throw new Error(
-        body?.message || 'La misión debe haber sido aceptada previamente (en curso) para reclasificar su tipología.'
+        extraerMensajeError(
+          error,
+          'La misión debe haber sido aceptada previamente (en curso) para reclasificar su tipología.'
+        )
       );
     }
 
     throw new Error(
-      body?.message || `Error del servidor (${res.status}) al reclasificar la tipología.`
+      extraerMensajeError(
+        error,
+        `Error del servidor (${status}) al reclasificar la tipología.`
+      )
     );
   } catch (err) {
-    // Si ocurre un error de conectividad durante el fetch, registrar en cola offline
     if (err instanceof TypeError || (err instanceof Error && err.message.includes('fetch'))) {
       await encolarAccionOutbox({
         tipo: 'ACTUALIZAR_TIPOLOGIA',
-        url: `/api/incidentes/${incidenteId}/tipologia`,
+        url: `/api/incidentes/${incidenteIdValido}/tipologia`,
         metodo: 'PATCH',
-        payload: payloadMutacion,
+        payload: payloadMutacion as Record<string, unknown>,
       });
 
       let misionActualizada: MisionLocal | undefined = undefined;
