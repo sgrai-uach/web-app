@@ -1,6 +1,11 @@
 import apiClient from '@/lib/api/client';
 import type { paths } from '@/types/api-generated';
-import type { AceptarMisionPayload, MisionLocal, RechazarMisionPayload } from '@/types/offline';
+import type {
+  AceptarMisionPayload,
+  AdjuntoLocal,
+  MisionLocal,
+  RechazarMisionPayload,
+} from '@/types/offline';
 import { rechazoMisionSchema, type RechazoMisionInput } from '@/lib/validations/misiones';
 import {
   guardarMisionesLocales,
@@ -228,6 +233,36 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         previa?.sincronizacionPendiente && d.estado === 'DESPACHADA'
       );
 
+      const adjuntosRemotos: AdjuntoLocal[] = Array.isArray(d.reportesTerreno)
+        ? d.reportesTerreno.flatMap((rep) =>
+            Array.isArray(rep.adjuntos)
+              ? rep.adjuntos.map((adj) => ({
+                  id: adj.id,
+                  nombreArchivo: adj.nombreArchivo,
+                  url: adj.url,
+                  tipoMime: adj.tipoMime,
+                  tamanoBytes: adj.tamanoBytes,
+                  creadoEn: adj.creadoEn,
+                  sincronizacionPendiente: false,
+                }))
+              : []
+          )
+        : [];
+
+      const adjuntosPrevios = Array.isArray(previa?.datosAdicionales?.adjuntos)
+        ? (previa.datosAdicionales.adjuntos as AdjuntoLocal[])
+        : [];
+      const adjuntosPendientesLocales = adjuntosPrevios.filter(
+        (item) => item.sincronizacionPendiente
+      );
+
+      const adjuntosCombinados = [
+        ...adjuntosPendientesLocales,
+        ...adjuntosRemotos.filter(
+          (rem) => !adjuntosPendientesLocales.some((loc) => loc.id === rem.id)
+        ),
+      ];
+
       const datosRemotos = {
         trabajo:
           d.descripcion ||
@@ -236,6 +271,11 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         titulo: d.titulo,
         estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION',
         estadoIncidente: d.incidente?.estado || 'VERIFICANDO',
+        reporteTerrenoId:
+          Array.isArray(d.reportesTerreno) && d.reportesTerreno.length > 0
+            ? d.reportesTerreno[0].id
+            : undefined,
+        adjuntos: adjuntosCombinados,
       };
 
       const misionLocal: MisionLocal = {

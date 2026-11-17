@@ -27,6 +27,28 @@ export type RechazarMisionPayload = NonNullable<
   paths['/api/misiones/{id}/rechazar']['post']['requestBody']
 >['content']['application/json'];
 
+export interface AdjuntoLocal {
+  id: string;
+  nombreArchivo: string;
+  url: string;
+  tipoMime: string;
+  tamanoBytes: number;
+  creadoEn: string;
+  sincronizacionPendiente?: boolean;
+  errorSincronizacion?: string;
+}
+
+export interface EvidenciaOutboxPayload extends Record<string, unknown> {
+  adjuntoLocalId: string;
+  misionId: string;
+  incidente_id?: string;
+  reporte_terreno_id?: string;
+  nombreArchivo: string;
+  tipoMime: string;
+  tamanoBytes: number;
+  dataUrl: string;
+}
+
 export interface AccionOutbox {
   id: string;
   tipo: AccionOutboxTipo;

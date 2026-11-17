@@ -6,9 +6,18 @@ import {
   sincronizarColaOutbox,
   obtenerMisionLocalPorId,
   guardarMisionLocal,
+  reemplazarAdjuntoLocalEnMision,
+  marcarErrorAdjuntoLocalEnMision,
 } from '@/services/offlineQueue';
+import {
+  construirFormDataEvidencia,
+  extraerMensajeErrorHttp,
+  parsearAdjuntoDesdeRespuesta,
+} from '@/services/evidenciaService';
+import { dataUrlToBlob } from '@/lib/utils/mediaUtils';
 import { obtenerDetalleMision } from '@/services/misionesService';
 import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge';
+import type { EvidenciaOutboxPayload } from '@/types/offline';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
 
 export function useConnectivity() {
@@ -54,14 +63,31 @@ export function useConnectivity() {
           ? { Authorization: `Bearer ${token}` }
           : {};
 
-        const res = await fetch(`${apiUrl}${accion.url}`, {
-          method: accion.metodo,
-          headers: {
-            'Content-Type': 'application/json',
-            ...authHeaders,
-          },
-          body: JSON.stringify(accion.payload),
-        });
+        let res: Response;
+        if (accion.tipo === 'SUBIR_EVIDENCIA') {
+          const evPayload = accion.payload as EvidenciaOutboxPayload;
+          const blob = dataUrlToBlob(evPayload.dataUrl);
+          const formData = construirFormDataEvidencia(
+            blob,
+            evPayload.nombreArchivo,
+            evPayload.incidente_id,
+            evPayload.reporte_terreno_id
+          );
+          res = await fetch(`${apiUrl}${accion.url}`, {
+            method: accion.metodo,
+            headers: authHeaders,
+            body: formData,
+          });
+        } else {
+          res = await fetch(`${apiUrl}${accion.url}`, {
+            method: accion.metodo,
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders,
+            },
+            body: JSON.stringify(accion.payload),
+          });
+        }
 
         const esExito = res.ok;
         let esIdempotenteEnCurso = false;
@@ -85,6 +111,8 @@ export function useConnectivity() {
           res.status === 400 ||
           res.status === 403 ||
           res.status === 404 ||
+          res.status === 413 ||
+          res.status === 415 ||
           res.status === 422;
 
         const procesada =
@@ -169,6 +197,35 @@ export function useConnectivity() {
               // Ignorar fallos de lectura/escritura secundaria en IndexedDB
             }
           }
+        } else if (accion.tipo === 'SUBIR_EVIDENCIA') {
+          const evPayload = accion.payload as EvidenciaOutboxPayload;
+          if (esExito) {
+            try {
+              const bodyJson = await res.clone().json();
+              const adjuntoDefinitivo = parsearAdjuntoDesdeRespuesta(bodyJson, {
+                id: evPayload.adjuntoLocalId,
+                nombreArchivo: evPayload.nombreArchivo,
+                url: '',
+                tipoMime: evPayload.tipoMime,
+                tamanoBytes: evPayload.tamanoBytes,
+                creadoEn: new Date().toISOString(),
+                sincronizacionPendiente: false,
+              });
+              await reemplazarAdjuntoLocalEnMision(
+                evPayload.misionId,
+                evPayload.adjuntoLocalId,
+                adjuntoDefinitivo
+              );
+            } catch {
+              // Ignorar fallos secundarios al actualizar caché de misión
+            }
+          } else if (esErrorIrrecuperable || esConflictoTerminal) {
+            await marcarErrorAdjuntoLocalEnMision(
+              evPayload.misionId,
+              evPayload.adjuntoLocalId,
+              extraerMensajeErrorHttp(res.status)
+            );
+          }
         }
 
         return procesada;
@@ -211,8 +268,21 @@ export function useConnectivity() {
       void actualizarPendientes();
     };
 
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data && (event.data as { type?: string }).type === 'PROCESS_OFFLINE_QUEUE') {
+        void sincronizar();
+      }
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    if (
+      typeof navigator !== 'undefined' &&
+      'serviceWorker' in navigator &&
+      typeof navigator.serviceWorker?.addEventListener === 'function'
+    ) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
 
     // Revisar periódicamente el outbox y sincronizar si hay conexión activa y pendientes
     const interval = setInterval(() => {
@@ -222,6 +292,13 @@ export function useConnectivity() {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      if (
+        typeof navigator !== 'undefined' &&
+        'serviceWorker' in navigator &&
+        typeof navigator.serviceWorker?.removeEventListener === 'function'
+      ) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
       clearInterval(interval);
     };
   }, [sincronizar, actualizarPendientes]);
