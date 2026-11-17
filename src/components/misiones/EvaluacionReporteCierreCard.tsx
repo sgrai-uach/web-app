@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
-import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { ModalConfirmacionReporteCierre } from './ModalConfirmacionReporteCierre';
 import {
@@ -28,7 +27,6 @@ import {
 } from './ReporteTerrenoBase';
 import {
   DICTAMENES_ATENCION,
-  ESTADOS_TERRENO_VERIFICACION,
   MOTIVO_NO_ABORDABLE_MIN,
   RESUMEN_TECNICO_MIN,
   VALORES_INICIALES_REPORTE_VERIFICACION,
@@ -39,13 +37,9 @@ import {
   obtenerReporteVerificacionMision,
   type ResultadoEnvioReporteVerificacion,
 } from '@/services/reporteVerificacionService';
-import {
-  formatearDictamenAtencion,
-  formatearEstadoTerreno,
-} from '@/lib/utils/formatters';
+import { formatearDictamenAtencion } from '@/lib/utils/formatters';
 import type {
   DictamenAtencion,
-  EstadoTerrenoVerificacion,
   MisionLocal,
   ReporteVerificacionTerrenoForm,
 } from '@/types/offline';
@@ -67,7 +61,6 @@ export function EvaluacionReporteCierreCard({
 }: EvaluacionReporteCierreCardProps) {
   const motivoId = useId();
   const resumenId = useId();
-  const estadoTerrenoId = useId();
   const personasId = useId();
   const danosId = useId();
   const observacionesId = useId();
@@ -281,11 +274,6 @@ export function EvaluacionReporteCierreCard({
               />
 
               <CampoResumenReporte
-                label="Estado del Terreno"
-                valor={formatearEstadoTerreno(reporteExistente.estado_terreno)}
-              />
-
-              <CampoResumenReporte
                 label="Personas Damnificadas"
                 valor={reporteExistente.personas_afectadas}
               />
@@ -453,24 +441,6 @@ export function EvaluacionReporteCierreCard({
                 </span>
               </div>
             </div>
-
-            <Select
-              id={estadoTerrenoId}
-              label="Estado del terreno"
-              requiredIndicator
-              value={form.estado_terreno}
-              disabled={deshabilitado || guardando}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  estado_terreno: e.target.value as EstadoTerrenoVerificacion,
-                }))
-              }
-              options={ESTADOS_TERRENO_VERIFICACION.map((estado) => ({
-                value: estado,
-                label: formatearEstadoTerreno(estado),
-              }))}
-            />
           </div>
 
           {/* 3. Personas Damnificadas / Afectadas (precargado de HU-38) */}
@@ -643,7 +613,6 @@ export function EvaluacionReporteCierreCard({
         dictamen={form.dictamen}
         motivoNoAbordable={esNoAbordable ? motivoLimpio : undefined}
         resumenTecnico={resumenLimpio}
-        estadoTerreno={form.estado_terreno}
         personasAfectadas={form.personas_afectadas}
         requiereAsistenciaSocial={form.requiere_asistencia_social}
         cargando={guardando}

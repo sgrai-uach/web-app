@@ -224,8 +224,12 @@ export async function enviarReporteVerificacionTerreno(
     motivoNoAbordable: motivoLimpio,
     resumen_tecnico: validado.resumen_tecnico.trim(),
     resumenTecnico: validado.resumen_tecnico.trim(),
-    estado_terreno: validado.estado_terreno,
-    estadoTerreno: validado.estado_terreno,
+    ...(validado.estado_terreno
+      ? {
+          estado_terreno: validado.estado_terreno,
+          estadoTerreno: validado.estado_terreno,
+        }
+      : {}),
     personas_afectadas: validado.personas_afectadas,
     personasAfectadas: validado.personas_afectadas,
     danos_estimados: danosLimpio,
@@ -255,7 +259,7 @@ export async function enviarReporteVerificacionTerreno(
       dictamen: validado.dictamen,
       motivo_no_abordable: motivoLimpio || '',
       resumen_tecnico: validado.resumen_tecnico.trim(),
-      estado_terreno: validado.estado_terreno,
+      ...(validado.estado_terreno ? { estado_terreno: validado.estado_terreno } : {}),
       personas_afectadas: validado.personas_afectadas,
       danos_estimados: danosLimpio || '',
       observaciones: observacionesLimpio || '',
@@ -289,7 +293,7 @@ export async function enviarReporteVerificacionTerreno(
       motivoNoAbordable: reporte.motivo_no_abordable || null,
       requiereAsistenciaSocial: reporte.requiere_asistencia_social,
       resumenTecnico: reporte.resumen_tecnico,
-      estadoTerreno: reporte.estado_terreno,
+      ...(reporte.estado_terreno ? { estadoTerreno: reporte.estado_terreno } : {}),
       personasAfectadas: reporte.personas_afectadas,
       danosEstimados: reporte.danos_estimados || null,
       observaciones: reporte.observaciones || null,

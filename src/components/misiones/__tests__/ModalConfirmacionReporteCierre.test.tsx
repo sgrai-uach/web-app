@@ -13,7 +13,6 @@ describe('ModalConfirmacionReporteCierre (H39)', () => {
         abierto={true}
         dictamen="REQUIERE_CUADRILLA"
         resumenTecnico="Obstrucción total de sumidero principal."
-        estadoTerreno="CRITICO"
         personasAfectadas={4}
         requiereAsistenciaSocial={true}
         alConfirmar={alConfirmar}
@@ -25,7 +24,6 @@ describe('ModalConfirmacionReporteCierre (H39)', () => {
       screen.getByText('Confirmar Informe Técnico y Cierre')
     ).toBeInTheDocument();
     expect(screen.getByText('Requiere cuadrilla')).toBeInTheDocument();
-    expect(screen.getByText('Crítico')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('Solicitada')).toBeInTheDocument();
 
@@ -42,7 +40,6 @@ describe('ModalConfirmacionReporteCierre (H39)', () => {
         dictamen="NO_ABORDABLE"
         motivoNoAbordable="Emergencia en predio privado cercado sin acceso autorizado."
         resumenTecnico="Inspección perimetral confirma ámbito privado."
-        estadoTerreno="INACCESIBLE"
         personasAfectadas={0}
         requiereAsistenciaSocial={false}
         alConfirmar={vi.fn()}

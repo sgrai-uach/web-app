@@ -161,7 +161,7 @@ export interface ReporteVerificacionTerrenoForm {
   dictamen: DictamenAtencion;
   motivo_no_abordable: string;
   resumen_tecnico: string;
-  estado_terreno: EstadoTerrenoVerificacion;
+  estado_terreno?: EstadoTerrenoVerificacion;
   personas_afectadas: number;
   danos_estimados: string;
   observaciones: string;

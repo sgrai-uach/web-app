@@ -9,11 +9,8 @@ import {
   ConfirmacionResumenJustificacion,
 } from '@/components/common/ConfirmacionResumen';
 import { Chip } from '@/components/ui/Chip';
-import {
-  formatearDictamenAtencion,
-  formatearEstadoTerreno,
-} from '@/lib/utils/formatters';
-import type { DictamenAtencion, EstadoTerrenoVerificacion } from '@/types/offline';
+import { formatearDictamenAtencion } from '@/lib/utils/formatters';
+import type { DictamenAtencion } from '@/types/offline';
 import styles from './ModalConfirmacionReporteCierre.module.css';
 
 export interface ModalConfirmacionReporteCierreProps {
@@ -21,7 +18,6 @@ export interface ModalConfirmacionReporteCierreProps {
   dictamen: DictamenAtencion;
   motivoNoAbordable?: string;
   resumenTecnico: string;
-  estadoTerreno: EstadoTerrenoVerificacion;
   personasAfectadas: number;
   requiereAsistenciaSocial: boolean;
   cargando?: boolean;
@@ -34,7 +30,6 @@ export function ModalConfirmacionReporteCierre({
   dictamen,
   motivoNoAbordable,
   resumenTecnico,
-  estadoTerreno,
   personasAfectadas,
   requiereAsistenciaSocial,
   cargando = false,
@@ -73,10 +68,6 @@ export function ModalConfirmacionReporteCierre({
           <Chip variant={esNoAbordable ? 'danger' : 'teal'} size="md">
             {formatearDictamenAtencion(dictamen)}
           </Chip>
-        </ConfirmacionResumenFila>
-
-        <ConfirmacionResumenFila etiqueta="Estado del Terreno">
-          {formatearEstadoTerreno(estadoTerreno)}
         </ConfirmacionResumenFila>
 
         <ConfirmacionResumenFila etiqueta="Personas Damnificadas">
