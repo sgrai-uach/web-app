@@ -253,5 +253,28 @@ describe('PatrullaMisionDetailPage — Categorización de Tipología en Terreno 
       expect(screen.getByText('Completado')).toBeInTheDocument();
     });
   });
+
+  it('bloquea la categorización y muestra aviso cuando falta el permiso misiones:terreno:verificar', async () => {
+    configurarAuth(true, false);
+
+    await act(async () => {
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <PatrullaMisionDetailPage
+            params={Promise.resolve({ id: misionEnCursoMock.id })}
+          />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no cuenta con el permiso misiones:terreno:verificar/i)
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('combobox')).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Confirmar Tipología/i })).toBeDisabled();
+  });
 });
 
