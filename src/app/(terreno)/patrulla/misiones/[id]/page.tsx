@@ -62,7 +62,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       } else {
         setMision({
           id: misionId,
-          incidenteId: `inc-${misionId}`,
+          incidenteId: '',
           codigoIncidente: `INC-2026-${misionId.substring(0, 5).toUpperCase()}`,
           tipologia: 'Caída de árbol',
           direccion: 'Av. Alemania 600, Valdivia',
@@ -314,9 +314,9 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                 <div className={styles.offlineQueueBanner} role="status">
                   <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
                   <span>
-                    Pendiente de sincronizar: La aceptación fue guardada en la cola
-                    local del dispositivo y se enviará automáticamente al recuperar
-                    conexión.
+                    Pendiente de sincronizar: Los cambios de esta misión fueron guardados
+                    en la cola local del dispositivo y se enviarán automáticamente al
+                    recuperar conexión.
                   </span>
                 </div>
               ) : (
@@ -377,9 +377,25 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                   ) : null
                 }
               >
+                {(!tienePermisoVerificar ||
+                  !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                    mision.incidenteId || ''
+                  )) && (
+                  <div className={styles.permissionWarning} role="note" style={{ marginBottom: '12px' }}>
+                    {!tienePermisoVerificar
+                      ? 'Su perfil no cuenta con el permiso misiones:terreno:verificar para categorizar incidentes.'
+                      : 'No se dispone de un identificador de incidente válido para registrar la categorización.'}
+                  </div>
+                )}
                 <EvaluacionTipologiaCard
                   incidenteId={mision.incidenteId}
                   misionActual={mision}
+                  deshabilitado={
+                    !tienePermisoVerificar ||
+                    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                      mision.incidenteId || ''
+                    )
+                  }
                   onTipologiaActualizada={(resultado) => {
                     if (resultado.mision) {
                       setMision(resultado.mision);

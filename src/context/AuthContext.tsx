@@ -253,12 +253,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (listaPermisos.includes('*') || listaPermisos.includes(permiso)) {
         return true;
       }
-      // Fallback por rol canónico de terreno cuando el token o mock no desglosa permisos granulares
-      if (
-        esPatrulla &&
-        (permiso.startsWith('patrulla:') ||
-          (listaPermisos.length === 0 && permiso === 'misiones:terreno:verificar'))
-      ) {
+      // Fallback por rol canónico de terreno cuando el token o mock no desglosa permisos de ruta
+      if (esPatrulla && permiso.startsWith('patrulla:')) {
         return true;
       }
       if (esCuadrilla && permiso.startsWith('cuadrilla:')) {
