@@ -2,8 +2,15 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { AccionOutbox, MisionLocal, CatalogoLocal } from '@/types/offline';
 
 const DB_NAME = 'sgrai_terreno_offline_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const CLAVE_CACHE_EVALUACIONES_MISION = 'sgrai_evaluaciones_mision_v1';
+
+export interface NotificacionLocal {
+  notificacionId: string;
+  misionId: string;
+  estado: 'RECIBIDA' | 'LEIDA';
+  procesadoEn: string;
+}
 
 const CLAVES_EVALUACION_CACHEABLES = [
   'tipologiaConstatada',
@@ -198,6 +205,10 @@ interface SgraiDB extends DBSchema {
     value: AccionOutbox;
     indexes: { 'por-timestamp': string };
   };
+  notificaciones: {
+    key: string;
+    value: NotificacionLocal;
+  };
 }
 
 let dbPromise: Promise<IDBPDatabase<SgraiDB>> | null = null;
@@ -219,6 +230,9 @@ export function getDB(): Promise<IDBPDatabase<SgraiDB>> {
         if (!db.objectStoreNames.contains('outbox')) {
           const outboxStore = db.createObjectStore('outbox', { keyPath: 'id' });
           outboxStore.createIndex('por-timestamp', 'timestamp');
+        }
+        if (!db.objectStoreNames.contains('notificaciones')) {
+          db.createObjectStore('notificaciones', { keyPath: 'notificacionId' });
         }
       },
     });
@@ -326,6 +340,21 @@ export async function encolarAccionOutbox(
   accion: Omit<AccionOutbox, 'id' | 'timestamp' | 'intentos'>
 ): Promise<AccionOutbox> {
   const db = await getDB();
+  const existentes = await obtenerAccionesOutbox();
+  const duplicada = existentes.find(
+    (item) => item.tipo === accion.tipo && item.url === accion.url
+  );
+
+  if (duplicada) {
+    const actualizada: AccionOutbox = {
+      ...duplicada,
+      payload: accion.payload,
+      timestamp: new Date().toISOString(),
+    };
+    await db.put('outbox', actualizada);
+    return actualizada;
+  }
+
   const nuevaAccion: AccionOutbox = {
     ...accion,
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `outbox-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -395,3 +424,25 @@ export async function sincronizarColaOutbox(
 
   return { total: acciones.length, exitosas, fallidas };
 }
+
+// ==========================================
+// NOTIFICACIONES Y ACKS
+// ==========================================
+
+export async function guardarNotificacionLocal(notificacion: NotificacionLocal): Promise<void> {
+  const db = await getDB();
+  await db.put('notificaciones', notificacion);
+}
+
+export async function obtenerNotificacionLocal(
+  notificacionId: string
+): Promise<NotificacionLocal | undefined> {
+  const db = await getDB();
+  return db.get('notificaciones', notificacionId);
+}
+
+export async function obtenerNotificacionesLocales(): Promise<NotificacionLocal[]> {
+  const db = await getDB();
+  return db.getAll('notificaciones');
+}
+

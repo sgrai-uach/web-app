@@ -161,7 +161,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     }
   };
 
-  if (cargando || !mision) {
+  if (cargando) {
     return (
       <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
         Cargando misión...
@@ -169,6 +169,39 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     );
   }
 
+  if (!mision) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.topBar}>
+          <Link href="/patrulla/misiones" className={styles.backLink}>
+            <ArrowLeft size={16} aria-hidden="true" />
+            <span>Misiones</span>
+          </Link>
+          <ConnectionStatusBadge
+            status={status}
+            pendingCount={pendientes}
+            onRetry={sincronizar}
+          />
+        </div>
+        <div
+          style={{
+            backgroundColor: 'var(--color-white)',
+            border: '1px solid var(--color-border)',
+            padding: 'var(--space-6)',
+            textAlign: 'center',
+          }}
+          role="alert"
+        >
+          <p style={{ fontWeight: 700, margin: '0 0 var(--space-2) 0' }}>
+            Misión no encontrada
+          </p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: 0 }}>
+            La misión solicitada no existe, fue removida o no se encuentra disponible en caché local.
+          </p>
+        </div>
+      </div>
+    );
+  }
   const estadoNormalizado = mision.estado?.toUpperCase() || '';
   const esDespachada = estadoNormalizado === 'DESPACHADA';
   const esEnCurso =

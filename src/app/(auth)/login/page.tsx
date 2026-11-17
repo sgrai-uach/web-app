@@ -2,21 +2,18 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogIn, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { LogIn, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Heading } from '@/components/ui/Heading';
 import { Input } from '@/components/ui/Input';
-import { setAuthCookie } from '@/lib/utils/cookieUtils';
-import { guardarMisionesLocales } from '@/services/offlineQueue';
 import { validarRutChileno, formatearRut } from '@/lib/validations/rut';
 import { UNIFIED_LOGIN_PATH } from '@/proxy';
-import type { MisionLocal } from '@/types/offline';
 import styles from './LoginPage.module.css';
 
 export default function LoginRedirectPage() {
   const router = useRouter();
-  const { autenticado, usuario, cargando, login, recargarSesion } = useAuth();
+  const { autenticado, usuario, cargando, login } = useAuth();
 
   const [identificador, setIdentificador] = useState('');
   const [password, setPassword] = useState('');
@@ -46,13 +43,6 @@ export default function LoginRedirectPage() {
     if (!esEntornoStandaloneTerreno) {
       const destino = `${UNIFIED_LOGIN_PATH}?returnUrl=${encodeURIComponent('/terreno')}`;
       router.push(destino);
-      try {
-        if (typeof window !== 'undefined' && window.location) {
-          window.location.assign(destino);
-        }
-      } catch {
-        // Ignorado en pruebas unitarias
-      }
     }
   }, [autenticado, usuario, cargando, router]);
 
@@ -107,39 +97,6 @@ export default function LoginRedirectPage() {
           ? err.message
           : 'Credenciales inválidas o problema de conectividad con la central.';
       setErrorLocal(msg);
-    } finally {
-      setProcesando(false);
-    }
-  };
-
-  const handleAccesoRapidoPatrulla = async () => {
-    setProcesando(true);
-    setErrorLocal(null);
-    try {
-      setAuthCookie('dev-patrulla-token');
-      const misionesIniciales: MisionLocal[] = [
-        {
-          id: '60000000-0000-4000-8000-000000000001',
-          incidenteId: 'a0000000-0000-4000-8000-000000000001',
-          codigoIncidente: 'INC-2026-0001',
-          tipologia: 'Caída de árbol',
-          direccion: 'Av. Ramón Picarte 1200, Valdivia',
-          coordenadas: { lat: -39.819588, lng: -73.245209 },
-          prioridad: 'ALTA',
-          estado: 'DESPACHADA',
-          fechaDespacho: new Date().toISOString(),
-          datosAdicionales: {
-            trabajo: 'Evaluar caída de árbol sobre calzada y riesgo de tendido eléctrico.',
-            titulo: 'Verificación de Incidente INC-2026-0001',
-          },
-          actualizadoEn: new Date().toISOString(),
-        },
-      ];
-      await guardarMisionesLocales(misionesIniciales);
-      if (typeof recargarSesion === 'function') {
-        await recargarSesion();
-      }
-      router.push('/patrulla/misiones');
     } finally {
       setProcesando(false);
     }
@@ -221,20 +178,6 @@ export default function LoginRedirectPage() {
                 icon={<LogIn size={20} />}
               >
                 Ingresar al Sistema
-              </Button>
-
-              <hr className={styles.divider} />
-
-              <Button
-                type="button"
-                variant="outline"
-                size="md"
-                fullWidth
-                disabled={procesando || cargando}
-                icon={<ShieldCheck size={18} />}
-                onClick={handleAccesoRapidoPatrulla}
-              >
-                Acceso Rápido Patrulla (Prueba Local)
               </Button>
             </form>
           </div>

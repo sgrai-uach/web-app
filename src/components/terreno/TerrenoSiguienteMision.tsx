@@ -33,8 +33,8 @@ export function TerrenoSiguienteMision() {
 
         const misiones = await sincronizarMisiones({
           tipoMision: esCuadrilla ? 'ATENCION_CUADRILLA' : 'VERIFICACION',
-          patrullaId: !esCuadrilla ? usuario.unidadId : undefined,
-          cuadrillaId: esCuadrilla ? usuario.unidadId : undefined,
+          patrullaId: !esCuadrilla ? usuario?.unidadId || undefined : undefined,
+          cuadrillaId: esCuadrilla ? usuario?.unidadId || undefined : undefined,
         });
         if (cancelado) return;
 

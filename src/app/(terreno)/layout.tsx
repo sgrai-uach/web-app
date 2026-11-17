@@ -4,6 +4,7 @@ import React from 'react';
 import { usePathname } from 'next/navigation';
 import { TerrenoBottomNav } from '@/components/terreno/TerrenoBottomNav';
 import { useTerrenoSocket } from '@/hooks/useTerrenoSocket';
+import { NotificacionesTerrenoProvider } from '@/context/NotificacionesTerrenoContext';
 import styles from './layout.module.css';
 
 /**
@@ -17,13 +18,15 @@ export default function TerrenoLayout({ children }: { children: React.ReactNode 
   useTerrenoSocket();
 
   return (
-    <div className={styles.container}>
-      <main
-        className={`${styles.main} ${esAnchoCompleto ? styles.mainAnchoCompleto : ''}`.trim()}
-      >
-        {children}
-      </main>
-      <TerrenoBottomNav />
-    </div>
+    <NotificacionesTerrenoProvider>
+      <div className={styles.container}>
+        <main
+          className={`${styles.main} ${esAnchoCompleto ? styles.mainAnchoCompleto : ''}`.trim()}
+        >
+          {children}
+        </main>
+        <TerrenoBottomNav />
+      </div>
+    </NotificacionesTerrenoProvider>
   );
 }
