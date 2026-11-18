@@ -104,6 +104,10 @@ describe('PatrullaMisionDetailPage — Evaluación en Terreno y Prioridad (H38)'
       actualizarPendientes: vi.fn(),
     });
 
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(
+      misionTipologiaCompletadaMock
+    );
+
     vi.mocked(tipologiaService.obtenerCatalogoTiposIncidente).mockResolvedValue([
       {
         id: '40000000-0000-4000-8000-000000000001',
@@ -235,9 +239,8 @@ describe('PatrullaMisionDetailPage — Evaluación en Terreno y Prioridad (H38)'
     expect(detailsElements[1]?.hasAttribute('open')).toBe(false);
   });
 
-  it('deshabilita EvaluacionPrioridadCard cuando falta el permiso misiones:terreno:verificar y preserva el borrador al colapsar', async () => {
+  it('deshabilita EvaluacionPrioridadCard cuando falta el permiso misiones:terreno:verificar', async () => {
     vi.mocked(useAuth).mockReturnValue({
-      ...vi.mocked(useAuth).mock.results[0]?.value,
       usuario: {
         id: '00000000-0000-4000-8000-000000000004',
         rut: '15.555.555-5',
@@ -261,6 +264,7 @@ describe('PatrullaMisionDetailPage — Evaluación en Terreno y Prioridad (H38)'
       unidadActiva: true,
       tieneUnidadAsignada: true,
       estadoAsignacion: 'ACTIVA',
+      actualizarUnidadAsignada: vi.fn(),
       login: vi.fn(),
       logout: vi.fn(),
       recargarSesion: vi.fn(),
@@ -283,6 +287,68 @@ describe('PatrullaMisionDetailPage — Evaluación en Terreno y Prioridad (H38)'
         screen.getByRole('button', { name: /Confirmar prioridad y enviar reporte/i })
       ).toBeDisabled();
     });
+
+    expect(
+      screen.getByRole('textbox', { name: /Referencia para Familia #1/i })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('switch', { name: /Riesgo eléctrico activo/i })
+    ).toBeDisabled();
+  });
+
+  it('preserva el borrador del formulario de prioridad al colapsar y reabrir la sección desplegable', async () => {
+    const { container } = await act(async () =>
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <PatrullaMisionDetailPage
+            params={Promise.resolve({ id: misionTipologiaCompletadaMock.id })}
+          />
+        </Suspense>
+      )
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Evaluación en terreno y prioridad')
+      ).toBeInTheDocument();
+    });
+
+    const inputReferencia = screen.getByRole('textbox', {
+      name: /Referencia para Familia #1/i,
+    });
+    fireEvent.change(inputReferencia, {
+      target: { value: 'Familia Soto - Casa 4' },
+    });
+
+    const switchElectrico = screen.getByRole('switch', {
+      name: /Riesgo eléctrico activo/i,
+    });
+    fireEvent.click(switchElectrico);
+    expect(switchElectrico).toHaveAttribute('aria-checked', 'true');
+
+    const detailsElements = container.querySelectorAll('details');
+    expect(detailsElements.length).toBe(2);
+    expect(detailsElements[1]?.hasAttribute('open')).toBe(true);
+
+    const resumenPrioridad = screen.getByText('Evaluación en terreno y prioridad');
+    fireEvent.click(resumenPrioridad);
+
+    await waitFor(() => {
+      expect(detailsElements[1]?.hasAttribute('open')).toBe(false);
+    });
+
+    fireEvent.click(resumenPrioridad);
+
+    await waitFor(() => {
+      expect(detailsElements[1]?.hasAttribute('open')).toBe(true);
+    });
+
+    expect(
+      screen.getByRole('textbox', { name: /Referencia para Familia #1/i })
+    ).toHaveValue('Familia Soto - Casa 4');
+    expect(
+      screen.getByRole('switch', { name: /Riesgo eléctrico activo/i })
+    ).toHaveAttribute('aria-checked', 'true');
   });
 });
 

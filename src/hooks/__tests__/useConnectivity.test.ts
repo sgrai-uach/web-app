@@ -126,4 +126,66 @@ describe('useConnectivity hook', () => {
     );
     fetchSpy.mockRestore();
   });
+
+  it('descarta AJUSTAR_PRIORIDAD del outbox cuando recibe HTTP 409 Conflict y limpia sincronizacionPendiente', async () => {
+    vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+      id: '60000000-0000-4000-8000-000000000001',
+      incidenteId: '50000000-0000-4000-8000-000000000001',
+      codigoIncidente: 'INC-2026-001',
+      tipologia: 'Inundación',
+      direccion: 'Valdivia',
+      prioridad: 'MEDIA',
+      estado: 'EN_CURSO',
+      fechaDespacho: '2026-11-10T00:00:00Z',
+      actualizadoEn: '2026-11-10T00:00:00Z',
+      sincronizacionPendiente: true,
+      datosAdicionales: {
+        reportesPrioridad: [{ versionReporte: 1, sincronizado: false }],
+      },
+    });
+
+    let ejecutorResultado = false;
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (ejecutor) => {
+      ejecutorResultado = await ejecutor({
+        id: 'act-prio-409',
+        tipo: 'AJUSTAR_PRIORIDAD',
+        url: '/api/incidentes/50000000-0000-4000-8000-000000000001/prioridad',
+        metodo: 'PATCH',
+        payload: {
+          misionId: '60000000-0000-4000-8000-000000000001',
+          prioridad: 'CRITICA',
+        },
+        timestamp: new Date().toISOString(),
+        intentos: 0,
+      });
+      return {
+        total: 1,
+        exitosas: ejecutorResultado ? 1 : 0,
+        fallidas: ejecutorResultado ? 0 : 1,
+      };
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ message: 'Conflicto de estado' }), {
+        status: 409,
+      })
+    );
+
+    const { result } = renderHook(() => useConnectivity());
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+
+    expect(ejecutorResultado).toBe(true);
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prioridad: 'MEDIA',
+        sincronizacionPendiente: false,
+        datosAdicionales: expect.objectContaining({
+          reportesPrioridad: [expect.objectContaining({ sincronizado: false })],
+        }),
+      })
+    );
+    fetchSpy.mockRestore();
+  });
 });
