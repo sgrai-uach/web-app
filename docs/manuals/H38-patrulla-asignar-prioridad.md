@@ -24,14 +24,29 @@ Este manual describe el procedimiento operativo mediante el cual la **Patrulla V
 
 ## 3. Matriz de Evaluación de Prioridades en Terreno
 
-El formulario de evaluación calcula de forma reactiva la `prioridadSugerida` y detalla los `factoresGatillantes` según la siguiente matriz técnica:
+El formulario de evaluación calcula de forma reactiva la `prioridadSugerida` y detalla los `factoresGatillantes` mediante un sistema de **puntaje acumulativo homologado con `sgrai-api`**:
 
-| Nivel de Prioridad | Criterios y Factores Gatillantes Constatados en Terreno |
+| Factor Constatado en Terreno | Puntaje / Regla Aplicada |
 |---|---|
-| **Crítica (`CRITICA`)** | • Personas electrodependientes afectadas (`> 0`).<br>• Necesidad de evacuación inmediata del sector.<br>• Vivienda con compromiso **Grave / Inhabitable**.<br>• Peligro activo eléctrico, riesgo de colapso estructural/derrumbe o riesgo químico/sanitario. |
-| **Alta (`ALTA`)** | • Personas con discapacidad (`> 0`) o adultos mayores (`> 0`) afectados.<br>• Presencia de 2 o más niños en el grupo afectado.<br>• Aislamiento vial o corte de ruta de acceso.<br>• Vivienda con daño **Moderado**, 3 o más viviendas afectadas, o núcleo familiar de 6 o más integrantes. |
-| **Media (`MEDIA`)** | • Núcleo familiar afectado (`1 a 5` integrantes) o presencia de 1 niño.<br>• Vivienda afectada con daño **Leve** o mascotas afectadas (`> 0`).<br>• Solicitud de asistencia social (levantamiento FIBE). |
-| **Baja (`BAJA`)** | • Sin personas vulnerables, sin daños habitacionales (`Sin daño`) ni peligros activos constatados en el lugar. |
+| **Personas electrodependientes (`> 0`)** | `+50 pts` por persona y **disparo directo a `CRITICA`**. |
+| **Requiere evacuación inmediata** | `+35 pts` (**disparo directo a `CRITICA`** si coexiste con niños, adultos mayores, personas con discapacidad o vivienda **Grave / Inhabitable**). |
+| **Compromiso de vivienda** | `Grave / Inhabitable`: `+45 pts` · `Moderado`: `+22 pts` · `Leve`: `+8 pts` · `Sin daño`: `0 pts`. |
+| **Cantidad de viviendas afectadas** | `6 o más` inmuebles: `+20 pts` · `3 a 5` inmuebles: `+10 pts` · `1 a 2` inmuebles: `0 pts`. |
+| **Tamaño del núcleo familiar afectado** | `8 o más` personas: `+20 pts` · `4 a 7` personas: `+12 pts` · `1 a 3` personas: `+5 pts`. |
+| **Personas con discapacidad o movilidad reducida** | `+12 pts` por persona (máximo `+36 pts`). |
+| **Adultos mayores (`>= 65 años`)** | `+7 pts` por persona (máximo `+28 pts`). |
+| **Niños, niñas y adolescentes (`< 14 años`)** | `+6 pts` por niño (máximo `+24 pts`). |
+| **Mascotas o animales afectados** | `1 a 3` mascotas: `+2 pts` c/u · `4 o más` mascotas: `+5 pts` base + `1 pt` adicional por mascota extra (máximo `+10 pts`). |
+| **Peligros activos en el sitio** | `Riesgo estructural / derrumbe`: `+25 pts` · `Riesgo eléctrico activo`: `+20 pts` · `Riesgo químico o sanitario`: `+15 pts` · `Aislamiento vial`: `+15 pts`. |
+
+Los puntajes se suman para determinar la prioridad sugerida según los siguientes umbrales:
+
+| Nivel de Prioridad | Umbral de Puntaje Acumulado / Condición |
+|---|---|
+| **Crítica (`CRITICA`)** | Puntaje total **`>= 60 pts`**, o disparo directo por personas electrodependientes (`> 0`) o evacuación inmediata con población vulnerable / vivienda **Grave / Inhabitable**. |
+| **Alta (`ALTA`)** | Puntaje total entre **`35 y 59 pts`** (por ejemplo, evacuación inmediata sin agravantes `+35 pts`, o vivienda con daño moderado `+22 pts` más riesgo eléctrico `+20 pts` = `42 pts`). |
+| **Media (`MEDIA`)** | Puntaje total entre **`15 y 34 pts`** (por ejemplo, riesgo estructural `+25 pts`, riesgo eléctrico `+20 pts`, riesgo químico/sanitario `+15 pts` o aislamiento vial `+15 pts` de forma individual). |
+| **Baja (`BAJA`)** | Puntaje total **`< 15 pts`** sin condiciones de disparo crítico (por ejemplo, sin afectación `0 pts` o daño habitacional leve único `+8 pts`). |
 
 ---
 
