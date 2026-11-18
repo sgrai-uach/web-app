@@ -164,15 +164,29 @@ export function EvaluacionReporteCierreCard({
 
     if (!resumenValido) {
       setErrorValidacion(
-        `El resumen técnico del siniestro es obligatorio y debe contener al menos ${RESUMEN_TECNICO_MIN} caracteres.`
+        `El resumen técnico del siniestro es obligatorio y debe contener al menos ${RESUMEN_TECNICO_MIN} caracteres (actual: ${resumenLimpio.length}).`
       );
+      if (typeof document !== 'undefined') {
+        const el = document.getElementById(resumenId);
+        if (el) {
+          el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+          el.focus?.();
+        }
+      }
       return;
     }
 
     if (esNoAbordable && !motivoValido) {
       setErrorValidacion(
-        `Cuando el dictamen es No abordable, el motivo es obligatorio y debe contener al menos ${MOTIVO_NO_ABORDABLE_MIN} caracteres.`
+        `Cuando el dictamen es No abordable, el motivo es obligatorio y debe contener al menos ${MOTIVO_NO_ABORDABLE_MIN} caracteres (actual: ${motivoLimpio.length}).`
       );
+      if (typeof document !== 'undefined') {
+        const el = document.getElementById(motivoId);
+        if (el) {
+          el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+          el.focus?.();
+        }
+      }
       return;
     }
 
@@ -613,13 +627,47 @@ export function EvaluacionReporteCierreCard({
             />
           </div>
 
+          {!formularioValido && !errorValidacion && (
+            <p
+              role="note"
+              style={{
+                margin: 0,
+                fontSize: '0.8rem',
+                color: 'var(--color-text-muted, #5F676E)',
+                textAlign: 'center',
+              }}
+            >
+              Para enviar el reporte falta completar:{' '}
+              {!resumenValido
+                ? `resumen técnico (${resumenLimpio.length}/${RESUMEN_TECNICO_MIN} caracteres mínimos)`
+                : `motivo de no abordabilidad (${motivoLimpio.length}/${MOTIVO_NO_ABORDABLE_MIN} caracteres mínimos)`}
+              .
+            </p>
+          )}
+
+          {errorValidacion && (
+            <div
+              role="alert"
+              style={{
+                padding: '10px 12px',
+                backgroundColor: 'var(--color-danger-bg, #FFEBEE)',
+                border: '1px solid var(--color-danger, #D32F2F)',
+                color: 'var(--color-danger, #D32F2F)',
+                fontSize: '0.8125rem',
+                fontWeight: 500,
+              }}
+            >
+              {errorValidacion}
+            </div>
+          )}
+
           <Button
             type="submit"
             variant={esNoAbordable ? 'destructive' : 'primary'}
             size="lg"
             fullWidth
             loading={guardando}
-            disabled={deshabilitado || !formularioValido}
+            disabled={deshabilitado || guardando}
             icon={<CheckCircle size={18} />}
             className={styles.submitBtn}
           >

@@ -31,6 +31,26 @@ export interface CargaEvidenciaCardProps {
   alAdjuntarEvidencia?: (adjunto: AdjuntoLocal, enColaOffline: boolean) => void | Promise<void>;
 }
 
+/**
+ * Resuelve la URL pública de un adjunto contra la URL base de sgrai-api
+ * cuando proviene como ruta relativa (`/uploads/evidencia/...`), manteniendo
+ * intactas las URLs `blob:`, `data:` o absolutas (`http://`, `https://`).
+ */
+export function resolverUrlEvidencia(url: string): string {
+  if (!url) return '';
+  if (
+    url.startsWith('blob:') ||
+    url.startsWith('data:') ||
+    url.startsWith('http://') ||
+    url.startsWith('https://')
+  ) {
+    return url;
+  }
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+  if (!apiBase) return url;
+  return `${apiBase}${url.startsWith('/') ? url : `/${url}`}`;
+}
+
 export function CargaEvidenciaCard({
   misionId,
   incidenteId,
@@ -243,26 +263,27 @@ export function CargaEvidenciaCard({
           {adjuntos.map((item) => {
             const esImagen = esMimeImagen(item.tipoMime);
             const esVideo = esMimeVideo(item.tipoMime);
+            const mediaUrl = resolverUrlEvidencia(item.url);
             const esUrlDescargable =
               item.url.startsWith('/uploads/') || item.url.startsWith('http');
 
             return (
               <div key={item.id} className={styles.attachmentItem}>
-                {esVideo && item.url ? (
+                {esVideo && mediaUrl ? (
                   <video
                     controls
                     preload="metadata"
-                    src={item.url}
+                    src={mediaUrl}
                     className={styles.videoPreview}
                     aria-label={`Previsualización de video ${item.nombreArchivo}`}
                   />
                 ) : null}
 
                 <div className={styles.attachmentMediaRow}>
-                  {esImagen && item.url ? (
+                  {esImagen && mediaUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={item.url}
+                      src={mediaUrl}
                       alt={`Miniatura de ${item.nombreArchivo}`}
                       className={styles.thumbnailImg}
                     />
@@ -304,7 +325,7 @@ export function CargaEvidenciaCard({
 
                       {!esImagen && !esVideo && esUrlDescargable && (
                         <a
-                          href={item.url}
+                          href={mediaUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={styles.downloadLink}

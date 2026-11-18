@@ -215,4 +215,24 @@ describe('EvaluacionReporteCierreCard (H39)', () => {
       screen.queryByRole('button', { name: /Enviar Reporte y Cerrar Tarea/i })
     ).not.toBeInTheDocument();
   });
+
+  it('muestra mensaje de validación claro al intentar enviar con resumen técnico menor a 10 caracteres', () => {
+    render(<EvaluacionReporteCierreCard misionActual={misionConPrioridadMock} />);
+
+    fireEvent.change(screen.getByLabelText(/Resumen técnico del siniestro/i), {
+      target: { value: 'mimi mi' },
+    });
+
+    const btnEnviar = screen.getByRole('button', {
+      name: /Enviar Reporte y Cerrar Tarea/i,
+    });
+    expect(btnEnviar).not.toBeDisabled();
+
+    fireEvent.click(btnEnviar);
+
+    expect(screen.getAllByRole('alert')[0]).toHaveTextContent(
+      /al menos 10 caracteres \(actual: 7\)/i
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 });

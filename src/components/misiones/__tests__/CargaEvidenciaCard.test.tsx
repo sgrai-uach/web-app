@@ -151,4 +151,64 @@ describe('CargaEvidenciaCard (H43)', () => {
       expect(screen.getByRole('status')).toHaveTextContent(/guardada localmente/i);
     });
   });
+
+  it('resuelve rutas relativas /uploads/evidencia/... contra NEXT_PUBLIC_API_URL y conserva blob:', () => {
+    const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
+    process.env.NEXT_PUBLIC_API_URL = 'http://localhost:4001/';
+
+    try {
+      const adjuntos: AdjuntoLocal[] = [
+        {
+          id: 'adj-remoto',
+          nombreArchivo: 'pudu.webp',
+          url: '/uploads/evidencia/abc123.webp',
+          tipoMime: 'image/webp',
+          tamanoBytes: 2048,
+          creadoEn: '2026-11-18T00:00:00.000Z',
+          sincronizacionPendiente: false,
+        },
+        {
+          id: 'adj-video',
+          nombreArchivo: 'clip.mp4',
+          url: '/uploads/evidencia/vid123.mp4',
+          tipoMime: 'video/mp4',
+          tamanoBytes: 4096,
+          creadoEn: '2026-11-18T00:01:00.000Z',
+          sincronizacionPendiente: false,
+        },
+        {
+          id: 'adj-blob',
+          nombreArchivo: 'offline.jpg',
+          url: 'blob:http://localhost:3002/offline-1',
+          tipoMime: 'image/jpeg',
+          tamanoBytes: 1024,
+          creadoEn: '2026-11-18T00:02:00.000Z',
+          sincronizacionPendiente: true,
+        },
+      ];
+
+      render(
+        <CargaEvidenciaCard
+          misionId="mision-1"
+          incidenteId="22222222-2222-4222-8222-222222222222"
+          adjuntos={adjuntos}
+        />
+      );
+
+      expect(screen.getByAltText('Miniatura de pudu.webp')).toHaveAttribute(
+        'src',
+        'http://localhost:4001/uploads/evidencia/abc123.webp'
+      );
+      expect(screen.getByLabelText('Previsualización de video clip.mp4')).toHaveAttribute(
+        'src',
+        'http://localhost:4001/uploads/evidencia/vid123.mp4'
+      );
+      expect(screen.getByAltText('Miniatura de offline.jpg')).toHaveAttribute(
+        'src',
+        'blob:http://localhost:3002/offline-1'
+      );
+    } finally {
+      process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
+    }
+  });
 });

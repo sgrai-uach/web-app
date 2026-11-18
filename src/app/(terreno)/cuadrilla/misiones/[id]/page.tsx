@@ -21,7 +21,6 @@ import { Chip } from '@/components/ui/Chip';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
-import { obtenerDetalleMision } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
