@@ -270,9 +270,17 @@ export function EvaluacionPrioridadCard({
         requiereEvacuacion: evaluacion.requiereEvacuacion,
         requiereAsistenciaSocial: evaluacion.requiereAsistenciaSocial,
         requiereApoyoAdicional: evaluacion.requiereApoyoAdicional,
-        familias: (evaluacion.familias || []).map(
-          ({ referencia: _ref, ...rest }) => rest
-        ),
+        familias: (evaluacion.familias || []).map((fam) => ({
+          id: fam.id,
+          nucleoFamiliarTotal: fam.nucleoFamiliarTotal,
+          cantidadNinos: fam.cantidadNinos,
+          cantidadAdultosMayores: fam.cantidadAdultosMayores,
+          personasDiscapacitadas: fam.personasDiscapacitadas,
+          personasElectrodependientes: fam.personasElectrodependientes,
+          mascotasAfectadas: fam.mascotasAfectadas,
+          nivelCompromisoVivienda: fam.nivelCompromisoVivienda,
+          requiereAsistenciaSocial: fam.requiereAsistenciaSocial,
+        })),
       }),
     [evaluacion]
   );

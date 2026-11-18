@@ -81,6 +81,8 @@ export function useConnectivity() {
             } catch {
               esConflictoTerminal = true;
             }
+          } else {
+            esConflictoTerminal = true;
           }
         }
 

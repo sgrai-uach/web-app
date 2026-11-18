@@ -167,13 +167,6 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     );
   }
 
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
-  }
   const estadoNormalizado = mision.estado?.toUpperCase() || '';
   const esDespachada = estadoNormalizado === 'DESPACHADA';
   const esEnCurso =
