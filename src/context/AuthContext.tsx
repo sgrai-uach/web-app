@@ -62,6 +62,7 @@ export interface AuthContextValue {
   login: (credenciales: LoginRequest) => Promise<UsuarioPerfilSesion>;
   logout: () => void;
   recargarSesion: () => Promise<void>;
+  actualizarUnidadAsignada?: (unidadId: string, unidadNombre: string, unidadActiva?: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -81,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const mapDetalleAUsuarioPerfil = useCallback(
     (detalle: UsuarioActivoDetalle): UsuarioPerfilSesion => {
+      const tieneUnidad = Boolean(detalle.unidadId || detalle.unidadNombre);
       return {
         id: detalle.id,
         rut: detalle.rut,
@@ -96,7 +98,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           : (detalle.rol as unknown as { permisos?: string[] } | undefined)?.permisos || [],
         unidadId: detalle.unidadId ?? null,
         unidadNombre: detalle.unidadNombre ?? null,
-        unidadActiva: detalle.unidadActiva,
+        unidadActiva:
+          detalle.unidadActiva !== undefined
+            ? detalle.unidadActiva
+            : tieneUnidad
+            ? true
+            : undefined,
       };
     },
     []
@@ -115,6 +122,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const detalle = await obtenerUsuarioActivo();
       const perfil = mapDetalleAUsuarioPerfil(detalle);
+
+      // Si la API remota aún no incluye unidad, intentar recuperar asignación previa desde sesión guardada
+      if (!perfil.unidadId && !perfil.unidadNombre) {
+        const guardado = leerPerfilGuardado();
+        if (guardado?.id === perfil.id && (guardado.unidadId || guardado.unidadNombre)) {
+          perfil.unidadId = guardado.unidadId;
+          perfil.unidadNombre = guardado.unidadNombre;
+          perfil.unidadActiva = guardado.unidadActiva ?? true;
+        }
+      }
 
       if (!esRolTerrenoPermitido(perfil.rolCodigo)) {
         // No eliminar la cookie sgrai_auth_token para preservar la sesión activa en sgrai-web (/gestion)
@@ -236,7 +253,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (listaPermisos.includes('*') || listaPermisos.includes(permiso)) {
         return true;
       }
-      if (esPatrulla && permiso.startsWith('patrulla:')) {
+      if (
+        esPatrulla &&
+        (permiso.startsWith('patrulla:') ||
+          (permiso === 'reportes:crear' &&
+            (listaPermisos.includes('misiones:terreno:reportar') ||
+              listaPermisos.includes('misiones:terreno:verificar'))))
+      ) {
         return true;
       }
       if (esCuadrilla && permiso.startsWith('cuadrilla:')) {
@@ -253,6 +276,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return permisos.some((p) => tienePermiso(p));
     },
     [tienePermiso]
+  );
+
+  const actualizarUnidadAsignada = useCallback(
+    (unidadId: string, unidadNombre: string, unidadActiva = true) => {
+      setUsuario((prev) => {
+        if (!prev) return null;
+        if (
+          prev.unidadId === unidadId &&
+          prev.unidadNombre === unidadNombre &&
+          prev.unidadActiva === unidadActiva
+        ) {
+          return prev;
+        }
+        const actualizado: UsuarioPerfilSesion = {
+          ...prev,
+          unidadId,
+          unidadNombre,
+          unidadActiva,
+        };
+        guardarPerfilSesion(actualizado);
+        return actualizado;
+      });
+    },
+    []
   );
 
   return (
@@ -272,6 +319,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         recargarSesion,
+        actualizarUnidadAsignada,
       }}
     >
       {children}

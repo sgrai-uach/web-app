@@ -17,8 +17,11 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
+import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
+import { obtenerDetalleMision } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
@@ -288,11 +291,11 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         <div className={styles.headerRow}>
           <div className={styles.codeArea}>
             <span className={styles.code}>{mision.codigoIncidente}</span>
-            <span className={`${styles.priorityChip} ${prioridadClase}`}>
+            <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
               {formatearPrioridad(mision.prioridad)}
-            </span>
+            </Chip>
           </div>
-          <EstadoBadge estado={mision.estado} />
+          <EstadoBadge estado={mision.estado} size="md" />
         </div>
 
         <div className={styles.detailGrid}>

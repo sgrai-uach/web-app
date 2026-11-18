@@ -1,0 +1,301 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+  width: 100%;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+}
+
+.blockSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  padding: var(--space-3, 12px);
+  background-color: var(--color-bg-light, #eceff3);
+  border: 1px solid var(--color-border, #d1d5db);
+}
+
+.blockTitle {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--color-primary-teal-dark, #14505a);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dictamenGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2, 8px);
+}
+
+@media (min-width: 520px) {
+  .dictamenGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.dictamenBtn {
+  min-height: 60px;
+  padding: var(--space-3, 12px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  background-color: var(--color-white, #ffffff);
+  border: 2px solid var(--color-border, #d1d5db);
+  color: var(--color-text-dark, #2b2b2b);
+  border-radius: var(--radius-none, 0px);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.dictamenBtnTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9375rem;
+  font-weight: 800;
+}
+
+.dictamenBtnDesc {
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.9;
+  line-height: 1.35;
+}
+
+.dictamenBtnSelectedTeal {
+  background-color: var(--color-primary-teal-dark, #14505a);
+  border-color: var(--color-primary-teal-dark, #14505a);
+  color: var(--color-white, #ffffff);
+}
+
+.dictamenBtnSelectedDanger {
+  background-color: var(--color-danger, #d32f2f);
+  border-color: var(--color-danger, #d32f2f);
+  color: var(--color-white, #ffffff);
+}
+
+.noAbordablePanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  padding: var(--space-3, 12px);
+  background-color: var(--color-danger-bg, #ffebee);
+  border: 1px solid var(--color-danger, #d32f2f);
+  border-left: 4px solid var(--color-danger, #d32f2f);
+}
+
+.noAbordableNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2, 8px);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-danger, #d32f2f);
+  line-height: 1.4;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+
+.fieldLabel {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-dark, #2b2b2b);
+}
+
+.requiredMark {
+  color: var(--color-danger, #d32f2f);
+}
+
+.textareaField {
+  resize: none;
+  min-height: 96px;
+  overflow-y: auto;
+}
+
+.counterRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-xs, 12px);
+  color: var(--color-text-muted, #5f676e);
+  line-height: 1.4;
+}
+
+.counterValid {
+  color: var(--color-success, #2e7d32);
+  font-weight: 700;
+}
+
+.counterInvalid {
+  color: var(--color-danger, #d32f2f);
+  font-weight: 700;
+}
+
+.personasCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  padding: var(--space-3, 12px);
+  background-color: var(--color-white, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+}
+
+.personasControlRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  flex-wrap: wrap;
+}
+
+.counterBtn {
+  min-width: 48px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg-light, #eceff3);
+  border: 1px solid var(--color-border, #d1d5db);
+  color: var(--color-text-dark, #2b2b2b);
+  border-radius: var(--radius-none, 0px);
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.counterBtn:hover:not(:disabled) {
+  background-color: #dce2e8;
+}
+
+.counterBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.personasNumberInput {
+  min-height: 48px;
+  width: 96px;
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--color-primary-teal-dark, #14505a);
+  background-color: var(--color-white, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-none, 0px);
+  padding: 0 var(--space-2, 8px);
+}
+
+.infoNote {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2, 8px);
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  background-color: var(--color-info-bg, #e0f2f1);
+  color: var(--color-primary-teal-dark, #14505a);
+  border-left: 4px solid var(--color-primary-teal, #1b6f7d);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.fibeSwitchBtn {
+  min-height: 52px;
+  padding: var(--space-3, 12px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+  background-color: var(--color-white, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+  color: var(--color-text-dark, #2b2b2b);
+  border-radius: var(--radius-none, 0px);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  width: 100%;
+}
+
+.fibeSwitchActive {
+  background-color: var(--color-primary-teal-dark, #14505a);
+  border-color: var(--color-primary-teal-dark, #14505a);
+  color: var(--color-white, #ffffff);
+}
+
+.fibeSwitchLabelGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.switchStateTag {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+  flex-shrink: 0;
+}
+
+.evidenciaBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  padding: var(--space-3, 12px);
+  background-color: var(--color-white, #ffffff);
+  border: 1px dashed var(--color-primary-teal, #1b6f7d);
+}
+
+.evidenciaHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2, 8px);
+}
+
+.evidenciaTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--color-primary-teal-dark, #14505a);
+  text-transform: uppercase;
+}
+
+.evidenciaEmpty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #5f676e);
+  line-height: 1.45;
+}
+
+.submitBtn {
+  min-height: 52px;
+  border-radius: var(--radius-none, 0px);
+  font-weight: 800;
+}

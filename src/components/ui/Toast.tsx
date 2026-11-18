@@ -32,6 +32,10 @@ export function useToast(): ToastContextValue {
   return context;
 }
 
+export function useToastOptional(): ToastContextValue | null {
+  return useContext(ToastContext);
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 

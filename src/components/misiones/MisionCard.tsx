@@ -2,6 +2,8 @@ import React from 'react';
 import Link from 'next/link';
 import { MapPin, ChevronRight, Archive } from 'lucide-react';
 import { EstadoBadge } from './EstadoBadge';
+import { Chip } from '@/components/ui/Chip';
+import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './MisionCard.module.css';
@@ -13,26 +15,17 @@ interface MisionCardProps {
 }
 
 export function MisionCard({ mision, href, esInactiva = false }: MisionCardProps) {
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
-  }
-
   return (
     <Link href={href} className={styles.card} tabIndex={0}>
       <div className={styles.headerRow}>
         <div className={styles.codeAndPriority}>
           <span className={styles.code}>{mision.codigoIncidente}</span>
-          <span className={`${styles.priorityChip} ${prioridadClase}`}>
+          <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
             {formatearPrioridad(mision.prioridad)}
-          </span>
+          </Chip>
         </div>
         <div className={styles.statusAndChevron}>
-          <EstadoBadge estado={mision.estado} />
+          <EstadoBadge estado={mision.estado} size="md" />
           <ChevronRight size={18} className={styles.chevron} aria-hidden="true" />
         </div>
       </div>

@@ -1,0 +1,10 @@
+.warningNotice {
+  margin-top: var(--space-2, 8px);
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  background-color: var(--color-danger-bg, #ffebee);
+  color: var(--color-danger, #d32f2f);
+  border-left: 3px solid var(--color-danger, #d32f2f);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
