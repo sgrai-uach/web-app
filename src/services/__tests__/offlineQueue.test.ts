@@ -175,4 +175,56 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
 
     await eliminarAccionOutbox(primera.id);
   });
+
+  it('preserva misión EN_CURSO con ACTUALIZAR_TIPOLOGIA en outbox y elimina obsoletas sin pendientes en guardarMisionesLocales (BUG-H37-PWA-03)', async () => {
+    const misionObsoleta: MisionLocal = {
+      ...misionEjemplo,
+      id: 'mision-obsoleta-01',
+      incidenteId: 'inc-obsoleto-01',
+      estado: 'FINALIZADA',
+      sincronizacionPendiente: false,
+    };
+    const misionEnCursoPendiente: MisionLocal = {
+      ...misionEjemplo,
+      id: 'mision-en-curso-tip-01',
+      incidenteId: 'inc-en-curso-tip-01',
+      estado: 'EN_CURSO',
+      tipologia: 'Inundación',
+      sincronizacionPendiente: true,
+      datosAdicionales: { tipologiaEvaluada: true },
+    };
+
+    await guardarMisionesLocales([misionObsoleta, misionEnCursoPendiente]);
+    const accion = await encolarAccionOutbox({
+      tipo: 'ACTUALIZAR_TIPOLOGIA',
+      url: '/api/incidentes/inc-en-curso-tip-01/tipologia',
+      metodo: 'PATCH',
+      payload: {
+        misionId: 'mision-en-curso-tip-01',
+        tipoIncidenteId: '40000000-0000-4000-8000-000000000001',
+        justificacion: 'Inundación constatada en terreno',
+      },
+    });
+
+    // Sincronización trae versión remota desactualizada y ya no incluye misionObsoleta
+    await guardarMisionesLocales([
+      {
+        ...misionEnCursoPendiente,
+        tipologia: 'Caída de árbol',
+        sincronizacionPendiente: false,
+        datosAdicionales: { trabajo: 'Remoto' },
+      },
+    ]);
+
+    const obsoleta = await obtenerMisionLocalPorId('mision-obsoleta-01');
+    const preservada = await obtenerMisionLocalPorId('mision-en-curso-tip-01');
+
+    expect(obsoleta).toBeUndefined();
+    expect(preservada?.estado).toBe('EN_CURSO');
+    expect(preservada?.tipologia).toBe('Inundación');
+    expect(preservada?.sincronizacionPendiente).toBe(true);
+    expect(preservada?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+
+    await eliminarAccionOutbox(accion.id);
+  });
 });
