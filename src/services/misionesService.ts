@@ -4,9 +4,9 @@ import type { AceptarMisionPayload, MisionLocal } from '@/types/offline';
 import {
   guardarMisionesLocales,
   guardarMisionLocal,
-  limpiarMisionesLocales,
   obtenerMisionesLocales,
   obtenerMisionLocalPorId,
+  obtenerAccionesOutbox,
   encolarAccionOutbox,
 } from '@/services/offlineQueue';
 import { limpiarTituloMision, formatearTipologia } from '@/lib/utils/formatters';
@@ -137,6 +137,54 @@ export async function obtenerCoordenadasOpcionales(
 }
 
 /**
+ * Identifica las misiones e incidentes que mantienen mutaciones pendientes
+ * (`ACEPTAR_MISION` o `ACTUALIZAR_TIPOLOGIA`) en la cola local `outbox` para
+ * evitar sobreescribir su estado optimista al refrescar desde la API.
+ */
+async function obtenerReferenciasOutboxPendientes(): Promise<{
+  misionesConOutbox: Set<string>;
+  incidentesConOutbox: Set<string>;
+}> {
+  const misionesConOutbox = new Set<string>();
+  const incidentesConOutbox = new Set<string>();
+
+  try {
+    if (typeof obtenerAccionesOutbox !== 'function') {
+      return { misionesConOutbox, incidentesConOutbox };
+    }
+
+    const acciones = (await obtenerAccionesOutbox()) || [];
+    for (const accion of acciones) {
+      if (
+        accion.tipo !== 'ACEPTAR_MISION' &&
+        accion.tipo !== 'ACTUALIZAR_TIPOLOGIA'
+      ) {
+        continue;
+      }
+
+      const payloadMisionId = accion.payload?.misionId;
+      if (typeof payloadMisionId === 'string' && payloadMisionId) {
+        misionesConOutbox.add(payloadMisionId);
+      }
+
+      const matchMision = accion.url.match(/\/api\/misiones\/([^/]+)/);
+      if (matchMision?.[1]) {
+        misionesConOutbox.add(matchMision[1]);
+      }
+
+      const matchIncidente = accion.url.match(/\/api\/incidentes\/([^/]+)/);
+      if (matchIncidente?.[1]) {
+        incidentesConOutbox.add(matchIncidente[1]);
+      }
+    }
+  } catch {
+    // Ignorar fallos de lectura de outbox en entornos sin IndexedDB
+  }
+
+  return { misionesConOutbox, incidentesConOutbox };
+}
+
+/**
  * Consulta y sincroniza el listado de misiones asignadas desde el backend SGRAI.
  * Si hay conectividad, actualiza el almacenamiento local IndexedDB (Offline-First).
  * Si ocurre una falla de red o se está offline, devuelve las misiones persistidas localmente.
@@ -159,13 +207,26 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
     });
 
     if (!error && data && Array.isArray(data.data)) {
-      const localesPrevias = (await obtenerMisionesLocales()) || [];
+      const [localesPreviasRaw, { misionesConOutbox, incidentesConOutbox }] =
+        await Promise.all([
+          obtenerMisionesLocales(),
+          obtenerReferenciasOutboxPendientes(),
+        ]);
+      const localesPrevias = localesPreviasRaw || [];
       const mapaLocales = new Map(localesPrevias.map((m) => [m.id, m]));
 
       const remotas: MisionLocal[] = data.data.map((item: MisionApiItem) => {
         const previa = mapaLocales.get(item.id);
+        const incidenteId = item.incidenteId || '';
+        const tieneOutboxPendiente =
+          misionesConOutbox.has(item.id) ||
+          (Boolean(incidenteId) && incidentesConOutbox.has(incidenteId));
+        const estadoPermiteOptimista =
+          item.estado === 'DESPACHADA' || item.estado === 'EN_CURSO';
         const mantenerOptimista = Boolean(
-          previa?.sincronizacionPendiente && item.estado === 'DESPACHADA'
+          previa &&
+            (previa.sincronizacionPendiente || tieneOutboxPendiente) &&
+            estadoPermiteOptimista
         );
 
         const baseDatosAdicionales = {
@@ -178,17 +239,19 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
           incidenteId: item.incidenteId || '',
           codigoIncidente: item.incidenteCodigo || item.codigo,
           tipologia:
-            mantenerOptimista && previa
+            mantenerOptimista && previa?.tipologia
               ? previa.tipologia
               : limpiarTituloMision(item.titulo),
           direccion:
             item.descripcion ||
             (item.delegacionNombre ? `Sector ${item.delegacionNombre}` : 'Valdivia'),
           prioridad: item.prioridad,
-          estado: mantenerOptimista && previa ? previa.estado : item.estado,
+          estado: mantenerOptimista && previa?.estado ? previa.estado : item.estado,
           fechaDespacho: item.fechaInicio || item.creadoEn,
           fechaInicio:
-            mantenerOptimista && previa ? previa.fechaInicio : item.fechaInicio || null,
+            mantenerOptimista && previa
+              ? (previa.fechaInicio ?? item.fechaInicio ?? null)
+              : item.fechaInicio || null,
           sincronizacionPendiente: mantenerOptimista,
           datosAdicionales:
             mantenerOptimista && previa?.datosAdicionales
@@ -198,7 +261,6 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
         };
       });
 
-      await limpiarMisionesLocales();
       if (remotas.length > 0) {
         await guardarMisionesLocales(remotas);
         void obtenerCatalogoTiposIncidente().catch(() => {
@@ -235,9 +297,21 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
 
     if (!error && data && data.data) {
       const d: MisionDetalleApi = data.data;
-      const previa = await obtenerMisionLocalPorId(d.id);
+      const [previa, { misionesConOutbox, incidentesConOutbox }] =
+        await Promise.all([
+          obtenerMisionLocalPorId(d.id),
+          obtenerReferenciasOutboxPendientes(),
+        ]);
+      const incidenteIdRemoto = d.incidente?.id || previa?.incidenteId || '';
+      const tieneOutboxPendiente =
+        misionesConOutbox.has(d.id) ||
+        (Boolean(incidenteIdRemoto) && incidentesConOutbox.has(incidenteIdRemoto));
+      const estadoPermiteOptimista =
+        d.estado === 'DESPACHADA' || d.estado === 'EN_CURSO';
       const mantenerOptimista = Boolean(
-        previa?.sincronizacionPendiente && d.estado === 'DESPACHADA'
+        previa &&
+          (previa.sincronizacionPendiente || tieneOutboxPendiente) &&
+          estadoPermiteOptimista
       );
 
       const datosRemotos = {
@@ -252,21 +326,26 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
 
       const misionLocal: MisionLocal = {
         id: d.id,
-        incidenteId: d.incidente?.id || '',
+        incidenteId: incidenteIdRemoto,
         codigoIncidente: d.incidente?.codigo || d.codigo,
-        tipologia: d.incidente?.tipoAfectacion
-          ? formatearTipologia(d.incidente.tipoAfectacion)
-          : limpiarTituloMision(d.titulo),
+        tipologia:
+          mantenerOptimista && previa?.tipologia
+            ? previa.tipologia
+            : d.incidente?.tipoAfectacion
+              ? formatearTipologia(d.incidente.tipoAfectacion)
+              : limpiarTituloMision(d.titulo),
         direccion: d.incidente?.direccion || d.descripcion || 'Valdivia',
         coordenadas:
           d.incidente?.latitud && d.incidente?.longitud
             ? { lat: d.incidente.latitud, lng: d.incidente.longitud }
             : undefined,
         prioridad: d.prioridad,
-        estado: mantenerOptimista && previa ? previa.estado : d.estado,
+        estado: mantenerOptimista && previa?.estado ? previa.estado : d.estado,
         fechaDespacho: d.fechaInicio || d.creadoEn,
         fechaInicio:
-          mantenerOptimista && previa ? previa.fechaInicio : d.fechaInicio || null,
+          mantenerOptimista && previa
+            ? (previa.fechaInicio ?? d.fechaInicio ?? null)
+            : d.fechaInicio || null,
         sincronizacionPendiente: mantenerOptimista,
         datosAdicionales:
           mantenerOptimista && previa?.datosAdicionales

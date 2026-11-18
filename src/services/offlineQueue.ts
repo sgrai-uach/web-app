@@ -93,7 +93,19 @@ export async function guardarMisionesLocales(misiones: MisionLocal[]): Promise<v
     }
   }
 
+  const idsEntrantes = new Set(misiones.map((m) => m.id));
   const tx = db.transaction('misiones', 'readwrite');
+  for (const existente of existentes) {
+    if (idsEntrantes.has(existente.id)) continue;
+    const tienePendienteExistente =
+      Boolean(existente.sincronizacionPendiente) ||
+      misionesConOutbox.has(existente.id) ||
+      (Boolean(existente.incidenteId) && incidentesConOutbox.has(existente.incidenteId));
+    if (!tienePendienteExistente) {
+      await tx.store.delete(existente.id);
+    }
+  }
+
   for (const mision of misiones) {
     const local = existentesPorId.get(mision.id);
     const tienePendiente =

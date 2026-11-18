@@ -7,6 +7,7 @@ import {
   obtenerMisionLocalPorId,
   obtenerMisionesLocales,
   guardarMisionLocal,
+  eliminarAccionOutbox,
 } from '@/services/offlineQueue';
 import { obtenerDetalleMision } from '@/services/misionesService';
 import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge';
@@ -111,25 +112,63 @@ export function useConnectivity() {
         const procesada =
           esExito || esIdempotenteEnCurso || esConflictoTerminal || esErrorIrrecuperable;
 
-        if (esExito && accion.tipo === 'ACTUALIZAR_TIPOLOGIA') {
+        if (accion.tipo === 'ACTUALIZAR_TIPOLOGIA') {
           const match = accion.url.match(/\/api\/incidentes\/([^/]+)\/tipologia/);
           const incidenteId = match?.[1];
-          const misionId = accion.payload?.misionId as string | undefined;
-          try {
-            let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
-            if (!local && incidenteId) {
-              const todas = await obtenerMisionesLocales();
-              local = todas.find((m) => m.incidenteId === incidenteId);
+          const misionId =
+            typeof accion.payload?.misionId === 'string' && accion.payload.misionId
+              ? accion.payload.misionId
+              : undefined;
+
+          if (esExito) {
+            try {
+              let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+              if (!local && incidenteId) {
+                const todas = (await obtenerMisionesLocales()) || [];
+                local = todas.find((m) => m.incidenteId === incidenteId);
+              }
+              if (local) {
+                await guardarMisionLocal({
+                  ...local,
+                  sincronizacionPendiente: false,
+                  actualizadoEn: new Date().toISOString(),
+                });
+              }
+            } catch {
+              // Ignorar fallos de persistencia secundaria
             }
-            if (local) {
-              await guardarMisionLocal({
-                ...local,
-                sincronizacionPendiente: false,
-                actualizadoEn: new Date().toISOString(),
-              });
+          } else if (esConflictoTerminal || esErrorIrrecuperable) {
+            try {
+              let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+              if (!local && incidenteId) {
+                const todas = (await obtenerMisionesLocales()) || [];
+                local = todas.find((m) => m.incidenteId === incidenteId);
+              }
+              const targetMisionId = local?.id || misionId;
+              if (local) {
+                const datosRestaurados = { ...(local.datosAdicionales || {}) };
+                delete datosRestaurados.tipologiaEvaluada;
+                delete datosRestaurados.tipoIncidenteId;
+                delete datosRestaurados.justificacionTipologia;
+                delete datosRestaurados.fechaEvaluacionTipologia;
+                delete datosRestaurados.esReclasificacion;
+
+                await guardarMisionLocal({
+                  ...local,
+                  sincronizacionPendiente: false,
+                  datosAdicionales: datosRestaurados,
+                  actualizadoEn: new Date().toISOString(),
+                });
+              }
+              if (typeof eliminarAccionOutbox === 'function') {
+                await eliminarAccionOutbox(accion.id);
+              }
+              if (targetMisionId) {
+                await obtenerDetalleMision(targetMisionId);
+              }
+            } catch {
+              // Ignorar fallos al refrescar estado real
             }
-          } catch {
-            // Ignorar fallos de persistencia secundaria
           }
         }
 
@@ -173,6 +212,9 @@ export function useConnectivity() {
                     sincronizacionPendiente: false,
                     actualizadoEn: new Date().toISOString(),
                   });
+                }
+                if (typeof eliminarAccionOutbox === 'function') {
+                  await eliminarAccionOutbox(accion.id);
                 }
                 await obtenerDetalleMision(misionId);
               } catch {
