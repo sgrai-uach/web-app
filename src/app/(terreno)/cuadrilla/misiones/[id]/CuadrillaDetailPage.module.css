@@ -161,3 +161,91 @@
   font-size: 0.8125rem;
   color: var(--color-text-muted);
 }
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.dispatchCard {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-top: 4px solid var(--color-primary-teal);
+  border-radius: 0;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dispatchTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-dark);
+  margin: 0;
+}
+
+.dispatchDesc {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.actionsStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.offlineAlertBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background-color: var(--color-warning-bg);
+  border: 1px solid var(--color-warning);
+  border-left: 4px solid var(--color-warning);
+  color: var(--color-warning);
+  padding: var(--space-3);
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0;
+}
+
+.successAlertBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background-color: var(--color-success-bg);
+  border: 1px solid var(--color-success);
+  border-left: 4px solid var(--color-success);
+  color: var(--color-success);
+  padding: var(--space-3);
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0;
+}
+
+.rejectedInfoBox {
+  background-color: var(--color-danger-bg);
+  border: 1px solid var(--color-danger);
+  border-left: 4px solid var(--color-danger);
+  color: var(--color-text-dark);
+  padding: var(--space-3);
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border-radius: 0;
+}
+
+.rejectedInfoLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-danger);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}

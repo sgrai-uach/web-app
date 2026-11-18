@@ -2,30 +2,45 @@
 
 import React, { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   MapPin,
   Calendar,
   Archive,
   Map,
+  Tag,
   CheckCircle,
+  CheckCircle2,
   Navigation,
   ClipboardCheck,
   WifiOff,
+  AlertCircle,
+  ShieldAlert,
+  FileCheck,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { useToastOptional } from '@/components/ui/Toast';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
+import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
+import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
+import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
+import { EvaluacionPrioridadCard } from '@/components/misiones/EvaluacionPrioridadCard';
+import { EvaluacionReporteCierreCard } from '@/components/misiones/EvaluacionReporteCierreCard';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
 } from '@/services/misionesService';
-import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
+import { obtenerReportesPrioridadMision } from '@/services/prioridadService';
+import { obtenerReporteVerificacionMision } from '@/services/reporteVerificacionService';
+import { formatearPrioridad, formatearFechaHora24h, formatearTipologia } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaDetailPage.module.css';
 
@@ -35,6 +50,8 @@ interface PageProps {
 
 export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const { id: misionId } = use(params);
+  const router = useRouter();
+  const toast = useToastOptional();
   const {
     usuario,
     unidadActiva,
@@ -49,29 +66,74 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
   const [errorAceptacion, setErrorAceptacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
+  const [seccionCategorizacionAbierta, setSeccionCategorizacionAbierta] = useState<boolean>(true);
+  const [seccionPrioridadAbierta, setSeccionPrioridadAbierta] = useState<boolean>(false);
+  const [seccionReporteCierreAbierta, setSeccionReporteCierreAbierta] = useState<boolean>(false);
 
-  const cargarDetalle = useCallback(async () => {
-    setCargando(true);
-    try {
-      const encontrada = await obtenerDetalleMision(misionId);
-      setMision(encontrada || null);
-    } finally {
-      setCargando(false);
-    }
-  }, [misionId]);
+  const cargarDetalle = useCallback(
+    async (silencioso = false) => {
+      if (!silencioso) {
+        setCargando(true);
+      }
+      try {
+        const encontrada = await obtenerDetalleMision(misionId);
+        if (encontrada) {
+          setMision(encontrada);
+          const reportesPrio = obtenerReportesPrioridadMision(encontrada);
+          const reporteCierre = obtenerReporteVerificacionMision(encontrada);
+          const estadoNorm = encontrada.estado?.toUpperCase() || '';
+          const yaCerrada =
+            estadoNorm === 'FINALIZADA' ||
+            estadoNorm === 'COMPLETADA' ||
+            estadoNorm === 'CERRADA';
+          const tipologiaYaEvaluada = Boolean(
+            encontrada.datosAdicionales?.tipologiaEvaluada
+          );
+          const prioridadYaEvaluada =
+            Boolean(encontrada.datosAdicionales?.prioridadEvaluada) ||
+            reportesPrio.length > 0;
+          const cierreYaEnviado =
+            Boolean(reporteCierre) ||
+            Boolean(encontrada.datosAdicionales?.reporteVerificacionEnviado);
+
+          setSeccionCategorizacionAbierta(!tipologiaYaEvaluada && !yaCerrada);
+          setSeccionPrioridadAbierta(
+            tipologiaYaEvaluada && !prioridadYaEvaluada && !yaCerrada
+          );
+          setSeccionReporteCierreAbierta(
+            (tipologiaYaEvaluada && prioridadYaEvaluada) ||
+              yaCerrada ||
+              cierreYaEnviado
+          );
+        } else {
+          setMision(null);
+        }
+      } finally {
+        if (!silencioso) {
+          setCargando(false);
+        }
+      }
+    },
+    [misionId]
+  );
 
   useEffect(() => {
     void cargarDetalle();
   }, [cargarDetalle]);
 
-  // Refrescar detalle local cuando la cola offline termine de sincronizarse al recuperar red
+  // Refrescar detalle local cuando la cola offline o eventos de otro integrante de la patrulla sincronicen la misión
   useEffect(() => {
     const handleOutboxSynced = () => {
-      void cargarDetalle();
+      void cargarDetalle(true);
+    };
+    const handleMisionSincronizada = () => {
+      void cargarDetalle(true);
     };
     window.addEventListener('sgrai:outbox-synced', handleOutboxSynced);
+    window.addEventListener('sgrai:mision-sincronizada', handleMisionSincronizada);
     return () => {
       window.removeEventListener('sgrai:outbox-synced', handleOutboxSynced);
+      window.removeEventListener('sgrai:mision-sincronizada', handleMisionSincronizada);
     };
   }, [cargarDetalle]);
 
@@ -140,15 +202,6 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       </div>
     );
   }
-
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
-  }
-
   const estadoNormalizado = mision.estado?.toUpperCase() || '';
   const esDespachada = estadoNormalizado === 'DESPACHADA';
   const esEnCurso =
@@ -161,16 +214,23 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       ? tienePermiso('misiones:terreno:verificar')
       : false;
 
+  const tienePermisoCrearReporte =
+    typeof tienePermiso === 'function'
+      ? tienePermiso('reportes:crear') || tienePermiso('misiones:terreno:verificar')
+      : false;
+
   const mostrarBotonAceptar =
     unidadActiva && esDespachada && tienePermisoVerificar;
 
   const trabajoTexto =
     (mision.datosAdicionales?.trabajo as string) || mision.direccion;
-  const esSoloLectura =
-    !unidadActiva ||
+  const esFinalizada =
     estadoNormalizado === 'FINALIZADA' ||
     estadoNormalizado === 'COMPLETADA' ||
     estadoNormalizado === 'CERRADA';
+  const esSoloLectura = !unidadActiva || esFinalizada;
+  const mostrarFormulariosTecnicos =
+    (unidadActiva && esEnCurso) || (tieneUnidadAsignada && esFinalizada);
 
   return (
     <div className={styles.container}>
@@ -201,12 +261,17 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
           <div className={styles.codeArea}>
+            <AlertCircle
+              size={20}
+              color="var(--color-primary-teal, #1B6F7D)"
+              aria-hidden="true"
+            />
             <span className={styles.code}>{mision.codigoIncidente}</span>
-            <span className={`${styles.priorityChip} ${prioridadClase}`}>
+            <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
               {formatearPrioridad(mision.prioridad)}
-            </span>
+            </Chip>
           </div>
-          <EstadoBadge estado={mision.estado} />
+          <EstadoBadge estado={mision.estado} size="md" />
         </div>
 
         <div className={styles.detailGrid}>
@@ -214,7 +279,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Tipo</span>
             <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
-              {mision.tipologia}
+              {formatearTipologia(mision.tipologia)}
             </span>
           </div>
 
@@ -301,25 +366,27 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
 
       {/* Vista activa: En Trayecto / Evaluación (HU-36) */}
       {unidadActiva && esEnCurso && (
-        <>
-          <section
-            className={styles.enTrayectoCard}
-            aria-label="Estado de traslado y evaluación"
-          >
-            <div className={styles.enTrayectoHeader}>
-              <div className={styles.enTrayectoTitleRow}>
-                <Navigation
-                  size={20}
-                  color="var(--color-primary-teal)"
-                  aria-hidden="true"
-                />
-                <h2 className={styles.enTrayectoTitle}>
-                  En Trayecto / Evaluación
-                </h2>
-              </div>
-              <span className={styles.activeStatusChip}>Misión activa</span>
+        <section
+          className={styles.enTrayectoCard}
+          aria-label="Estado de traslado y evaluación"
+        >
+          <div className={styles.enTrayectoHeader}>
+            <div className={styles.enTrayectoTitleRow}>
+              <Navigation
+                size={20}
+                color="var(--color-primary-teal, #1B6F7D)"
+                aria-hidden="true"
+              />
+              <h2 className={styles.enTrayectoTitle}>
+                En Trayecto / Evaluación
+              </h2>
             </div>
+            <Chip variant="success" size="sm">
+              Misión activa
+            </Chip>
+          </div>
 
+          <div className={styles.enTrayectoContent}>
             {mision.sincronizacionPendiente ? (
               <div className={styles.offlineQueueBanner} role="status">
                 <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
@@ -351,31 +418,186 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                 <span className={styles.canonicalStateValue}>Verificando</span>
               </div>
             </div>
-          </section>
+          </div>
+        </section>
+      )}
 
-          <section
-            className={styles.evaluationFormsSection}
-            data-testid="formularios-reporte-tecnico"
-            aria-label="Formularios de reporte técnico de terreno"
-          >
-            <div className={styles.evaluationHeader}>
-              <h3 className={styles.evaluationTitle}>
-                <ClipboardCheck
-                  size={18}
-                  color="var(--color-primary-teal)"
-                  aria-hidden="true"
-                />
-                <span>Formularios de Reporte Técnico</span>
-              </h3>
-              <span className={styles.activeStatusChip}>Habilitado</span>
-            </div>
-            <p className={styles.evaluationBody}>
-              La unidad se encuentra en trayecto / evaluación. Los formularios
-              operativos para categorizar el incidente, ajustar la prioridad y
-              enviar el reporte de situación están habilitados.
-            </p>
-          </section>
-        </>
+      {mostrarFormulariosTecnicos && (
+        <section
+          className={styles.evaluationFormsSection}
+          data-testid="formularios-reporte-tecnico"
+          aria-label="Formularios de reporte técnico de terreno"
+        >
+          <div className={styles.evaluationHeader}>
+            <h3 className={styles.evaluationTitle}>
+              <ClipboardCheck
+                size={20}
+                color="var(--color-primary-teal, #1B6F7D)"
+                aria-hidden="true"
+              />
+              <span>Formularios de Reporte Técnico</span>
+            </h3>
+          </div>
+
+          <div className={styles.evaluationContent}>
+            {(() => {
+              const reportesPrioridad = obtenerReportesPrioridadMision(mision);
+              const reportesPrioridadCount = reportesPrioridad.length;
+              const reporteCierre = obtenerReporteVerificacionMision(mision);
+              const tipologiaCompletada = Boolean(
+                mision.datosAdicionales?.tipologiaEvaluada
+              );
+              const prioridadCompletada =
+                Boolean(mision.datosAdicionales?.prioridadEvaluada) ||
+                reportesPrioridadCount > 0;
+              const cierreCompletado =
+                Boolean(reporteCierre) ||
+                Boolean(mision.datosAdicionales?.reporteVerificacionEnviado);
+              const versionPrioridad =
+                typeof mision.datosAdicionales?.versionReportePrioridad === 'number'
+                  ? mision.datosAdicionales.versionReportePrioridad
+                  : reportesPrioridadCount > 0
+                    ? reportesPrioridadCount
+                    : undefined;
+
+              return (
+                <>
+                  <SeccionDesplegable
+                    titulo="Categorización del incidente"
+                    icono={<Tag size={18} />}
+                    abierto={seccionCategorizacionAbierta}
+                    onToggle={(abierto) => setSeccionCategorizacionAbierta(abierto)}
+                    indicador={
+                      tipologiaCompletada ? (
+                        <Chip
+                          variant="success"
+                          size="sm"
+                          icon={<CheckCircle2 size={12} />}
+                        >
+                          Completado
+                        </Chip>
+                      ) : mision.sincronizacionPendiente ? (
+                        <Chip variant="warning" size="sm">
+                          Pendiente
+                        </Chip>
+                      ) : null
+                    }
+                  >
+                    <EvaluacionTipologiaCard
+                      incidenteId={mision.incidenteId}
+                      misionActual={mision}
+                      usuarioActualId={usuario?.id}
+                      deshabilitado={esSoloLectura}
+                      onTipologiaActualizada={(resultado) => {
+                        if (resultado.mision) {
+                          setMision(resultado.mision);
+                        }
+                        setSeccionCategorizacionAbierta(false);
+                        if (!prioridadCompletada) {
+                          setSeccionPrioridadAbierta(true);
+                        } else if (!cierreCompletado) {
+                          setSeccionReporteCierreAbierta(true);
+                        }
+                      }}
+                    />
+                  </SeccionDesplegable>
+
+                  <SeccionDesplegable
+                    titulo="Evaluación en terreno y prioridad"
+                    icono={<ShieldAlert size={18} />}
+                    abierto={seccionPrioridadAbierta}
+                    onToggle={(abierto) => setSeccionPrioridadAbierta(abierto)}
+                    indicador={
+                      prioridadCompletada ? (
+                        <Chip
+                          variant="success"
+                          size="sm"
+                          icon={<CheckCircle2 size={12} />}
+                        >
+                          Completado
+                          {typeof versionPrioridad === 'number'
+                            ? ` (#${versionPrioridad})`
+                            : ''}
+                        </Chip>
+                      ) : mision.sincronizacionPendiente ? (
+                        <Chip variant="warning" size="sm">
+                          Pendiente
+                        </Chip>
+                      ) : null
+                    }
+                  >
+                    {seccionPrioridadAbierta && (
+                      <EvaluacionPrioridadCard
+                        incidenteId={mision.incidenteId}
+                        misionActual={mision}
+                        usuarioActualId={usuario?.id}
+                        deshabilitado={esSoloLectura}
+                        onPrioridadActualizada={(resultado) => {
+                          if (resultado.mision) {
+                            setMision(resultado.mision);
+                          }
+                          setSeccionPrioridadAbierta(false);
+                          if (!cierreCompletado) {
+                            setSeccionReporteCierreAbierta(true);
+                          }
+                          void actualizarPendientes();
+                        }}
+                      />
+                    )}
+                  </SeccionDesplegable>
+
+                  <SeccionDesplegable
+                    titulo="Informe técnico de verificación y cierre"
+                    icono={<FileCheck size={18} />}
+                    abierto={seccionReporteCierreAbierta}
+                    onToggle={(abierto) => setSeccionReporteCierreAbierta(abierto)}
+                    indicador={
+                      cierreCompletado ? (
+                        <Chip
+                          variant="success"
+                          size="sm"
+                          icon={<CheckCircle2 size={12} />}
+                        >
+                          Completado
+                        </Chip>
+                      ) : mision.sincronizacionPendiente ? (
+                        <Chip variant="warning" size="sm">
+                          Pendiente
+                        </Chip>
+                      ) : null
+                    }
+                  >
+                    {seccionReporteCierreAbierta && (
+                      <EvaluacionReporteCierreCard
+                        misionActual={mision}
+                        usuarioActualId={usuario?.id}
+                        deshabilitado={esSoloLectura || !tienePermisoCrearReporte}
+                        onReporteEnviado={(resultado) => {
+                          if (resultado.mision) {
+                            setMision(resultado.mision);
+                          }
+                          setMensajeConfirmacion(resultado.mensaje);
+                          if (toast) {
+                            if (resultado.offline) {
+                              toast.showWarning(
+                                resultado.mensaje,
+                                'Guardado sin conexión'
+                              );
+                            } else {
+                              toast.showSuccess(resultado.mensaje, 'Misión cerrada');
+                            }
+                          }
+                          void actualizarPendientes();
+                          router.push('/patrulla/misiones');
+                        }}
+                      />
+                    )}
+                  </SeccionDesplegable>
+                </>
+              );
+            })()}
+          </div>
+        </section>
       )}
 
       {esSoloLectura && (

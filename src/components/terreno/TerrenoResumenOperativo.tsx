@@ -16,7 +16,7 @@ interface MetricasTerreno {
 }
 
 export function TerrenoResumenOperativo() {
-  const { usuario, esCuadrilla, unidadActiva, tieneUnidadAsignada } = useAuth();
+  const { usuario, esCuadrilla, unidadActiva, tieneUnidadAsignada, actualizarUnidadAsignada } = useAuth();
   const [metricas, setMetricas] = useState<MetricasTerreno>({
     pendientes: 0,
     enCurso: 0,
@@ -40,6 +40,28 @@ export function TerrenoResumenOperativo() {
           cuadrillaId: esCuadrilla ? usuario.unidadId : undefined,
         });
         if (cancelado) return;
+
+        // Auto-detección resiliente de unidad asignada a partir de misiones recibidas
+        if (!tieneUnidadAsignada && actualizarUnidadAsignada && misiones.length > 0) {
+          const misionConUnidad = misiones.find(
+            (m) =>
+              m.datosAdicionales?.patrullaId ||
+              m.datosAdicionales?.patrullaNombre ||
+              m.datosAdicionales?.cuadrillaId ||
+              m.datosAdicionales?.cuadrillaNombre
+          );
+          if (misionConUnidad) {
+            const uId = (esCuadrilla
+              ? misionConUnidad.datosAdicionales?.cuadrillaId
+              : misionConUnidad.datosAdicionales?.patrullaId) as string | undefined;
+            const uNombre = (esCuadrilla
+              ? misionConUnidad.datosAdicionales?.cuadrillaNombre
+              : misionConUnidad.datosAdicionales?.patrullaNombre) as string | undefined;
+            if (uId || uNombre) {
+              actualizarUnidadAsignada(uId || uNombre || '', uNombre || uId || '', true);
+            }
+          }
+        }
 
         const misionesPendientes = misiones.filter(
           (m) =>
@@ -75,7 +97,7 @@ export function TerrenoResumenOperativo() {
     return () => {
       cancelado = true;
     };
-  }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId]);
+  }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId, actualizarUnidadAsignada]);
 
   const UnidadIcon = esCuadrilla ? HardHat : Compass;
 
