@@ -89,6 +89,7 @@ export function useTerrenoSocket(): void {
     socket.on('mision:actualizada', manejarSincronizacionMision);
     socket.on('incidente:actualizado', manejarSincronizacionMision);
     socket.on('patrulla:actualizada', manejarSincronizacionMision);
+    socket.on('cuadrilla:actualizada', manejarSincronizacionMision);
     socket.on('patrulla:liberada', manejarSincronizacionMision);
     socket.on('mision:asignada', manejarSincronizacionMision);
     if (typeof document !== 'undefined') {
@@ -102,6 +103,7 @@ export function useTerrenoSocket(): void {
       socket.off('mision:actualizada', manejarSincronizacionMision);
       socket.off('incidente:actualizado', manejarSincronizacionMision);
       socket.off('patrulla:actualizada', manejarSincronizacionMision);
+      socket.off('cuadrilla:actualizada', manejarSincronizacionMision);
       socket.off('patrulla:liberada', manejarSincronizacionMision);
       socket.off('mision:asignada', manejarSincronizacionMision);
       if (typeof document !== 'undefined') {
