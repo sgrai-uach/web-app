@@ -224,6 +224,13 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         : null
     );
     setMensajeConfirmacion(res.mensaje);
+    if (toast) {
+      if (res.modoOffline) {
+        toast.showWarning(res.mensaje, 'Guardado sin conexión');
+      } else {
+        toast.showSuccess(res.mensaje, 'Misión rechazada');
+      }
+    }
     setModalRechazoAbierto(false);
     await actualizarPendientes();
     router.push('/cuadrilla/misiones');

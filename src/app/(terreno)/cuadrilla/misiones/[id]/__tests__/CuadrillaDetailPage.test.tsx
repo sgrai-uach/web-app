@@ -5,6 +5,7 @@ import CuadrillaMisionDetailPage from '../page';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { obtenerDetalleMision, rechazarMision } from '@/services/misionesService';
+import { ToastProvider } from '@/components/ui/Toast';
 
 const mockPush = vi.fn();
 
@@ -115,7 +116,11 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
       mensaje: 'Misión rechazada exitosamente.',
     });
 
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />);
+    render(
+      <ToastProvider>
+        <CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />
+      </ToastProvider>
+    );
 
     await waitFor(() => {
       expect(
@@ -152,6 +157,8 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
     });
 
     await waitFor(() => {
+      expect(screen.getByText('Misión rechazada')).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('Misión rechazada exitosamente.');
       expect(actualizarPendientesMock).toHaveBeenCalled();
       expect(mockPush).toHaveBeenCalledWith('/cuadrilla/misiones');
     });
