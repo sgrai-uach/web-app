@@ -9,6 +9,11 @@
   border-radius: 0;
 }
 
+.cardEmbebida {
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--color-primary-teal);
+}
+
 .header {
   display: flex;
   justify-content: space-between;

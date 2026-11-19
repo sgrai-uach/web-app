@@ -1,21 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, use } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
-  MapPin,
-  Calendar,
-  Archive,
-  Map,
   Tag,
   CheckCircle,
   CheckCircle2,
   Navigation,
   ClipboardCheck,
-  WifiOff,
-  AlertCircle,
   ShieldAlert,
   FileCheck,
 } from 'lucide-react';
@@ -24,9 +16,13 @@ import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { useToastOptional } from '@/components/ui/Toast';
-import { EstadoBadge } from '@/components/misiones/EstadoBadge';
-import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
-import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
+import {
+  MisionDetalleTopBar,
+  MisionDetalleHeaderCard,
+  MisionEstadoActivoCard,
+  MisionNoEncontradaCard,
+  MisionSoloLecturaNotice,
+} from '@/components/misiones/MisionDetalleShared';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
@@ -40,9 +36,8 @@ import {
 } from '@/services/misionesService';
 import { obtenerReportesPrioridadMision } from '@/services/prioridadService';
 import { obtenerReporteVerificacionMision } from '@/services/reporteVerificacionService';
-import { formatearPrioridad, formatearFechaHora24h, formatearTipologia } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
-import styles from './PatrullaDetailPage.module.css';
+import styles from '@/components/misiones/MisionDetailLayout.module.css';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -171,35 +166,14 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
 
   if (!mision) {
     return (
-      <div className={styles.container}>
-        <div className={styles.topBar}>
-          <Link href="/patrulla/misiones" className={styles.backLink}>
-            <ArrowLeft size={16} aria-hidden="true" />
-            <span>Misiones</span>
-          </Link>
-          <ConnectionStatusBadge
-            status={status}
-            pendingCount={pendientes}
-            onRetry={sincronizar}
-          />
-        </div>
-        <div
-          style={{
-            backgroundColor: 'var(--color-white)',
-            border: '1px solid var(--color-border)',
-            padding: 'var(--space-6)',
-            textAlign: 'center',
-          }}
-          role="alert"
-        >
-          <p style={{ fontWeight: 700, margin: '0 0 var(--space-2) 0' }}>
-            Misión no encontrada
-          </p>
-          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: 0 }}>
-            La misión solicitada no existe, fue removida o no se encuentra disponible en caché local.
-          </p>
-        </div>
-      </div>
+      <MisionNoEncontradaCard
+        backHref="/patrulla/misiones"
+        backLabel="Misiones"
+        status={status}
+        pendingCount={pendientes}
+        onRetry={sincronizar}
+        descripcion="La misión solicitada no existe, fue removida o no se encuentra disponible en caché local."
+      />
     );
   }
   const estadoNormalizado = mision.estado?.toUpperCase() || '';
@@ -234,17 +208,13 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
 
   return (
     <div className={styles.container}>
-      <div className={styles.topBar}>
-        <Link href="/patrulla/misiones" className={styles.backLink}>
-          <ArrowLeft size={16} aria-hidden="true" />
-          <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Misiones'}</span>
-        </Link>
-        <ConnectionStatusBadge
-          status={status}
-          pendingCount={pendientes}
-          onRetry={sincronizar}
-        />
-      </div>
+      <MisionDetalleTopBar
+        backHref="/patrulla/misiones"
+        backLabel={estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Misiones'}
+        status={status}
+        pendingCount={pendientes}
+        onRetry={sincronizar}
+      />
 
       {!tieneUnidadAsignada ? (
         <SinUnidadBanner
@@ -258,87 +228,24 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         />
       ) : null}
 
-      <div className={styles.missionHeader}>
-        <div className={styles.headerRow}>
-          <div className={styles.codeArea}>
-            <AlertCircle
-              size={20}
-              color="var(--color-primary-teal, #1B6F7D)"
-              aria-hidden="true"
-            />
-            <span className={styles.code}>{mision.codigoIncidente}</span>
-            <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
-              {formatearPrioridad(mision.prioridad)}
-            </Chip>
-          </div>
-          <EstadoBadge estado={mision.estado} size="md" />
-        </div>
-
-        <div className={styles.detailGrid}>
-          {/* Bloque Tipo (único en negrita) */}
-          <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>Tipo</span>
-            <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
-              {formatearTipologia(mision.tipologia)}
-            </span>
-          </div>
-
-          {/* Bloque Ubicación separado */}
-          <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>Ubicación</span>
-            <div className={styles.locationActionRow}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <MapPin
-                  size={16}
-                  color="var(--color-primary-teal)"
-                  aria-hidden="true"
-                />
-                <span className={styles.itemValue}>{mision.direccion}</span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                icon={<Map size={14} />}
-                onClick={() => setMapaAbierto(true)}
-              >
-                Ver mapa
-              </Button>
-            </div>
-          </div>
-
-          {/* Bloque Trabajo separado */}
-          <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>Trabajo</span>
-            <span className={styles.itemValue}>{trabajoTexto}</span>
-          </div>
-
-          {/* Fecha Despachada / Inicio */}
-          <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>
-              {esEnCurso && mision.fechaInicio ? 'Inicio de trayecto' : 'Despachada'}
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Calendar
-                size={15}
-                color="var(--color-text-muted)"
-                aria-hidden="true"
-              />
-              <span className={styles.itemValue}>
-                {formatearFechaHora24h(mision.fechaInicio || mision.fechaDespacho)}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <MisionDetalleHeaderCard
+        mision={mision}
+        trabajoTexto={trabajoTexto}
+        etiquetaFecha={
+          esEnCurso && mision.fechaInicio ? 'Inicio de trayecto' : 'Despachada'
+        }
+        fechaPrincipal={mision.fechaInicio || mision.fechaDespacho}
+        onVerMapa={() => setMapaAbierto(true)}
+      />
 
       {/* Acción principal: Confirmar y Aceptar Misión (HU-36) */}
       {mostrarBotonAceptar && (
         <section
-          className={styles.acceptCard}
+          className={styles.actionCard}
           aria-label="Confirmación de salida de patrulla"
         >
-          <h2 className={styles.acceptTitle}>Confirmación de salida a terreno</h2>
-          <p className={styles.acceptDescription}>
+          <h2 className={styles.actionTitle}>Confirmación de salida a terreno</h2>
+          <p className={styles.actionDescription}>
             Presione el botón para informar al Centro de Mando que la patrulla ha
             tomado conocimiento de la emergencia y se dirige al lugar para iniciar
             la evaluación.
@@ -357,7 +264,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             loading={aceptando}
             icon={<CheckCircle size={20} />}
             onClick={handleAceptarMision}
-            className={styles.acceptButton}
+            className={styles.actionPrimaryButton}
           >
             Aceptar Misión
           </Button>
@@ -366,60 +273,25 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
 
       {/* Vista activa: En Trayecto / Evaluación (HU-36) */}
       {unidadActiva && esEnCurso && (
-        <section
-          className={styles.enTrayectoCard}
-          aria-label="Estado de traslado y evaluación"
-        >
-          <div className={styles.enTrayectoHeader}>
-            <div className={styles.enTrayectoTitleRow}>
-              <Navigation
-                size={20}
-                color="var(--color-primary-teal, #1B6F7D)"
-                aria-hidden="true"
-              />
-              <h2 className={styles.enTrayectoTitle}>
-                En Trayecto / Evaluación
-              </h2>
-            </div>
-            <Chip variant="success" size="sm">
-              Misión activa
-            </Chip>
-          </div>
-
-          <div className={styles.enTrayectoContent}>
-            {mision.sincronizacionPendiente ? (
-              <div className={styles.offlineQueueBanner} role="status">
-                <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
-                <span>
-                  Pendiente de sincronizar: La aceptación fue guardada en la cola
-                  local del dispositivo y se enviará automáticamente al recuperar
-                  conexión.
-                </span>
-              </div>
-            ) : (
-              mensajeConfirmacion && (
-                <div className={styles.SyncedBanner} role="status">
-                  {mensajeConfirmacion}
-                </div>
-              )
-            )}
-
-            <div className={styles.canonicalStatesGrid}>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Misión</span>
-                <span className={styles.canonicalStateValue}>En curso</span>
-              </div>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Patrulla</span>
-                <span className={styles.canonicalStateValue}>En verificación</span>
-              </div>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Incidente</span>
-                <span className={styles.canonicalStateValue}>Verificando</span>
-              </div>
-            </div>
-          </div>
-        </section>
+        <MisionEstadoActivoCard
+          ariaLabel="Estado de traslado y evaluación"
+          icono={
+            <Navigation
+              size={20}
+              color="var(--color-primary-teal, #1B6F7D)"
+              aria-hidden="true"
+            />
+          }
+          titulo="En Trayecto / Evaluación"
+          sincronizacionPendiente={Boolean(mision.sincronizacionPendiente)}
+          mensajeOffline="Pendiente de sincronizar: La aceptación fue guardada en la cola local del dispositivo y se enviará automáticamente al recuperar conexión."
+          mensajeConfirmacion={mensajeConfirmacion}
+          estadosCanonicos={[
+            { etiqueta: 'Misión', valor: 'En curso' },
+            { etiqueta: 'Patrulla', valor: 'En verificación' },
+            { etiqueta: 'Incidente', valor: 'Verificando' },
+          ]}
+        />
       )}
 
       {mostrarFormulariosTecnicos && (
@@ -600,21 +472,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         </section>
       )}
 
-      {esSoloLectura && (
-        <div className={styles.readOnlyNotice}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-            }}
-          >
-            <Archive size={16} aria-hidden="true" />
-            <span>Solo lectura</span>
-          </div>
-        </div>
-      )}
+      {esSoloLectura && <MisionSoloLecturaNotice />}
 
       <MapaModal
         abierto={mapaAbierto}

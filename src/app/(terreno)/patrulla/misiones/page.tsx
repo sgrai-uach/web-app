@@ -17,7 +17,7 @@ import {
 } from '@/components/misiones/MisionFiltrosChips';
 import { MisionCard } from '@/components/misiones/MisionCard';
 import type { MisionLocal } from '@/types/offline';
-import styles from './PatrullaMisionesPage.module.css';
+import styles from '@/components/misiones/MisionesBandeja.module.css';
 
 function PatrullaMisionesContenido() {
   const { usuario, unidadActiva, tieneUnidadAsignada, estadoAsignacion } = useAuth();
@@ -58,6 +58,19 @@ function PatrullaMisionesContenido() {
 
   useEffect(() => {
     cargarMisiones();
+  }, [cargarMisiones]);
+
+  // Refrescar bandeja automáticamente cuando la cola offline o eventos de otro integrante sincronicen cambios
+  useEffect(() => {
+    const handleSync = () => {
+      void cargarMisiones();
+    };
+    window.addEventListener('sgrai:outbox-synced', handleSync);
+    window.addEventListener('sgrai:mision-sincronizada', handleSync);
+    return () => {
+      window.removeEventListener('sgrai:outbox-synced', handleSync);
+      window.removeEventListener('sgrai:mision-sincronizada', handleSync);
+    };
   }, [cargarMisiones]);
 
   const cambiarFiltro = (nuevoFiltro: FiltroEstado) => {

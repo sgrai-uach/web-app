@@ -1,7 +1,7 @@
 /* ==========================================================================
-   Estilos Vista Detallada de Misión (Patrulla) — SGRAI PWA
-   Directrices: Flat UI, bordes rectos (0px), alto contraste y ergonomía móvil.
-   El contenido ocupa el ancho completo en dispositivos móviles.
+   Estilos Compartidos Vista Detallada de Misión (Patrulla y Cuadrilla) — SGRAI PWA
+   Fuente de verdad visual: Patrulla Verificadora (Flat UI, bordes rectos 0px,
+   alto contraste, ergonomía móvil y ancho completo en dispositivos móviles).
    ========================================================================== */
 
 .container {
@@ -46,7 +46,9 @@
   border-radius: var(--radius-none, 0px);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  transition: background-color var(--transition-fast, 0.15s ease), border-color var(--transition-fast, 0.15s ease);
+  transition:
+    background-color var(--transition-fast, 0.15s ease),
+    border-color var(--transition-fast, 0.15s ease);
 }
 
 .backLink:hover {
@@ -107,35 +109,6 @@
   letter-spacing: 0.02em;
 }
 
-.priorityChip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-family-base, inherit);
-  font-size: 0.75rem;
-  font-weight: 800;
-  padding: 4px 8px;
-  border-radius: var(--radius-none, 0px);
-  line-height: 1;
-  white-space: nowrap;
-  letter-spacing: 0.03em;
-}
-
-.priorityCritica {
-  background-color: var(--color-danger, #D32F2F);
-  color: #FFFFFF;
-}
-
-.priorityAlta {
-  background-color: var(--color-warning, #E65100);
-  color: #FFFFFF;
-}
-
-.priorityNeutro {
-  background-color: var(--color-bg-light, #ECEFF3);
-  color: var(--color-text-dark, #2B2B2B);
-}
-
 .detailGrid {
   display: flex;
   flex-direction: column;
@@ -184,11 +157,12 @@
   margin-top: 4px;
 }
 
-/* --- Tarjeta de Acción: Aceptar Misión --- */
-.acceptCard {
+/* --- Tarjeta de Acción en Misión Despachada (Aceptar / Rechazar) --- */
+.actionCard {
   background-color: var(--color-white, #FFFFFF);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
   border-top: 4px solid var(--color-accent-mint, #4FAE9B);
+  border-radius: var(--radius-none, 0px);
   padding: var(--space-4, 16px);
   display: flex;
   flex-direction: column;
@@ -196,33 +170,32 @@
   width: 100%;
 }
 
-@media (min-width: 640px) {
-  .acceptCard {
-    border: 1px solid var(--border-color-neutral, #DFE3E8);
-    border-top: 4px solid var(--color-accent-mint, #4FAE9B);
-  }
-}
-
-.acceptTitle {
+.actionTitle {
   font-size: 1rem;
   font-weight: 800;
   color: var(--color-text-dark, #2B2B2B);
   margin: 0;
 }
 
-.acceptDescription {
+.actionDescription {
   font-size: 0.875rem;
   color: var(--color-text-dark, #2B2B2B);
   line-height: 1.45;
   margin: 0;
 }
 
-.acceptButton {
+.actionPrimaryButton {
   min-height: 56px;
   font-size: 1.0625rem;
   font-weight: 800;
   letter-spacing: 0.01em;
   border-radius: var(--radius-none, 0px);
+}
+
+.actionsStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
 }
 
 .errorAlert {
@@ -281,17 +254,6 @@
   flex-direction: column;
   gap: var(--space-3, 12px);
   padding: var(--space-3, 12px) var(--space-4, 16px);
-}
-
-.activeStatusChip {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  background-color: var(--color-sage, #A9CBA4);
-  color: var(--color-charcoal-dark, #24272B);
-  font-size: 0.75rem;
-  font-weight: 800;
-  border-radius: var(--radius-none, 0px);
 }
 
 .canonicalStatesGrid {
@@ -388,31 +350,35 @@
   width: 100%;
 }
 
-.syncPendingBadge {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  background-color: var(--color-warning-bg, #FFF3E0);
-  color: var(--color-warning, #E65100);
-  border: 1px solid var(--color-warning, #E65100);
-  border-radius: var(--radius-none, 0px);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+/* --- Contenedor de Evidencia Autónoma (Fallback RBAC sin permiso de cierre) --- */
+.evidenceStandaloneWrapper {
+  background-color: var(--color-white, #FFFFFF);
+  border: 1px solid var(--border-color-neutral, #DFE3E8);
+  border-top: 4px solid var(--color-accent-mint, #4FAE9B);
+  padding: var(--space-4, 16px);
+  width: 100%;
 }
 
-.badgeCompletado {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  background-color: var(--color-success-bg, #E8F5E9);
-  color: var(--color-success, #2E7D32);
-  border: 1px solid var(--color-success, #2E7D32);
+/* --- Detalle de Rechazo, Solo Lectura y Estado Vacío --- */
+.rejectedInfoBox {
+  background-color: var(--color-danger-bg, #FFEBEE);
+  border: 1px solid var(--color-danger, #D32F2F);
+  border-left: 4px solid var(--color-danger, #D32F2F);
+  color: var(--color-text-dark, #2B2B2B);
+  padding: var(--space-3, 12px);
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
   border-radius: var(--radius-none, 0px);
+}
+
+.rejectedInfoLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-danger, #D32F2F);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 
 .readOnlyNotice {
@@ -423,4 +389,31 @@
   font-weight: 600;
   font-size: 0.8125rem;
   color: var(--color-text-muted, #5F676E);
+}
+
+.readOnlyNoticeInner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.notFoundCard {
+  background-color: var(--color-white, #FFFFFF);
+  border: 1px solid var(--border-color-neutral, #DFE3E8);
+  border-top: 4px solid var(--color-accent-mint, #4FAE9B);
+  padding: var(--space-6, 24px);
+  text-align: center;
+}
+
+.notFoundTitle {
+  font-weight: 700;
+  margin: 0 0 var(--space-2, 8px) 0;
+  color: var(--color-text-dark, #2B2B2B);
+}
+
+.notFoundDescription {
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #5F676E);
+  margin: 0;
 }

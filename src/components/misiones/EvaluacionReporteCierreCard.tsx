@@ -584,6 +584,7 @@ export function EvaluacionReporteCierreCard({
             />
 
             <CargaEvidenciaCard
+              embebida
               misionId={misionActual.id}
               incidenteId={misionActual.incidenteId}
               reporteTerrenoId={reporteTerrenoIdActual}

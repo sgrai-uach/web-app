@@ -17,7 +17,7 @@ import {
 } from '@/components/misiones/MisionFiltrosChips';
 import { MisionCard } from '@/components/misiones/MisionCard';
 import type { MisionLocal } from '@/types/offline';
-import styles from './CuadrillaMisionesPage.module.css';
+import styles from '@/components/misiones/MisionesBandeja.module.css';
 
 function CuadrillaMisionesContenido() {
   const { usuario, unidadActiva, tieneUnidadAsignada, estadoAsignacion } = useAuth();
