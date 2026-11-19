@@ -1,7 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
 import type { MisionAsignadaPayload } from '@/types/notificaciones';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
-import { DEV_PATRULLA_TOKEN } from '@/lib/api/client';
 
 let socketInstance: Socket | null = null;
 let currentPatrullaId: string | null = null;
@@ -20,7 +19,7 @@ function resolveSocketUrl(): string {
  */
 export function getSocket(tokenOverride?: string): Socket {
   if (!socketInstance) {
-    const token = tokenOverride || getAuthCookie() || DEV_PATRULLA_TOKEN;
+    const token = tokenOverride || getAuthCookie() || undefined;
     const socketUrl = resolveSocketUrl();
 
     socketInstance = io(socketUrl, {
