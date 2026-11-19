@@ -13,11 +13,15 @@ import {
   CheckCircle2,
   AlertCircle,
   WifiOff,
+  FileCheck,
+  Wrench,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
+import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
+import { useToastOptional } from '@/components/ui/Toast';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
@@ -29,23 +33,33 @@ import {
   type CoordenadasGPS,
 } from '@/components/misiones/RechazoMisionModal';
 import { CargaEvidenciaCard } from '@/components/misiones/CargaEvidenciaCard';
+import { CierreMisionCuadrillaCard } from '@/components/misiones/CierreMisionCuadrillaCard';
+import {
+  obtenerReporteCierreCuadrillaMision,
+  type ResultadoCierreCuadrilla,
+} from '@/services/cierreCuadrillaService';
 import { obtenerDetalleMision, rechazarMision } from '@/services/misionesService';
 import { extraerAdjuntosDeMision } from '@/services/offlineQueue';
-import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
+import {
+  formatearPrioridad,
+  formatearFechaHora24h,
+  formatearTipologia,
+} from '@/lib/utils/formatters';
 import type { AdjuntoLocal, MisionLocal } from '@/types/offline';
 import styles from './CuadrillaDetailPage.module.css';
 
 interface PageProps {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const resolvedParams =
     params && typeof (params as { then?: unknown }).then === 'function'
-      ? use(params as Promise<{ id: string }>)
-      : (params as { id: string });
+      ? use(params)
+      : (params as unknown as { id: string });
   const misionId = resolvedParams?.id;
   const router = useRouter();
+  const toast = useToastOptional();
 
   const {
     usuario,
@@ -62,28 +76,38 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
   const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
+  const [seccionCierreAbierta, setSeccionCierreAbierta] = useState<boolean>(true);
 
-  const cargarDetalle = useCallback(async () => {
-    setCargando(true);
-    try {
-      const encontrada = await obtenerDetalleMision(misionId);
-      setMision(encontrada || null);
-    } finally {
-      setCargando(false);
-    }
-  }, [misionId]);
+  const cargarDetalle = useCallback(
+    async (silencioso = false) => {
+      if (!silencioso) {
+        setCargando(true);
+      }
+      try {
+        const encontrada = await obtenerDetalleMision(misionId);
+        setMision(encontrada || null);
+      } finally {
+        if (!silencioso) {
+          setCargando(false);
+        }
+      }
+    },
+    [misionId]
+  );
 
   useEffect(() => {
     void cargarDetalle();
   }, [cargarDetalle]);
 
   useEffect(() => {
-    const handleOutboxSynced = () => {
-      void cargarDetalle();
+    const handleSync = () => {
+      void cargarDetalle(true);
     };
-    window.addEventListener('sgrai:outbox-synced', handleOutboxSynced);
+    window.addEventListener('sgrai:outbox-synced', handleSync);
+    window.addEventListener('sgrai:mision-sincronizada', handleSync);
     return () => {
-      window.removeEventListener('sgrai:outbox-synced', handleOutboxSynced);
+      window.removeEventListener('sgrai:outbox-synced', handleSync);
+      window.removeEventListener('sgrai:mision-sincronizada', handleSync);
     };
   }, [cargarDetalle]);
 
@@ -142,14 +166,6 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     );
   }
 
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
-  }
-
   const estadoNormalizado = mision.estado?.toUpperCase() || '';
   const tienePermisoEjecutar =
     typeof tienePermiso === 'function'
@@ -165,17 +181,41 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       estadoNormalizado === 'DESPACHADA'
   );
 
-  const esMisionActivaParaEvidencia =
+  const esMisionActiva =
     estadoNormalizado === 'EN_CURSO' ||
     estadoNormalizado === 'EN_TERRENO' ||
     estadoNormalizado === 'ACEPTADA';
+
+  const esFinalizada =
+    estadoNormalizado === 'FINALIZADA' ||
+    estadoNormalizado === 'COMPLETADA' ||
+    estadoNormalizado === 'CERRADA';
 
   const puedeAdjuntarEvidencia = Boolean(
     unidadActiva &&
       esCuadrilla &&
       tienePermisoEvidencia &&
-      esMisionActivaParaEvidencia
+      esMisionActiva
   );
+
+  const puedeEjecutarCierre = Boolean(
+    unidadActiva &&
+      esCuadrilla &&
+      tienePermisoEjecutar &&
+      esMisionActiva
+  );
+
+  const reporteCierreExistente = obtenerReporteCierreCuadrillaMision(mision);
+  const reporteCierreEnviado =
+    Boolean(reporteCierreExistente) ||
+    Boolean(mision.datosAdicionales?.reporteCuadrillaEnviado) ||
+    esFinalizada;
+
+  const mostrarSeccionCierre =
+    puedeEjecutarCierre ||
+    Boolean(reporteCierreExistente) ||
+    Boolean(mision.datosAdicionales?.reporteCuadrillaEnviado) ||
+    (tieneUnidadAsignada && esFinalizada);
 
   const adjuntosMision = extraerAdjuntosDeMision(mision);
   const reporteTerrenoIdMision =
@@ -190,11 +230,14 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       ? mision.datosAdicionales.justificacionRechazo
       : null;
 
+  const fechaCierreTexto =
+    typeof mision.datosAdicionales?.fechaCierre === 'string'
+      ? mision.datosAdicionales.fechaCierre
+      : null;
+
   const esSoloLectura =
     !unidadActiva ||
-    estadoNormalizado === 'FINALIZADA' ||
-    estadoNormalizado === 'COMPLETADA' ||
-    estadoNormalizado === 'CERRADA' ||
+    esFinalizada ||
     estadoNormalizado === 'RECHAZADA';
 
   const handleConfirmarRechazo = async (
@@ -242,6 +285,28 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       };
     });
     await actualizarPendientes();
+  };
+
+  const handleCierreEnviado = async (resultado: ResultadoCierreCuadrilla) => {
+    if (resultado.mision) {
+      setMision(resultado.mision);
+    }
+    setMensajeConfirmacion(resultado.mensaje);
+    if (resultado.offline) {
+      toast?.showWarning(resultado.mensaje);
+    } else {
+      toast?.showSuccess(resultado.mensaje);
+    }
+    await actualizarPendientes();
+    router.push('/cuadrilla/misiones');
+  };
+
+  const irASeccionEvidencia = () => {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('seccion-evidencia-cuadrilla');
+    if (el) {
+      el.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   return (
@@ -302,7 +367,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
           <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Tipo</span>
             <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
-              {mision.tipologia}
+              {formatearTipologia(mision.tipologia)}
             </span>
           </div>
 
@@ -341,6 +406,22 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
               </span>
             </div>
           </div>
+
+          {esFinalizada && fechaCierreTexto && (
+            <div className={styles.sectionBlock}>
+              <span className={styles.itemLabel}>Finalizada</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle2
+                  size={15}
+                  color="var(--color-success, #2E7D32)"
+                  aria-hidden="true"
+                />
+                <span className={styles.itemValue}>
+                  {formatearFechaHora24h(fechaCierreTexto)}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -377,15 +458,63 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         </div>
       )}
 
+      {/* Evidencia Multimedia (H43) */}
       {(puedeAdjuntarEvidencia || adjuntosMision.length > 0) && (
-        <CargaEvidenciaCard
-          misionId={mision.id}
-          incidenteId={mision.incidenteId}
-          reporteTerrenoId={reporteTerrenoIdMision}
-          adjuntos={adjuntosMision}
-          soloLectura={!puedeAdjuntarEvidencia}
-          alAdjuntarEvidencia={handleEvidenciaCargada}
-        />
+        <div id="seccion-evidencia-cuadrilla">
+          <CargaEvidenciaCard
+            misionId={mision.id}
+            incidenteId={mision.incidenteId}
+            reporteTerrenoId={reporteTerrenoIdMision}
+            adjuntos={adjuntosMision}
+            soloLectura={!puedeAdjuntarEvidencia}
+            alAdjuntarEvidencia={handleEvidenciaCargada}
+          />
+        </div>
+      )}
+
+      {/* Gestión Técnica de Faena y Cierre de Misión (H68) */}
+      {mostrarSeccionCierre && (
+        <section
+          className={styles.evaluationFormsSection}
+          aria-label="Gestión técnica y cierre de misión de cuadrilla"
+        >
+          <div className={styles.evaluationHeader}>
+            <h2 className={styles.evaluationTitle}>
+              <Wrench size={18} aria-hidden="true" />
+              <span>Gestión Técnica de Faena</span>
+            </h2>
+          </div>
+
+          <div className={styles.evaluationContent}>
+            <SeccionDesplegable
+              titulo="Finalizar Misión e Informe Técnico"
+              icono={<FileCheck size={18} aria-hidden="true" />}
+              abierto={seccionCierreAbierta}
+              onToggle={setSeccionCierreAbierta}
+              indicador={
+                reporteCierreEnviado ? (
+                  <span className={styles.badgeCompletado}>
+                    <CheckCircle2 size={12} aria-hidden="true" />
+                    <span>Enviado</span>
+                  </span>
+                ) : undefined
+              }
+            >
+              <CierreMisionCuadrillaCard
+                misionActual={mision}
+                adjuntosMision={adjuntosMision}
+                usuarioActualId={usuario?.id}
+                deshabilitado={!puedeEjecutarCierre}
+                onCierreEnviado={handleCierreEnviado}
+                onIrAEvidencia={
+                  puedeAdjuntarEvidencia || adjuntosMision.length > 0
+                    ? irASeccionEvidencia
+                    : undefined
+                }
+              />
+            </SeccionDesplegable>
+          </div>
+        </section>
       )}
 
       {esSoloLectura && (
