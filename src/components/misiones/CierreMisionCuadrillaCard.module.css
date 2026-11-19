@@ -190,26 +190,6 @@
   line-height: 1.35;
 }
 
-.evidenciaSummaryBox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2, 8px);
-  padding: var(--space-3, 12px);
-  background-color: var(--color-white, #ffffff);
-  border: 1px dashed var(--color-primary-teal, #1b6f7d);
-}
-
-.evidenciaSummaryRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-2, 8px);
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--color-text-dark, #2b2b2b);
-}
-
 .materialResumenList {
   margin: 4px 0 0 0;
   padding-left: 18px;
@@ -218,6 +198,22 @@
   gap: 4px;
   font-size: 0.875rem;
   color: var(--color-text-dark, #2b2b2b);
+}
+
+.validationHint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #5f676e);
+  text-align: center;
+}
+
+.inlineValidationAlert {
+  padding: 10px 12px;
+  background-color: var(--color-danger-bg, #ffebee);
+  border: 1px solid var(--color-danger, #d32f2f);
+  color: var(--color-danger, #d32f2f);
+  font-size: 0.8125rem;
+  font-weight: 500;
 }
 
 .submitBtn {

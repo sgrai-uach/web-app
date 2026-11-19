@@ -23,7 +23,6 @@ export const VALORES_INICIALES_CIERRE_CUADRILLA: CierreMisionCuadrillaForm = {
   danos_estimados: '',
   observaciones: '',
   requiere_apoyo_adicional: false,
-  requiere_asistencia_social: false,
   adjunto_ids: [],
   adjuntos: [],
 };
@@ -96,7 +95,6 @@ export const cerrarMisionCuadrillaSchema = z
       .optional()
       .default(''),
     requiere_apoyo_adicional: z.boolean().optional().default(false),
-    requiere_asistencia_social: z.boolean().optional().default(false),
     adjunto_ids: z
       .array(
         z.string().uuid('Cada identificador de adjunto debe ser un UUID válido.')

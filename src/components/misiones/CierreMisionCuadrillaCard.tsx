@@ -9,16 +9,15 @@ import {
   Plus,
   Trash2,
   AlertTriangle,
-  HeartHandshake,
   Truck,
   FileText,
-  Camera,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
+import { CargaEvidenciaCard } from './CargaEvidenciaCard';
 import {
   AlertaFeedbackReporte,
   BloqueFormularioReporte,
@@ -77,18 +76,25 @@ const PRESETS_HORAS_HOMBRE = [
 export interface CierreMisionCuadrillaCardProps {
   misionActual: MisionLocal;
   adjuntosMision?: AdjuntoLocal[];
+  reporteTerrenoId?: string;
+  puedeAdjuntarEvidencia?: boolean;
   usuarioActualId?: string;
   deshabilitado?: boolean;
   onCierreEnviado?: (resultado: ResultadoCierreCuadrilla) => void;
-  onIrAEvidencia?: () => void;
+  onAdjuntarEvidencia?: (
+    adjunto: AdjuntoLocal,
+    enColaOffline: boolean
+  ) => void | Promise<void>;
 }
 
 export function CierreMisionCuadrillaCard({
   misionActual,
   adjuntosMision,
+  reporteTerrenoId,
+  puedeAdjuntarEvidencia = false,
   deshabilitado = false,
   onCierreEnviado,
-  onIrAEvidencia,
+  onAdjuntarEvidencia,
 }: CierreMisionCuadrillaCardProps) {
   const resumenId = useId();
   const horasId = useId();
@@ -125,12 +131,14 @@ export function CierreMisionCuadrillaCard({
     obtenerRecursosDisponiblesCuadrilla(misionActual)
       .then((lista) => {
         if (!cancelado) {
-          setRecursosCatalogo(lista);
+          setRecursosCatalogo((prev) =>
+            prev.length === 0 && lista.length === 0 ? prev : lista
+          );
         }
       })
       .catch(() => {
         if (!cancelado) {
-          setRecursosCatalogo([]);
+          setRecursosCatalogo((prev) => (prev.length === 0 ? prev : []));
         }
       });
     return () => {
@@ -169,12 +177,32 @@ export function CierreMisionCuadrillaCard({
     [listaAdjuntos]
   );
 
+  const reporteTerrenoIdActual =
+    reporteTerrenoId ??
+    (typeof misionActual.datosAdicionales?.reporteTerrenoId === 'string'
+      ? misionActual.datosAdicionales.reporteTerrenoId
+      : undefined);
+
   const resumenLimpio = form.resumen_faenas.trim();
   const resumenValido = resumenLimpio.length >= RESUMEN_FAENAS_MIN;
   const horasValidas =
     Number.isFinite(form.horas_hombre) &&
     form.horas_hombre > 0 &&
     form.horas_hombre <= HORAS_HOMBRE_MAX;
+
+  const materialesInvalidos = useMemo(() => {
+    const vistos = new Set<string>();
+    for (const mat of form.materiales_consumidos) {
+      if (!mat.recurso_id) return true;
+      if (!Number.isFinite(mat.cantidad) || mat.cantidad <= 0) return true;
+      if (vistos.has(mat.recurso_id)) return true;
+      vistos.add(mat.recurso_id);
+    }
+    return false;
+  }, [form.materiales_consumidos]);
+
+  const formularioValido =
+    resumenValido && horasValidas && !materialesInvalidos;
 
   const fechaReporteCierre =
     reporteExistente?.creadoEn ||
@@ -365,104 +393,105 @@ export function CierreMisionCuadrillaCard({
       role="group"
       aria-label="Informe técnico final de cuadrilla y cierre de misión"
     >
-      <AlertaFeedbackReporte
-        feedback={feedback}
-        errorValidacion={errorValidacion}
-      />
+      <AlertaFeedbackReporte feedback={feedback} />
 
       {yaEnviado ? (
-        <ResumenReporteTerreno
-          testId="resumen-cierre-cuadrilla"
-          titulo="Informe Técnico Final de Cuadrilla (Cierre de Misión)"
-          chip={
-            <Chip
-              variant={obtenerVarianteChipEstadoTerreno(estadoTerrenoActual)}
-              size="sm"
-            >
-              {formatearEstadoTerreno(estadoTerrenoActual)}
-            </Chip>
-          }
-          registradoPor={formatearAutorReporte(
-            reporteExistente?.evaluador,
-            fechaReporteCierre,
-            'Delegado de Cuadrilla'
-          )}
-        >
-          {reporteExistente && (
-            <>
-              <CampoResumenReporte
-                label="Resumen de Faenas Ejecutadas"
-                valor={reporteExistente.resumen_faenas}
-                esBloqueTexto
-              />
-
-              <CampoResumenReporte
-                label="Horas Hombre Invertidas"
-                valor={`${reporteExistente.horas_hombre} h`}
-              />
-
-              <CampoResumenReporte
-                label="Estado Final del Terreno"
-                valor={formatearEstadoTerreno(reporteExistente.estado_terreno)}
-              />
-
-              <CampoResumenReporte
-                label="Materiales e Insumos Consumidos"
-                valor={
-                  reporteExistente.materiales_consumidos &&
-                  reporteExistente.materiales_consumidos.length > 0 ? (
-                    <ul className={styles.materialResumenList}>
-                      {reporteExistente.materiales_consumidos.map((mat, idx) => (
-                        <li key={`${mat.recurso_id}-${idx}`}>
-                          <strong>{mat.nombre || mat.recurso_id}:</strong>{' '}
-                          {mat.cantidad}
-                          {mat.unidad ? ` ${mat.unidad}` : ''}
-                          {mat.observacion ? ` (${mat.observacion})` : ''}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    'Sin materiales consumidos registrados'
-                  )
-                }
-              />
-
-              {reporteExistente.danos_estimados && (
+        <>
+          <ResumenReporteTerreno
+            testId="resumen-cierre-cuadrilla"
+            titulo="Informe Técnico Final de Cuadrilla (Cierre de Misión)"
+            chip={
+              <Chip
+                variant={obtenerVarianteChipEstadoTerreno(estadoTerrenoActual)}
+                size="sm"
+              >
+                {formatearEstadoTerreno(estadoTerrenoActual)}
+              </Chip>
+            }
+            registradoPor={formatearAutorReporte(
+              reporteExistente?.evaluador,
+              fechaReporteCierre,
+              'Delegado de Cuadrilla'
+            )}
+          >
+            {reporteExistente && (
+              <>
                 <CampoResumenReporte
-                  label="Daños Materiales Estimados"
-                  valor={reporteExistente.danos_estimados}
+                  label="Resumen de Faenas Ejecutadas"
+                  valor={reporteExistente.resumen_faenas}
                   esBloqueTexto
                 />
-              )}
 
-              {reporteExistente.observaciones && (
                 <CampoResumenReporte
-                  label="Observaciones Generales"
-                  valor={reporteExistente.observaciones}
-                  esBloqueTexto
+                  label="Horas Hombre Invertidas"
+                  valor={`${reporteExistente.horas_hombre} h`}
                 />
-              )}
 
-              <CampoResumenReporte
-                label="Apoyo Adicional / Seguimiento"
-                valor={
-                  reporteExistente.requiere_apoyo_adicional
-                    ? 'Requiere apoyo adicional o seguimiento operativo'
-                    : 'No requiere apoyo adicional'
-                }
-              />
+                <CampoResumenReporte
+                  label="Estado Final del Terreno"
+                  valor={formatearEstadoTerreno(reporteExistente.estado_terreno)}
+                />
 
-              <CampoResumenReporte
-                label="Asistencia Social (Ficha FIBE)"
-                valor={
-                  reporteExistente.requiere_asistencia_social
-                    ? 'Requiere levantamiento social (FIBE)'
-                    : 'No requiere asistencia social'
-                }
-              />
-            </>
+                <CampoResumenReporte
+                  label="Materiales e Insumos Consumidos"
+                  valor={
+                    reporteExistente.materiales_consumidos &&
+                    reporteExistente.materiales_consumidos.length > 0 ? (
+                      <ul className={styles.materialResumenList}>
+                        {reporteExistente.materiales_consumidos.map((mat, idx) => (
+                          <li key={`${mat.recurso_id}-${idx}`}>
+                            <strong>{mat.nombre || mat.recurso_id}:</strong>{' '}
+                            {mat.cantidad}
+                            {mat.unidad ? ` ${mat.unidad}` : ''}
+                            {mat.observacion ? ` (${mat.observacion})` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      'Sin materiales consumidos registrados'
+                    )
+                  }
+                />
+
+                {reporteExistente.danos_estimados && (
+                  <CampoResumenReporte
+                    label="Daños Materiales Estimados"
+                    valor={reporteExistente.danos_estimados}
+                    esBloqueTexto
+                  />
+                )}
+
+                {reporteExistente.observaciones && (
+                  <CampoResumenReporte
+                    label="Observaciones Generales"
+                    valor={reporteExistente.observaciones}
+                    esBloqueTexto
+                  />
+                )}
+
+                <CampoResumenReporte
+                  label="Apoyo Adicional / Seguimiento"
+                  valor={
+                    reporteExistente.requiere_apoyo_adicional
+                      ? 'Requiere apoyo adicional o seguimiento operativo'
+                      : 'No requiere apoyo adicional'
+                  }
+                />
+              </>
+            )}
+          </ResumenReporteTerreno>
+
+          {listaAdjuntos.length > 0 && (
+            <CargaEvidenciaCard
+              embebida
+              misionId={misionActual.id}
+              incidenteId={misionActual.incidenteId}
+              reporteTerrenoId={reporteTerrenoIdActual}
+              adjuntos={listaAdjuntos}
+              soloLectura
+            />
           )}
-        </ResumenReporteTerreno>
+        </>
       ) : (
         <form onSubmit={handlePreConfirmar} className={styles.form} noValidate>
           {/* 1. Resumen de Faenas Ejecutadas */}
@@ -750,10 +779,10 @@ export function CierreMisionCuadrillaCard({
             </Button>
           </BloqueFormularioReporte>
 
-          {/* 4. Observaciones, Daños y Escalamientos */}
+          {/* 4. Observaciones, Daños y Evidencia Multimedia */}
           <BloqueFormularioReporte
             icono={<FileText size={16} aria-hidden="true" />}
-            titulo="4. Observaciones, Daños y Escalamientos"
+            titulo="4. Observaciones, Daños y Evidencia Multimedia"
           >
             <div className={styles.fieldGroup}>
               <Textarea
@@ -787,7 +816,7 @@ export function CierreMisionCuadrillaCard({
                     observaciones: e.target.value,
                   }))
                 }
-                placeholder=" Recomendaciones preventivas o coordinación con vecinos"
+                placeholder="Recomendaciones preventivas o coordinación con vecinos"
                 disabled={deshabilitado || guardando}
                 className={styles.textareaField}
               />
@@ -808,56 +837,38 @@ export function CierreMisionCuadrillaCard({
               }
             />
 
-            <SwitchReporteTerreno
-              activo={form.requiere_asistencia_social}
-              disabled={deshabilitado || guardando}
-              icono={<HeartHandshake size={18} aria-hidden="true" />}
-              etiqueta="Requiere Asistencia Social (Levantamiento Ficha FIBE)"
-              textoActivo="Solicitada"
-              textoInactivo="No requerida"
-              onChange={(activo) =>
-                setForm((prev) => ({
-                  ...prev,
-                  requiere_asistencia_social: activo,
-                }))
-              }
-            />
+            {(puedeAdjuntarEvidencia || listaAdjuntos.length > 0) && (
+              <CargaEvidenciaCard
+                embebida
+                misionId={misionActual.id}
+                incidenteId={misionActual.incidenteId}
+                reporteTerrenoId={reporteTerrenoIdActual}
+                adjuntos={listaAdjuntos}
+                soloLectura={
+                  !puedeAdjuntarEvidencia || deshabilitado || guardando
+                }
+                alAdjuntarEvidencia={onAdjuntarEvidencia}
+              />
+            )}
           </BloqueFormularioReporte>
 
-          {/* 5. Evidencia Multimedia Vinculada (H43) */}
-          <BloqueFormularioReporte
-            icono={<Camera size={16} aria-hidden="true" />}
-            titulo="5. Evidencia Multimedia Vinculada"
-          >
-            <div className={styles.evidenciaSummaryBox}>
-              <div className={styles.evidenciaSummaryRow}>
-                <span>
-                  {listaAdjuntos.length === 0
-                    ? 'No se han cargado fotografías ni videos en esta misión.'
-                    : `${listaAdjuntos.length} evidencia(s) adjunta(s) (${adjuntosSincronizados.length} sincronizada(s)${
-                        adjuntosPendientes.length > 0
-                          ? `, ${adjuntosPendientes.length} en cola offline`
-                          : ''
-                      }).`}
-                </span>
-                {onIrAEvidencia && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={onIrAEvidencia}
-                  >
-                    Ir a Evidencia Multimedia
-                  </Button>
-                )}
-              </div>
-              <span className={styles.fieldHint}>
-                Las fotografías, videos y documentos PDF cargados en la tarjeta de
-                Evidencia Multimedia se vincularán automáticamente a este informe
-                técnico final.
-              </span>
+          {!formularioValido && !errorValidacion && (
+            <p role="note" className={styles.validationHint}>
+              Para enviar el informe falta completar:{' '}
+              {!resumenValido
+                ? `resumen de faenas (${resumenLimpio.length}/${RESUMEN_FAENAS_MIN} caracteres mínimos)`
+                : !horasValidas
+                  ? `horas hombre válidas (> 0 y <= ${HORAS_HOMBRE_MAX})`
+                  : 'selección y cantidad válida en materiales consumidos'}
+              .
+            </p>
+          )}
+
+          {errorValidacion && (
+            <div role="alert" className={styles.inlineValidationAlert}>
+              {errorValidacion}
             </div>
-          </BloqueFormularioReporte>
+          )}
 
           <Button
             type="submit"
@@ -869,7 +880,9 @@ export function CierreMisionCuadrillaCard({
             icon={<CheckCircle size={18} />}
             className={styles.submitBtn}
           >
-            Finalizar Misión e Informe Técnico
+            {guardando
+              ? 'Enviando informe...'
+              : 'Finalizar Misión e Informe Técnico'}
           </Button>
         </form>
       )}
@@ -881,7 +894,6 @@ export function CierreMisionCuadrillaCard({
         estadoTerreno={form.estado_terreno}
         materialesConsumidos={form.materiales_consumidos}
         requiereApoyoAdicional={form.requiere_apoyo_adicional}
-        requiereAsistenciaSocial={form.requiere_asistencia_social}
         totalAdjuntosSincronizados={adjuntosSincronizados.length}
         totalAdjuntosPendientes={adjuntosPendientes.length}
         cargando={guardando}

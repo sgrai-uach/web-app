@@ -1,20 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, use } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
-  MapPin,
-  Calendar,
-  Archive,
-  Map,
   XCircle,
   CheckCircle2,
-  AlertCircle,
   WifiOff,
   FileCheck,
-  Wrench,
+  ClipboardCheck,
+  HardHat,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
@@ -22,9 +16,13 @@ import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
 import { useToastOptional } from '@/components/ui/Toast';
-import { EstadoBadge } from '@/components/misiones/EstadoBadge';
-import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
-import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
+import {
+  MisionDetalleTopBar,
+  MisionDetalleHeaderCard,
+  MisionEstadoActivoCard,
+  MisionNoEncontradaCard,
+  MisionSoloLecturaNotice,
+} from '@/components/misiones/MisionDetalleShared';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
@@ -40,13 +38,8 @@ import {
 } from '@/services/cierreCuadrillaService';
 import { obtenerDetalleMision, rechazarMision } from '@/services/misionesService';
 import { extraerAdjuntosDeMision } from '@/services/offlineQueue';
-import {
-  formatearPrioridad,
-  formatearFechaHora24h,
-  formatearTipologia,
-} from '@/lib/utils/formatters';
 import type { AdjuntoLocal, MisionLocal } from '@/types/offline';
-import styles from './CuadrillaDetailPage.module.css';
+import styles from '@/components/misiones/MisionDetailLayout.module.css';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -121,48 +114,14 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
 
   if (!mision) {
     return (
-      <div className={styles.container}>
-        <div className={styles.topBar}>
-          <Link href="/cuadrilla/misiones" className={styles.backLink}>
-            <ArrowLeft size={16} aria-hidden="true" />
-            <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}</span>
-          </Link>
-          <ConnectionStatusBadge
-            status={status}
-            pendingCount={pendientes}
-            onRetry={sincronizar}
-          />
-        </div>
-        <div
-          className={styles.missionHeader}
-          style={{ textAlign: 'center', padding: 'var(--space-6)' }}
-          role="alert"
-        >
-          <AlertCircle
-            size={40}
-            color="var(--color-text-muted)"
-            aria-hidden="true"
-            style={{ margin: '0 auto var(--space-2)' }}
-          />
-          <p style={{ fontWeight: 700, margin: '0 0 var(--space-1) 0' }}>
-            Misión no encontrada
-          </p>
-          <p
-            style={{
-              fontSize: '0.875rem',
-              color: 'var(--color-text-muted)',
-              margin: '0 0 var(--space-3) 0',
-            }}
-          >
-            La misión solicitada no existe o no se encuentra disponible en caché local.
-          </p>
-          <div>
-            <Link href="/cuadrilla/misiones" className={styles.backLink}>
-              Volver a la bandeja
-            </Link>
-          </div>
-        </div>
-      </div>
+      <MisionNoEncontradaCard
+        backHref="/cuadrilla/misiones"
+        backLabel={estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}
+        status={status}
+        pendingCount={pendientes}
+        onRetry={sincronizar}
+        descripcion="La misión solicitada no existe o no se encuentra disponible en caché local."
+      />
     );
   }
 
@@ -292,36 +251,26 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       setMision(resultado.mision);
     }
     setMensajeConfirmacion(resultado.mensaje);
-    if (resultado.offline) {
-      toast?.showWarning(resultado.mensaje);
-    } else {
-      toast?.showSuccess(resultado.mensaje);
+    if (toast) {
+      if (resultado.offline) {
+        toast.showWarning(resultado.mensaje, 'Guardado sin conexión');
+      } else {
+        toast.showSuccess(resultado.mensaje, 'Misión cerrada');
+      }
     }
     await actualizarPendientes();
     router.push('/cuadrilla/misiones');
   };
 
-  const irASeccionEvidencia = () => {
-    if (typeof document === 'undefined') return;
-    const el = document.getElementById('seccion-evidencia-cuadrilla');
-    if (el) {
-      el.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
   return (
     <div className={styles.container}>
-      <div className={styles.topBar}>
-        <Link href="/cuadrilla/misiones" className={styles.backLink}>
-          <ArrowLeft size={16} aria-hidden="true" />
-          <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}</span>
-        </Link>
-        <ConnectionStatusBadge
-          status={status}
-          pendingCount={pendientes}
-          onRetry={sincronizar}
-        />
-      </div>
+      <MisionDetalleTopBar
+        backHref="/cuadrilla/misiones"
+        backLabel={estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}
+        status={status}
+        pendingCount={pendientes}
+        onRetry={sincronizar}
+      />
 
       {!tieneUnidadAsignada ? (
         <SinUnidadBanner
@@ -335,104 +284,41 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         />
       ) : null}
 
-      {mision.sincronizacionPendiente && (
-        <div className={styles.offlineAlertBanner} role="status">
-          <WifiOff size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+      <MisionDetalleHeaderCard
+        mision={mision}
+        trabajoTexto={trabajoTexto}
+        etiquetaFecha="Despachada"
+        fechaPrincipal={mision.fechaDespacho}
+        fechaCierre={esFinalizada ? fechaCierreTexto : null}
+        onVerMapa={() => setMapaAbierto(true)}
+      />
+
+      {!(unidadActiva && esMisionActiva) && mision.sincronizacionPendiente && (
+        <div className={styles.offlineQueueBanner} role="status">
+          <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
           <span>
-            Acción registrada localmente. Pendiente de sincronizar con el Centro de Mando.
+            Acción registrada localmente. Pendiente de sincronizar con el Centro de
+            Mando.
           </span>
         </div>
       )}
 
-      {mensajeConfirmacion && !mision.sincronizacionPendiente && (
-        <div className={styles.successAlertBanner} role="status">
-          <CheckCircle2 size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
-          <span>{mensajeConfirmacion}</span>
-        </div>
-      )}
-
-      <div className={styles.missionHeader}>
-        <div className={styles.headerRow}>
-          <div className={styles.codeArea}>
-            <span className={styles.code}>{mision.codigoIncidente}</span>
-            <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
-              {formatearPrioridad(mision.prioridad)}
-            </Chip>
+      {!(unidadActiva && esMisionActiva) &&
+        mensajeConfirmacion &&
+        !mision.sincronizacionPendiente && (
+          <div className={styles.SyncedBanner} role="status">
+            {mensajeConfirmacion}
           </div>
-          <EstadoBadge estado={mision.estado} size="md" />
-        </div>
-
-        <div className={styles.detailGrid}>
-          {/* Bloque Tipo */}
-          <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>Tipo</span>
-            <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
-              {formatearTipologia(mision.tipologia)}
-            </span>
-          </div>
-
-          {/* Bloque Ubicación */}
-          <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>Ubicación</span>
-            <div className={styles.locationActionRow}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <MapPin size={16} color="var(--color-primary-teal)" aria-hidden="true" />
-                <span className={styles.itemValue}>{mision.direccion}</span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                icon={<Map size={14} />}
-                onClick={() => setMapaAbierto(true)}
-              >
-                Ver mapa
-              </Button>
-            </div>
-          </div>
-
-          {/* Bloque Trabajo */}
-          <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>Trabajo</span>
-            <span className={styles.itemValue}>{trabajoTexto}</span>
-          </div>
-
-          {/* Fecha Despachada */}
-          <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>Despachada</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Calendar size={15} color="var(--color-text-muted)" aria-hidden="true" />
-              <span className={styles.itemValue}>
-                {formatearFechaHora24h(mision.fechaDespacho)}
-              </span>
-            </div>
-          </div>
-
-          {esFinalizada && fechaCierreTexto && (
-            <div className={styles.sectionBlock}>
-              <span className={styles.itemLabel}>Finalizada</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CheckCircle2
-                  size={15}
-                  color="var(--color-success, #2E7D32)"
-                  aria-hidden="true"
-                />
-                <span className={styles.itemValue}>
-                  {formatearFechaHora24h(fechaCierreTexto)}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+        )}
 
       {/* Acciones de Despacho (H41) */}
       {esRechazable && (
         <section
-          className={styles.dispatchCard}
+          className={styles.actionCard}
           aria-label="Acciones de despacho de cuadrilla"
         >
-          <h2 className={styles.dispatchTitle}>Acciones de Despacho</h2>
-          <p className={styles.dispatchDesc}>
+          <h2 className={styles.actionTitle}>Acciones de Despacho</h2>
+          <p className={styles.actionDescription}>
             Si la cuadrilla presenta un impedimento técnico o de fuerza mayor para
             atender la asignación, registre el rechazo motivado para reasignación
             inmediata.
@@ -453,36 +339,52 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
 
       {estadoNormalizado === 'RECHAZADA' && justificacionRegistrada && (
         <div className={styles.rejectedInfoBox}>
-          <span className={styles.rejectedInfoLabel}>Justificación de rechazo registrada</span>
+          <span className={styles.rejectedInfoLabel}>
+            Justificación de rechazo registrada
+          </span>
           <span>{justificacionRegistrada}</span>
         </div>
       )}
 
-      {/* Evidencia Multimedia (H43) */}
-      {(puedeAdjuntarEvidencia || adjuntosMision.length > 0) && (
-        <div id="seccion-evidencia-cuadrilla">
-          <CargaEvidenciaCard
-            misionId={mision.id}
-            incidenteId={mision.incidenteId}
-            reporteTerrenoId={reporteTerrenoIdMision}
-            adjuntos={adjuntosMision}
-            soloLectura={!puedeAdjuntarEvidencia}
-            alAdjuntarEvidencia={handleEvidenciaCargada}
-          />
-        </div>
+      {/* Vista activa: Faena en Curso */}
+      {unidadActiva && esMisionActiva && (
+        <MisionEstadoActivoCard
+          ariaLabel="Estado de faena operativa"
+          icono={
+            <HardHat
+              size={20}
+              color="var(--color-primary-teal, #1B6F7D)"
+              aria-hidden="true"
+            />
+          }
+          titulo="Faena en Curso"
+          sincronizacionPendiente={Boolean(mision.sincronizacionPendiente)}
+          mensajeOffline="Acción registrada localmente. Pendiente de sincronizar con el Centro de Mando."
+          mensajeConfirmacion={mensajeConfirmacion}
+          estadosCanonicos={[
+            { etiqueta: 'Misión', valor: 'En curso' },
+            { etiqueta: 'Cuadrilla', valor: 'En misión' },
+            { etiqueta: 'Incidente', valor: 'En atención' },
+          ]}
+        />
       )}
 
       {/* Gestión Técnica de Faena y Cierre de Misión (H68) */}
       {mostrarSeccionCierre && (
         <section
           className={styles.evaluationFormsSection}
+          data-testid="formularios-reporte-tecnico"
           aria-label="Gestión técnica y cierre de misión de cuadrilla"
         >
           <div className={styles.evaluationHeader}>
-            <h2 className={styles.evaluationTitle}>
-              <Wrench size={18} aria-hidden="true" />
+            <h3 className={styles.evaluationTitle}>
+              <ClipboardCheck
+                size={20}
+                color="var(--color-primary-teal, #1B6F7D)"
+                aria-hidden="true"
+              />
               <span>Gestión Técnica de Faena</span>
-            </h2>
+            </h3>
           </div>
 
           <div className={styles.evaluationContent}>
@@ -493,38 +395,56 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
               onToggle={setSeccionCierreAbierta}
               indicador={
                 reporteCierreEnviado ? (
-                  <span className={styles.badgeCompletado}>
-                    <CheckCircle2 size={12} aria-hidden="true" />
-                    <span>Enviado</span>
-                  </span>
-                ) : undefined
+                  <Chip
+                    variant="success"
+                    size="sm"
+                    icon={<CheckCircle2 size={12} />}
+                  >
+                    Completado
+                  </Chip>
+                ) : mision.sincronizacionPendiente ? (
+                  <Chip variant="warning" size="sm">
+                    Pendiente
+                  </Chip>
+                ) : null
               }
             >
               <CierreMisionCuadrillaCard
                 misionActual={mision}
                 adjuntosMision={adjuntosMision}
+                reporteTerrenoId={reporteTerrenoIdMision}
+                puedeAdjuntarEvidencia={puedeAdjuntarEvidencia}
                 usuarioActualId={usuario?.id}
                 deshabilitado={!puedeEjecutarCierre}
                 onCierreEnviado={handleCierreEnviado}
-                onIrAEvidencia={
-                  puedeAdjuntarEvidencia || adjuntosMision.length > 0
-                    ? irASeccionEvidencia
-                    : undefined
-                }
+                onAdjuntarEvidencia={handleEvidenciaCargada}
               />
             </SeccionDesplegable>
           </div>
         </section>
       )}
 
-      {esSoloLectura && (
-        <div className={styles.readOnlyNotice}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-            <Archive size={16} aria-hidden="true" />
-            <span>Solo lectura</span>
-          </div>
-        </div>
-      )}
+      {/* Respaldo RBAC si cuenta con reportes:crear sin misiones:terreno:ejecutar */}
+      {!mostrarSeccionCierre &&
+        (puedeAdjuntarEvidencia || adjuntosMision.length > 0) && (
+          <section
+            id="seccion-evidencia-cuadrilla"
+            className={styles.evidenceStandaloneWrapper}
+            aria-label="Evidencia multimedia de la faena"
+          >
+            <CargaEvidenciaCard
+              embebida
+              misionId={mision.id}
+              incidenteId={mision.incidenteId}
+              reporteTerrenoId={reporteTerrenoIdMision}
+              adjuntos={adjuntosMision}
+              soloLectura={!puedeAdjuntarEvidencia}
+              alAdjuntarEvidencia={handleEvidenciaCargada}
+            />
+          </section>
+        )}
+
+      {esSoloLectura && <MisionSoloLecturaNotice />}
 
       <MapaModal
         abierto={mapaAbierto}

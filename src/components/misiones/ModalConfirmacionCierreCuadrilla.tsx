@@ -24,7 +24,6 @@ export interface ModalConfirmacionCierreCuadrillaProps {
   estadoTerreno: EstadoTerrenoCierreCuadrilla;
   materialesConsumidos: MaterialConsumidoFormItem[];
   requiereApoyoAdicional: boolean;
-  requiereAsistenciaSocial: boolean;
   totalAdjuntosSincronizados?: number;
   totalAdjuntosPendientes?: number;
   cargando?: boolean;
@@ -39,7 +38,6 @@ export function ModalConfirmacionCierreCuadrilla({
   estadoTerreno,
   materialesConsumidos,
   requiereApoyoAdicional,
-  requiereAsistenciaSocial,
   totalAdjuntosSincronizados = 0,
   totalAdjuntosPendientes = 0,
   cargando = false,
@@ -47,14 +45,6 @@ export function ModalConfirmacionCierreCuadrilla({
   alCancelar,
 }: ModalConfirmacionCierreCuadrillaProps) {
   const totalEvidencias = totalAdjuntosSincronizados + totalAdjuntosPendientes;
-
-  const escalamientos: string[] = [];
-  if (requiereApoyoAdicional) {
-    escalamientos.push('Apoyo adicional solicitado');
-  }
-  if (requiereAsistenciaSocial) {
-    escalamientos.push('Asistencia Social (Ficha FIBE)');
-  }
 
   return (
     <ConfirmModal
@@ -110,8 +100,8 @@ export function ModalConfirmacionCierreCuadrilla({
               : `${totalAdjuntosSincronizados} archivo(s) vinculado(s)`}
         </ConfirmacionResumenFila>
 
-        <ConfirmacionResumenFila etiqueta="Escalamientos">
-          {escalamientos.length > 0 ? escalamientos.join(' · ') : 'Ninguno'}
+        <ConfirmacionResumenFila etiqueta="Apoyo Adicional">
+          {requiereApoyoAdicional ? 'Solicitado' : 'No requerido'}
         </ConfirmacionResumenFila>
 
         <ConfirmacionResumenJustificacion

@@ -101,6 +101,16 @@ describe('CuadrillaMisionDetailPage — Cierre de Misión e Informe Técnico (H6
       expect(screen.getByText('Gestión Técnica de Faena')).toBeInTheDocument();
     });
 
+    expect(
+      screen.getByTestId('formularios-reporte-tecnico')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Faena en Curso')).toBeInTheDocument();
+    expect(screen.getByText('Misión activa')).toBeInTheDocument();
+    expect(screen.getByText('En misión')).toBeInTheDocument();
+    expect(screen.getByText('En atención')).toBeInTheDocument();
+    expect(screen.queryByText(/FIBE/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Asistencia Social/i)).not.toBeInTheDocument();
+
     fireEvent.change(
       screen.getByLabelText(/Detalle Técnico de Trabajos Realizados/i),
       {
@@ -135,7 +145,6 @@ describe('CuadrillaMisionDetailPage — Cierre de Misión e Informe Técnico (H6
         danos_estimados: '',
         observaciones: '',
         requiere_apoyo_adicional: false,
-        requiere_asistencia_social: false,
         adjunto_ids: [],
         adjuntos: [],
         creadoEn: '2026-11-18T12:00:00.000Z',
@@ -180,6 +189,38 @@ describe('CuadrillaMisionDetailPage — Cierre de Misión e Informe Técnico (H6
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-0004')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByText('Gestión Técnica de Faena')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Evidencia Multimedia')).not.toBeInTheDocument();
+  });
+
+  it('mantiene accesible Evidencia Multimedia como respaldo RBAC cuando solo posee reportes:crear sin permiso de cierre', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      usuario: {
+        id: '00000000-0000-4000-8000-000000000005',
+        nombre: 'Operador Terreno',
+        unidadId: 'c1000000-0000-4000-8000-000000000001',
+        unidadNombre: 'Cuadrilla Aguas Lluvias Alfa',
+      },
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      esCuadrilla: true,
+      esPatrulla: false,
+      tienePermiso: (p: string) => p === 'reportes:crear',
+    } as never);
+
+    render(
+      <CuadrillaMisionDetailPage
+        params={{ id: misionEnCurso.id } as unknown as Promise<{ id: string }>}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Evidencia Multimedia')).toBeInTheDocument();
     });
 
     expect(

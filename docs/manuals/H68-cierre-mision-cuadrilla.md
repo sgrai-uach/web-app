@@ -20,11 +20,9 @@ Este manual describe cómo el **Delegado de Cuadrilla** (`DELEGADO_CUADRILLA`) c
 ## 3. Paso a Paso en Terreno
 
 1. **Ingresar al detalle de la faena activa:**
-   - Desde la bandeja **Misiones** (`/cuadrilla/misiones`), seleccione la misión en estado **En curso** (por ejemplo, `INC-2026-0004`).
-2. **Adjuntar evidencia multimedia (opcional, HU-43):**
-   - En la tarjeta **Evidencia Multimedia**, utilice **Tomar Foto**, **Grabar Video** o **Subir Archivo** para respaldar visualmente los trabajos realizados.
-   - Las fotografías cargadas durante la misión se reflejan de inmediato en el Centro de Mando y quedan vinculadas automáticamente al informe técnico final al cerrar la misión.
-3. **Completar el formulario "Finalizar Misión e Informe Técnico":**
+   - Desde la bandeja **Faenas** (`/cuadrilla/misiones`), seleccione la misión en estado **En curso** (por ejemplo, `INC-2026-0004`).
+   - La cabecera mostrará los datos de la faena y el bloque de estado operativo **Faena en Curso** (`Misión: En curso`, `Cuadrilla: En misión`, `Incidente: En atención`).
+2. **Completar el formulario "Finalizar Misión e Informe Técnico" (dentro de "Gestión Técnica de Faena"):**
    - **1. Resumen de Faenas Ejecutadas (obligatorio):** Describa las labores técnicas ejecutadas por la cuadrilla con un mínimo de **15 caracteres**.
    - **2. Horas Hombre y Estado del Terreno (obligatorios):**
      - Ingrese las **Horas Hombre Invertidas** (`> 0` y `<= 1000`) usando los botones `-` / `+` (pasos de `0.5 h`), el campo numérico o los atajos rápidos (`1 h`, `2 h`, `4 h`, `8 h`).
@@ -32,12 +30,11 @@ Este manual describe cómo el **Delegado de Cuadrilla** (`DELEGADO_CUADRILLA`) c
    - **3. Materiales e Insumos Consumidos (opcional):**
      - Pulse **Agregar material consumido** para declarar insumos gastados en la faena (ej. *Sacos de Arena de Contención Fluvial*).
      - Los vehículos y equipos individuales retornables (ej. camionetas o motobombas) se liberan automáticamente y no requieren declararse como consumo.
-   - **4. Observaciones, Daños y Escalamientos (opcional):**
+   - **4. Observaciones, Daños y Evidencia Multimedia (opcional):**
      - Registre daños materiales estimados u observaciones generales.
-     - Active los interruptores si la emergencia **Requiere apoyo adicional o seguimiento operativo** o **Requiere Asistencia Social (Levantamiento Ficha FIBE)**.
-   - **5. Evidencia Multimedia Vinculada:**
-     - Verifique el resumen de archivos sincronizados y en cola offline que se asociarán al informe.
-4. **Confirmar y finalizar la misión:**
+     - Active el interruptor si la emergencia **Requiere apoyo adicional o seguimiento operativo**. (El levantamiento de vulnerabilidad social no se solicita desde el cierre de cuadrilla).
+     - En el módulo integrado **Evidencia Multimedia** (HU-43), utilice **Tomar Foto**, **Grabar Video** o **Subir Archivo** para respaldar visualmente los trabajos realizados; las fotografías cargadas durante la misión se reflejan de inmediato en el Centro de Mando y quedan vinculadas automáticamente al informe técnico final. (Si su perfil solo cuenta con `reportes:crear` sin `misiones:terreno:ejecutar`, este módulo se mostrará de forma directa en la ficha).
+3. **Confirmar y finalizar la misión:**
    - Pulse **Finalizar Misión e Informe Técnico**.
    - Revise el resumen en el modal **Confirmar Cierre de Misión e Informe Técnico** y pulse **Confirmar y Finalizar Misión**.
    - La misión pasará a **Finalizada**, la cuadrilla quedará **Disponible** para un nuevo despacho y el incidente permanecerá en evaluación del Encargado en el Centro de Mando para su cierre formal (HU-86).

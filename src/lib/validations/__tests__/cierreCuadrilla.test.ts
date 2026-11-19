@@ -15,6 +15,11 @@ describe('cierreCuadrillaSchema (H68)', () => {
   it('valida un payload completo con y sin materiales consumidos', () => {
     const resSinMateriales = cerrarMisionCuadrillaSchema.safeParse(baseInput);
     expect(resSinMateriales.success).toBe(true);
+    if (resSinMateriales.success) {
+      expect(resSinMateriales.data).not.toHaveProperty(
+        'requiere_asistencia_social'
+      );
+    }
 
     const resConMateriales = cerrarMisionCuadrillaSchema.safeParse({
       ...baseInput,
@@ -27,7 +32,6 @@ describe('cierreCuadrillaSchema (H68)', () => {
         },
       ],
       requiere_apoyo_adicional: true,
-      requiere_asistencia_social: true,
       latitud: -39.817,
       longitud: -73.242,
     });

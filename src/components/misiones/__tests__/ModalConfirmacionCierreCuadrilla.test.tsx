@@ -23,7 +23,6 @@ describe('ModalConfirmacionCierreCuadrilla (H68)', () => {
           },
         ]}
         requiereApoyoAdicional={true}
-        requiereAsistenciaSocial={true}
         totalAdjuntosSincronizados={2}
         totalAdjuntosPendientes={1}
         alConfirmar={alConfirmar}
@@ -36,6 +35,10 @@ describe('ModalConfirmacionCierreCuadrilla (H68)', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Finalizado')).toBeInTheDocument();
     expect(screen.getByText('6.5 h')).toBeInTheDocument();
+    expect(screen.getByText('Apoyo Adicional')).toBeInTheDocument();
+    expect(screen.getByText('Solicitado')).toBeInTheDocument();
+    expect(screen.queryByText(/FIBE/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Asistencia Social/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Sacos de Arena: 15 sacos/i)).toBeInTheDocument();
     expect(
       screen.getByText(/3 archivo\(s\) \(2 sincronizado\(s\), 1 en cola offline\)/i)

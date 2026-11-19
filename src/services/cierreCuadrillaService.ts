@@ -192,7 +192,6 @@ export function obtenerReporteCierreCuadrillaMision(
             ? cierreRemoto.observaciones
             : '',
         requiere_apoyo_adicional: Boolean(cierreRemoto.requiereApoyoAdicional),
-        requiere_asistencia_social: Boolean(cierreRemoto.requiereAsistenciaSocial),
         adjunto_ids: adjuntos
           .map((a) => a.id)
           .filter((id): id is string => esUuidValido(id)),
@@ -409,7 +408,7 @@ export async function cerrarMisionCuadrilla(
     ...(observacionesLimpio ? { observaciones: observacionesLimpio } : {}),
     ...(danosLimpio ? { danos_estimados: danosLimpio } : {}),
     requiere_apoyo_adicional: Boolean(validado.requiere_apoyo_adicional),
-    requiere_asistencia_social: Boolean(validado.requiere_asistencia_social),
+    requiere_asistencia_social: false,
     ...(validado.adjunto_ids.length > 0
       ? { adjunto_ids: validado.adjunto_ids }
       : {}),
@@ -458,7 +457,6 @@ export async function cerrarMisionCuadrilla(
       danos_estimados: danosLimpio || '',
       observaciones: observacionesLimpio || '',
       requiere_apoyo_adicional: Boolean(validado.requiere_apoyo_adicional),
-      requiere_asistencia_social: Boolean(validado.requiere_asistencia_social),
       adjunto_ids: validado.adjunto_ids,
       adjuntos: validado.adjuntos,
       ...(evaluadorFinal ? { evaluador: evaluadorFinal } : {}),
@@ -508,7 +506,6 @@ export async function cerrarMisionCuadrilla(
       danosEstimados: reporte.danos_estimados || null,
       observaciones: reporte.observaciones || null,
       requiereApoyoAdicional: reporte.requiere_apoyo_adicional,
-      requiereAsistenciaSocial: reporte.requiere_asistencia_social,
       adjuntos: reporte.adjuntos,
       ...(reporte.evaluador ? { evaluador: reporte.evaluador } : {}),
       creadoEn: reporte.creadoEn,

@@ -55,12 +55,13 @@ describe('CierreMisionCuadrillaCard (H68)', () => {
     ]);
   });
 
-  it('renderiza los 5 bloques del formulario, valida resumen >= 15 caracteres y permite agregar materiales', async () => {
+  it('renderiza los 4 bloques del formulario (sin Ficha FIBE), integra evidencia en bloque 4, valida resumen >= 15 caracteres y permite agregar materiales', async () => {
     const onCierreEnviado = vi.fn();
 
     render(
       <CierreMisionCuadrillaCard
         misionActual={misionActiva}
+        puedeAdjuntarEvidencia={true}
         onCierreEnviado={onCierreEnviado}
       />
     );
@@ -70,6 +71,14 @@ describe('CierreMisionCuadrillaCard (H68)', () => {
         screen.getByText(/1\. Resumen de Faenas Ejecutadas/i)
       ).toBeInTheDocument();
     });
+
+    expect(
+      screen.getByText(/4\. Observaciones, Daños y Evidencia Multimedia/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText('Evidencia Multimedia')).toBeInTheDocument();
+    expect(screen.queryByText(/5\./i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/FIBE/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Asistencia Social/i)).not.toBeInTheDocument();
 
     // Intento con resumen vacío
     fireEvent.click(
@@ -127,7 +136,6 @@ describe('CierreMisionCuadrillaCard (H68)', () => {
         danos_estimados: '',
         observaciones: '',
         requiere_apoyo_adicional: false,
-        requiere_asistencia_social: false,
         adjunto_ids: [],
         adjuntos: [],
         creadoEn: '2026-11-18T12:00:00.000Z',
@@ -145,7 +153,7 @@ describe('CierreMisionCuadrillaCard (H68)', () => {
     });
   });
 
-  it('renderiza la tarjeta de resumen en modo solo lectura cuando la misión ya fue completada', () => {
+  it('renderiza la tarjeta de resumen en modo solo lectura cuando la misión ya fue completada', async () => {
     vi.mocked(obtenerReporteCierreCuadrillaMision).mockReturnValue({
       id: 'rep-cierre-1',
       misionId: misionActiva.id,
@@ -163,7 +171,6 @@ describe('CierreMisionCuadrillaCard (H68)', () => {
       danos_estimados: '',
       observaciones: 'Vía habilitada al tránsito.',
       requiere_apoyo_adicional: false,
-      requiere_asistencia_social: false,
       adjunto_ids: [],
       adjuntos: [],
       evaluador: {
@@ -180,10 +187,14 @@ describe('CierreMisionCuadrillaCard (H68)', () => {
       />
     );
 
-    expect(screen.getByTestId('resumen-cierre-cuadrilla')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('resumen-cierre-cuadrilla')).toBeInTheDocument();
+    });
     expect(
       screen.getByText('Limpieza integral de colectores y retiro de ramas.')
     ).toBeInTheDocument();
     expect(screen.getByText('8 h')).toBeInTheDocument();
+    expect(screen.queryByText(/FIBE/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Asistencia Social/i)).not.toBeInTheDocument();
   });
 });

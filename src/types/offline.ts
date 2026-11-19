@@ -268,7 +268,6 @@ export interface CierreMisionCuadrillaForm {
   danos_estimados: string;
   observaciones: string;
   requiere_apoyo_adicional: boolean;
-  requiere_asistencia_social: boolean;
   adjunto_ids: string[];
   adjuntos: AdjuntoReportePreliminar[];
 }
