@@ -19,7 +19,9 @@
 
 .textarea {
   width: 100%;
-  padding: 10px 14px;
+  min-height: 48px;
+  padding: 12px 14px;
+  line-height: 1.45;
   background-color: var(--color-white, #FFFFFF);
   color: var(--color-text-dark, #2B2B2B);
   border: 1px solid var(--border-color-dark, #3B3F45);
@@ -29,6 +31,11 @@
   box-sizing: border-box;
   resize: vertical;
   transition: border-color 0.15s ease, outline 0.15s ease;
+}
+
+.textarea::placeholder {
+  color: var(--color-text-muted, #5F676E);
+  opacity: 1;
 }
 
 .textarea:focus {

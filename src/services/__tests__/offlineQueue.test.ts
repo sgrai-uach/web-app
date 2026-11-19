@@ -85,6 +85,72 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
     expect(listaActual.some((a) => a.id === accion1.id)).toBe(false);
   });
 
+  it('respeta el orden causal por misión en sincronizarColaOutbox si una acción previa falla', async () => {
+    const misionId = 'mision-causal-01';
+    const aceptar = await encolarAccionOutbox({
+      tipo: 'ACEPTAR_MISION',
+      url: `/api/misiones/${misionId}/aceptar`,
+      metodo: 'POST',
+      payload: { misionId },
+    });
+    const tipificar = await encolarAccionOutbox({
+      tipo: 'ACTUALIZAR_TIPOLOGIA',
+      url: '/api/incidentes/inc-causal-01/tipologia',
+      metodo: 'PATCH',
+      payload: {
+        misionId,
+        tipoIncidenteId: '40000000-0000-4000-8000-000000000001',
+        justificacion: 'Cambio tras llegada',
+      },
+    });
+
+    const ejecutadas: string[] = [];
+    await sincronizarColaOutbox(async (accion) => {
+      ejecutadas.push(accion.id);
+      return accion.id !== aceptar.id;
+    });
+
+    expect(ejecutadas).toContain(aceptar.id);
+    expect(ejecutadas).not.toContain(tipificar.id);
+
+    await eliminarAccionOutbox(aceptar.id);
+    await eliminarAccionOutbox(tipificar.id);
+  });
+
+  it('preserva cambios locales pendientes en guardarMisionesLocales si hay acciones en outbox', async () => {
+    const misionLocalPendiente: MisionLocal = {
+      ...misionEjemplo,
+      id: 'mision-pendiente-01',
+      incidenteId: 'inc-pendiente-01',
+      tipologia: 'Inundación',
+      sincronizacionPendiente: true,
+      datosAdicionales: { tipologiaEvaluada: true },
+    };
+    await guardarMisionesLocales([misionLocalPendiente]);
+    const accion = await encolarAccionOutbox({
+      tipo: 'ACTUALIZAR_TIPOLOGIA',
+      url: '/api/incidentes/inc-pendiente-01/tipologia',
+      metodo: 'PATCH',
+      payload: { misionId: 'mision-pendiente-01' },
+    });
+
+    await guardarMisionesLocales([
+      {
+        ...misionLocalPendiente,
+        tipologia: 'Caída de árbol',
+        sincronizacionPendiente: false,
+        datosAdicionales: { trabajo: 'Remoto' },
+      },
+    ]);
+
+    const recuperada = await obtenerMisionLocalPorId('mision-pendiente-01');
+    expect(recuperada?.tipologia).toBe('Inundación');
+    expect(recuperada?.sincronizacionPendiente).toBe(true);
+    expect(recuperada?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+
+    await eliminarAccionOutbox(accion.id);
+  });
+
   it('deduplica acciones en outbox con mismo tipo y url (BUG-H36-PWA-04)', async () => {
     const primera = await encolarAccionOutbox({
       tipo: 'ACEPTAR_MISION',
@@ -108,5 +174,57 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
     expect(accionesMismoTipoUrl[0].payload).toEqual({ latitud: -39.82, longitud: -73.25 });
 
     await eliminarAccionOutbox(primera.id);
+  });
+
+  it('preserva misión EN_CURSO con ACTUALIZAR_TIPOLOGIA en outbox y elimina obsoletas sin pendientes en guardarMisionesLocales (BUG-H37-PWA-03)', async () => {
+    const misionObsoleta: MisionLocal = {
+      ...misionEjemplo,
+      id: 'mision-obsoleta-01',
+      incidenteId: 'inc-obsoleto-01',
+      estado: 'FINALIZADA',
+      sincronizacionPendiente: false,
+    };
+    const misionEnCursoPendiente: MisionLocal = {
+      ...misionEjemplo,
+      id: 'mision-en-curso-tip-01',
+      incidenteId: 'inc-en-curso-tip-01',
+      estado: 'EN_CURSO',
+      tipologia: 'Inundación',
+      sincronizacionPendiente: true,
+      datosAdicionales: { tipologiaEvaluada: true },
+    };
+
+    await guardarMisionesLocales([misionObsoleta, misionEnCursoPendiente]);
+    const accion = await encolarAccionOutbox({
+      tipo: 'ACTUALIZAR_TIPOLOGIA',
+      url: '/api/incidentes/inc-en-curso-tip-01/tipologia',
+      metodo: 'PATCH',
+      payload: {
+        misionId: 'mision-en-curso-tip-01',
+        tipoIncidenteId: '40000000-0000-4000-8000-000000000001',
+        justificacion: 'Inundación constatada en terreno',
+      },
+    });
+
+    // Sincronización trae versión remota desactualizada y ya no incluye misionObsoleta
+    await guardarMisionesLocales([
+      {
+        ...misionEnCursoPendiente,
+        tipologia: 'Caída de árbol',
+        sincronizacionPendiente: false,
+        datosAdicionales: { trabajo: 'Remoto' },
+      },
+    ]);
+
+    const obsoleta = await obtenerMisionLocalPorId('mision-obsoleta-01');
+    const preservada = await obtenerMisionLocalPorId('mision-en-curso-tip-01');
+
+    expect(obsoleta).toBeUndefined();
+    expect(preservada?.estado).toBe('EN_CURSO');
+    expect(preservada?.tipologia).toBe('Inundación');
+    expect(preservada?.sincronizacionPendiente).toBe(true);
+    expect(preservada?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+
+    await eliminarAccionOutbox(accion.id);
   });
 });
