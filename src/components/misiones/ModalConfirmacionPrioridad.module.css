@@ -1,0 +1,11 @@
+.chipTransition {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.transitionArrow {
+  color: var(--color-primary-teal, #1b6f7d);
+  flex-shrink: 0;
+}

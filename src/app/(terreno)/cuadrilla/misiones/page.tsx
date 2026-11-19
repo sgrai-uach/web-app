@@ -9,7 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
-import { ordenarMisionesPorPrioridadYFecha } from '@/lib/utils/formatters';
+import { ordenarMisionesPorActualizacion } from '@/lib/utils/formatters';
 import {
   MisionFiltrosChips,
   type FiltroEstado,
@@ -17,7 +17,7 @@ import {
 } from '@/components/misiones/MisionFiltrosChips';
 import { MisionCard } from '@/components/misiones/MisionCard';
 import type { MisionLocal } from '@/types/offline';
-import styles from './CuadrillaMisionesPage.module.css';
+import styles from '@/components/misiones/MisionesBandeja.module.css';
 
 function CuadrillaMisionesContenido() {
   const { usuario, unidadActiva, tieneUnidadAsignada, estadoAsignacion } = useAuth();
@@ -58,6 +58,20 @@ function CuadrillaMisionesContenido() {
 
   useEffect(() => {
     cargarMisiones();
+  }, [cargarMisiones]);
+
+  useEffect(() => {
+    const refrescar = () => {
+      void cargarMisiones();
+    };
+    window.addEventListener('sgrai:outbox-synced', refrescar);
+    window.addEventListener('sgrai:mision-rechazada', refrescar);
+    window.addEventListener('sgrai:mision-sincronizada', refrescar);
+    return () => {
+      window.removeEventListener('sgrai:outbox-synced', refrescar);
+      window.removeEventListener('sgrai:mision-rechazada', refrescar);
+      window.removeEventListener('sgrai:mision-sincronizada', refrescar);
+    };
   }, [cargarMisiones]);
 
   const cambiarFiltro = (nuevoFiltro: FiltroEstado) => {
@@ -117,7 +131,7 @@ function CuadrillaMisionesContenido() {
       });
     }
 
-    return ordenarMisionesPorPrioridadYFecha(filtradas);
+    return ordenarMisionesPorActualizacion(filtradas);
   }, [misiones, filtroActual]);
 
   return (

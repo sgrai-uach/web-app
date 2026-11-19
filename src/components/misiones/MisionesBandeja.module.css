@@ -1,0 +1,34 @@
+/* Hoja de estilos compartida para las bandejas de misiones en terreno (Patrulla y Cuadrilla) */
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+  padding: var(--space-4, 16px);
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.titleArea {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+
+.missionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+}
+
+.emptyState {
+  background-color: var(--color-white, #FFFFFF);
+  border: 1px solid var(--border-color-neutral, #DFE3E8);
+  padding: var(--space-8, 32px) var(--space-4, 16px);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  border-radius: var(--radius-none, 0px);
+}

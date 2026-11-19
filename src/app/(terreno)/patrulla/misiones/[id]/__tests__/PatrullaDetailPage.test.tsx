@@ -64,6 +64,7 @@ function configurarAuthMock(opciones?: {
     unidadActiva,
     tieneUnidadAsignada,
     estadoAsignacion,
+    actualizarUnidadAsignada: vi.fn(),
     tienePermiso: vi
       .fn()
       .mockImplementation((permiso: string) =>
