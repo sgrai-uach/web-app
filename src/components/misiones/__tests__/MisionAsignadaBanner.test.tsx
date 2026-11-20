@@ -46,7 +46,7 @@ describe('MisionAsignadaBanner (HU-35)', () => {
     expect(screen.getByTestId('direccion-banner')).toHaveTextContent(
       'Av. Ramón Picarte 1500, Valdivia'
     );
-    expect(screen.getByTestId('badge-prioridad-banner')).toHaveTextContent('ALTA');
+    expect(screen.getByTestId('badge-prioridad-banner')).toHaveTextContent('Alta');
   });
 
   // CP-H35-PWA-08: Accesibilidad Táctil para Guantes (48x48px)

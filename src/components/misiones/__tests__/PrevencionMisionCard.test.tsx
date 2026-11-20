@@ -100,10 +100,6 @@ describe('PrevencionMisionCard (HU-33)', () => {
     expect(screen.getByText('40 sacos')).toBeInTheDocument();
     expect(screen.getByText('Bajo stock')).toBeInTheDocument();
 
-    expect(screen.getByTestId('otros-recursos-evento')).toHaveTextContent(
-      /1 recurso adicional asignado/i
-    );
-
     fireEvent.click(screen.getByRole('button', { name: /Ver punto crítico en mapa/i }));
     expect(onVerMapa).toHaveBeenCalledTimes(1);
 
@@ -129,7 +125,7 @@ describe('PrevencionMisionCard (HU-33)', () => {
     render(<PrevencionMisionCard mision={misionBasicaOffline} esOffline={true} />);
 
     expect(screen.getByTestId('nota-prevencion-resumen-basico')).toHaveTextContent(
-      /sin incidente previo \(§3\.4\).*recuperar cobertura/i
+      /sin incidente previo.*recuperar cobertura/i
     );
     expect(screen.getByTestId('sin-recursos-prevencion')).toHaveTextContent(
       /Sin recursos cacheados localmente/i

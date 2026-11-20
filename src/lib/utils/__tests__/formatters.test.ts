@@ -5,6 +5,7 @@ import {
   formatearTipologia,
   formatearFechaHora24h,
   ordenarMisionesPorActualizacion,
+  humanizarTextoConEnums,
 } from '../formatters';
 
 describe('formatters — Conversión de Enums a Lenguaje Natural', () => {
@@ -90,6 +91,21 @@ describe('formatters — Conversión de Enums a Lenguaje Natural', () => {
     it('devuelve Sin fecha ante valores vacíos', () => {
       expect(formatearFechaHora24h(null)).toBe('Sin fecha');
       expect(formatearFechaHora24h('')).toBe('Sin fecha');
+    });
+  });
+
+  describe('humanizarTextoConEnums', () => {
+    it('reemplaza enums técnicos en mensajes de error o estado por texto legible', () => {
+      expect(
+        humanizarTextoConEnums(
+          "La patrulla no se encuentra en estado 'EN_VERIFICACION' (estado actual: 'EN_PREVENCION')."
+        )
+      ).toBe(
+        'La patrulla no se encuentra en estado En verificación (estado actual: En prevención).'
+      );
+      expect(humanizarTextoConEnums('Misión DESPACHADA para ATENCION_CUADRILLA')).toBe(
+        'Misión Despachada para Faena de cuadrilla'
+      );
     });
   });
 });
