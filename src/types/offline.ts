@@ -64,6 +64,7 @@ export interface MisionLocal {
   id: string;
   incidenteId: string;
   codigoIncidente: string;
+  tipoMision?: TipoMisionOperativa | string;
   tipologia: string;
   direccion: string;
   coordenadas?: {
@@ -78,6 +79,9 @@ export interface MisionLocal {
   datosAdicionales?: Record<string, unknown>;
   actualizadoEn: string;
 }
+
+export type TipoMisionOperativa =
+  paths['/api/misiones']['get']['responses'][200]['content']['application/json']['data'][number]['tipoMision'];
 
 export interface CatalogoLocal {
   clave: string; // ej: 'tipologias', 'prioridades'
@@ -279,6 +283,59 @@ export interface ReporteCierreCuadrillaLocal extends CierreMisionCuadrillaForm {
   evaluador?: EvaluadorReporteTerreno;
   creadoEn: string;
   sincronizado: boolean;
+}
+
+// ========================================================
+// HU-33: Misiones de Prevención y Recursos Logísticos Asignados
+// ========================================================
+
+export type EventoPrevencionDetalleApi =
+  paths['/api/eventos-atp/prevencion/{id}']['get']['responses'][200]['content']['application/json']['data'];
+
+export type RecursoAsignadoPrevencionApi =
+  EventoPrevencionDetalleApi['recursosAsignados'][number];
+
+export type AsignarRecursosPrevencionResponseData =
+  paths['/api/eventos-atp/prevencion/{id}/recursos']['post']['responses'][200]['content']['application/json']['data'];
+
+export interface RecursoPrevencionLocal {
+  id?: string;
+  recursoId: string;
+  nombre: string;
+  esIndividual: boolean;
+  cantidadAsignada: number;
+  cantidadEnUso?: number;
+  estadoRecurso?: string;
+  unidad?: string | null;
+  misionId?: string | null;
+  creadoEn?: string;
+}
+
+export interface PuntoCriticoPrevencionLocal {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion?: string | null;
+  tipoRiesgo?: string | null;
+  prioridad?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+  delegacionNombre?: string | null;
+}
+
+export interface EventoPrevencionResumenLocal {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion?: string | null;
+  sector?: string | null;
+  direccionTexto?: string | null;
+  estado?: string | null;
+  prioridad?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+  delegacionNombre?: string | null;
+  fechaEstimadaFin?: string | null;
 }
 
 

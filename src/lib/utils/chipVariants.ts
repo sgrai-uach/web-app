@@ -82,3 +82,54 @@ export function obtenerVarianteChipEstadoTerreno(estado?: string | null): ChipVa
   }
 }
 
+export function obtenerVarianteChipTipoMision(tipoMision?: string | null): ChipVariant {
+  const norm = (tipoMision || '').trim().toUpperCase();
+  switch (norm) {
+    case 'PREVENCION':
+      return 'teal';
+    case 'VERIFICACION':
+    case 'ASISTENCIA_SOCIAL':
+      return 'info';
+    case 'ATENCION_CUADRILLA':
+      return 'warning';
+    default:
+      return 'neutral';
+  }
+}
+
+export function obtenerVarianteChipEstadoPatrulla(estado?: string | null): ChipVariant {
+  const norm = (estado || '').trim().toUpperCase();
+  switch (norm) {
+    case 'DISPONIBLE':
+      return 'success';
+    case 'EN_PREVENCION':
+      return 'teal';
+    case 'EN_VERIFICACION':
+    case 'EN_MISION':
+      return 'warning';
+    case 'EN_RECUPERACION':
+      return 'info';
+    case 'NO_DISPONIBLE':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+
+export function obtenerVarianteChipEstadoRecurso(estado?: string | null): ChipVariant {
+  const norm = (estado || '').trim().toUpperCase();
+  switch (norm) {
+    case 'DISPONIBLE':
+      return 'success';
+    case 'BAJO_STOCK':
+      return 'warning';
+    case 'ASIGNADO':
+      return 'info';
+    case 'EN_MANTENCION':
+    case 'NO_DISPONIBLE':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+

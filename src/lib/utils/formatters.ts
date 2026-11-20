@@ -9,6 +9,7 @@ import {
   ETIQUETAS_PRIORIDAD,
   ETIQUETAS_TIPOLOGIA,
   ETIQUETAS_ROL,
+  ETIQUETAS_TIPO_MISION,
   ETIQUETAS_DICTAMEN_ATENCION,
   ETIQUETAS_ESTADO_TERRENO,
   limpiarTituloMision,
@@ -60,6 +61,30 @@ export function formatearDictamenAtencion(dictamen?: string | null): string {
  */
 export function formatearEstadoTerreno(estadoTerreno?: string | null): string {
   return formatearEtiquetaSegura(estadoTerreno, ETIQUETAS_ESTADO_TERRENO);
+}
+
+/**
+ * Convierte un tipo táctico de misión a lenguaje natural.
+ */
+export function formatearTipoMision(tipoMision?: string | null): string {
+  return formatearEtiquetaSegura(tipoMision, ETIQUETAS_TIPO_MISION);
+}
+
+/**
+ * Determina si una misión corresponde a prevención territorial (sin incidente previo obligatorio §3.4).
+ */
+export function esMisionDePrevencion(
+  mision?: { tipoMision?: string | null; datosAdicionales?: Record<string, unknown> } | null
+): boolean {
+  if (!mision) return false;
+  const tipoRaiz =
+    typeof mision.tipoMision === 'string' ? mision.tipoMision.trim().toUpperCase() : '';
+  if (tipoRaiz === 'PREVENCION') return true;
+  const tipoAdicional =
+    typeof mision.datosAdicionales?.tipoMision === 'string'
+      ? mision.datosAdicionales.tipoMision.trim().toUpperCase()
+      : '';
+  return tipoAdicional === 'PREVENCION';
 }
 
 /**
