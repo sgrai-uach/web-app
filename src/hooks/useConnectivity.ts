@@ -139,11 +139,43 @@ export function useConnectivity() {
           }
         }
 
+        if (procesada && accion.tipo === 'RECHAZAR_MISION') {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/rechazar/);
+          const misionId = match?.[1];
+          if (misionId) {
+            try {
+              const local = await obtenerMisionLocalPorId(misionId);
+              if (local) {
+                let actualizadoServidor = local.actualizadoEn || new Date().toISOString();
+                if (res.ok) {
+                  try {
+                    const bodyJson = await res.clone().json();
+                    if (bodyJson?.data?.mision?.actualizadoEn) {
+                      actualizadoServidor = bodyJson.data.mision.actualizadoEn;
+                    }
+                  } catch {
+                    // Ignorar si la respuesta no contiene JSON
+                  }
+                }
+                await guardarMisionLocal({
+                  ...local,
+                  estado: res.status === 422 ? local.estado : 'RECHAZADA',
+                  sincronizacionPendiente: false,
+                  actualizadoEn: actualizadoServidor,
+                });
+              }
+            } catch {
+              // Ignorar fallos de lectura/escritura secundaria en IndexedDB
+            }
+          }
+        }
+
         return procesada;
       });
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('sgrai:outbox-synced'));
+        window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
       }
     } catch (err) {
       console.warn('[OfflineQueue] Error durante la sincronización:', err);
