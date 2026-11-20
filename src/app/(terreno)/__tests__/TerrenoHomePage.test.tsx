@@ -11,6 +11,10 @@ vi.mock('@/context/AuthContext', () => ({
   useAuth: vi.fn(),
 }));
 
+vi.mock('@/hooks/useTerrenoSocket', () => ({
+  useTerrenoSocket: vi.fn(),
+}));
+
 vi.mock('@/hooks/useConnectivity', () => ({
   useConnectivity: vi.fn(),
 }));
@@ -70,7 +74,7 @@ function buildAuthMock(overrides?: Partial<AuthContextValue>): AuthContextValue 
       rolCodigo: 'PATRULLA_VERIFICADORA',
       delegacionId: 'del-1',
       delegacionNombre: 'Delegación Centro',
-      unidadId: 'pat-alfa-01',
+      unidadId: 'f1000000-0000-4000-8000-000000000050',
       unidadNombre: 'Patrulla Alfa 01',
       unidadActiva: true,
       permisos: [],

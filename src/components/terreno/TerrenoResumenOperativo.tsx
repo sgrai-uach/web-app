@@ -109,7 +109,7 @@ export function TerrenoResumenOperativo() {
         {/* Tarjeta 1: Resumen Operativo de Misiones / Faenas */}
         <div
           className={`${styles.kpiCard} ${
-            !unidadActiva ? styles.kpiCardWarning : ''
+            tieneUnidadAsignada && !unidadActiva ? styles.kpiCardWarning : ''
           }`.trim()}
         >
           <div className={styles.kpiHeader}>

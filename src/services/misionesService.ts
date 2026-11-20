@@ -5,6 +5,7 @@ import type { AceptarMisionPayload, MisionLocal } from '@/types/offline';
 import {
   guardarMisionesLocales,
   guardarMisionLocal,
+  limpiarMisionesLocales,
   obtenerMisionesLocales,
   obtenerMisionLocalPorId,
   encolarAccionOutbox,
@@ -179,6 +180,7 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
         actualizadoEn: item.actualizadoEn,
       }));
 
+      await limpiarMisionesLocales();
       if (remotas.length > 0) {
         await guardarMisionesLocales(remotas);
       }
@@ -326,7 +328,7 @@ export async function rechazarMision(
     if (error || !response.ok) {
       const status = response?.status ?? 500;
       const errorMsg =
-        (error as { message?: string })?.message ||
+        (error as unknown as { message?: string })?.message ||
         (status === 403
           ? 'No cuenta con permisos para rechazar esta misión.'
           : status === 404

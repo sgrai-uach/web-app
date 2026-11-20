@@ -43,7 +43,14 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       ? use(params as Promise<{ id: string }>)
       : (params as { id: string });
   const misionId = resolvedParams?.id;
-  const { usuario, unidadActiva, tieneUnidadAsignada, tienePermiso, esPatrulla } = useAuth();
+  const {
+    usuario,
+    unidadActiva,
+    tieneUnidadAsignada,
+    estadoAsignacion,
+    tienePermiso,
+    esPatrulla,
+  } = useAuth();
   const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
@@ -246,7 +253,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       <div className={styles.topBar}>
         <Link href="/patrulla/misiones" className={styles.backLink}>
           <ArrowLeft size={16} aria-hidden="true" />
-          <span>{unidadActiva ? 'Misiones' : 'Historial'}</span>
+          <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Misiones'}</span>
         </Link>
         <ConnectionStatusBadge
           status={status}

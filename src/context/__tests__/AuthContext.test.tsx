@@ -34,6 +34,7 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
   it('permite login exitoso con rol PATRULLA_VERIFICADORA', async () => {
     vi.mocked(seguridadService.loginUsuario).mockResolvedValue({
       token: 'token-patrulla',
+      tipoToken: 'Bearer',
       expiraEn: '2026-10-28T00:00:00Z',
       usuario: {
         id: 'user-patrulla-1',
@@ -73,6 +74,7 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
   it('rechaza login con 403 si el rol no es de terreno (ej: CALL_CENTER o ADMIN)', async () => {
     vi.mocked(seguridadService.loginUsuario).mockResolvedValue({
       token: 'token-admin',
+      tipoToken: 'Bearer',
       expiraEn: '2026-10-28T00:00:00Z',
       usuario: {
         id: 'user-admin-1',
@@ -121,10 +123,11 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
         id: 'rol-admin',
         nombre: 'Administrador General',
         codigo: 'ADMIN',
-        permisos: ['todo'],
+        esAdmin: true,
       },
+      permisos: ['todo'],
       delegacionId: null,
-      delegacion: null,
+      delegacionNombre: null,
     });
 
     const { result } = renderHook(() => useAuth(), {
@@ -151,10 +154,11 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
         id: 'rol-patrulla',
         nombre: 'Patrulla Verificadora',
         codigo: 'PATRULLA_VERIFICADORA',
-        permisos: ['misiones:terreno:verificar'],
+        esAdmin: false,
       },
+      permisos: ['misiones:terreno:verificar'],
       delegacionId: 'del-1',
-      delegacion: { id: 'del-1', nombre: 'Valdivia Sur' },
+      delegacionNombre: 'Valdivia Sur',
       unidadId: 'pat-1',
       unidadNombre: 'Patrulla Móvil 01',
       unidadActiva: false,
@@ -187,10 +191,11 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
         id: 'rol-patrulla',
         nombre: 'Patrulla Verificadora',
         codigo: 'PATRULLA_VERIFICADORA',
-        permisos: ['misiones:terreno:verificar'],
+        esAdmin: false,
       },
+      permisos: ['misiones:terreno:verificar'],
       delegacionId: 'del-1',
-      delegacion: { id: 'del-1', nombre: 'Valdivia Sur' },
+      delegacionNombre: 'Valdivia Sur',
       unidadId: 'pat-1',
       unidadNombre: 'Patrulla Móvil 01',
       unidadActiva: true,
@@ -224,10 +229,11 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
         id: 'rol-patrulla',
         nombre: 'Patrulla Verificadora',
         codigo: 'PATRULLA_VERIFICADORA',
-        permisos: ['misiones:terreno:verificar'],
+        esAdmin: false,
       },
+      permisos: ['misiones:terreno:verificar'],
       delegacionId: 'del-1',
-      delegacion: { id: 'del-1', nombre: 'Valdivia Sur' },
+      delegacionNombre: 'Valdivia Sur',
       unidadId: null,
       unidadNombre: null,
       unidadActiva: false,

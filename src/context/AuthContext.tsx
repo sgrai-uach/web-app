@@ -33,6 +33,7 @@ const PERFIL_DEMO_PATRULLA: UsuarioPerfilSesion = {
   rolCodigo: 'PATRULLA_VERIFICADORA',
   delegacionId: 'del-01',
   delegacionNombre: 'Valdivia Norte',
+  unidadId: 'f1000000-0000-4000-8000-000000000050',
   unidadNombre: 'Patrulla Rápida Costa-1',
   unidadActiva: true,
   permisos: ['misiones:terreno:verificar', 'misiones:terreno:reportar'],
@@ -104,11 +105,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         rolId: detalle.rol?.id || '',
         rolNombre: detalle.rol?.nombre || '',
         rolCodigo: detalle.rol?.codigo || '',
-        delegacionId: detalle.delegacionId || detalle.delegacion?.id || null,
-        delegacionNombre: detalle.delegacion?.nombre || null,
-        permisos: Array.isArray(detalle.permisos)
-          ? detalle.permisos
-          : detalle.rol?.permisos || [],
+        delegacionId: detalle.delegacionId ?? null,
+        delegacionNombre: detalle.delegacionNombre ?? null,
+        permisos: Array.isArray(detalle.permisos) ? detalle.permisos : [],
         unidadId: detalle.unidadId ?? null,
         unidadNombre: detalle.unidadNombre ?? null,
         unidadActiva: detalle.unidadActiva,

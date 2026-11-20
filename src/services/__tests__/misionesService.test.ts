@@ -20,6 +20,7 @@ vi.mock('@/lib/api/client', () => ({
 
 vi.mock('@/services/offlineQueue', () => ({
   guardarMisionesLocales: vi.fn(),
+  limpiarMisionesLocales: vi.fn(),
   guardarMisionLocal: vi.fn(),
   obtenerMisionesLocales: vi.fn(),
   obtenerMisionLocalPorId: vi.fn(),

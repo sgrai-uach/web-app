@@ -45,8 +45,15 @@ export function useTerrenoSocket(): void {
       socket.emit('unirse', roomName);
     });
 
-    const manejarDesactivacion = (data?: { id?: string }) => {
-      if (!data?.id || data.id === usuario.unidadId) {
+    interface DesactivacionPayload {
+      id?: string;
+      patrullaId?: string;
+      cuadrillaId?: string;
+    }
+
+    const manejarDesactivacion = (data?: DesactivacionPayload) => {
+      const unidadPayloadId = data?.patrullaId ?? data?.cuadrillaId ?? data?.id;
+      if (!unidadPayloadId || unidadPayloadId === usuario.unidadId) {
         void recargarSesion();
       }
     };
