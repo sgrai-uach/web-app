@@ -9,6 +9,7 @@ import {
   Navigation,
   ClipboardCheck,
   ShieldAlert,
+  ShieldCheck,
   FileCheck,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -30,6 +31,9 @@ import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
 import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
 import { EvaluacionPrioridadCard } from '@/components/misiones/EvaluacionPrioridadCard';
 import { EvaluacionReporteCierreCard } from '@/components/misiones/EvaluacionReporteCierreCard';
+import { PrevencionMisionCard } from '@/components/misiones/PrevencionMisionCard';
+import { NotaInformativaReporte } from '@/components/misiones/ReporteTerrenoBase';
+import { esMisionDePrevencion } from '@/lib/utils/formatters';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
@@ -126,9 +130,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     };
     window.addEventListener('sgrai:outbox-synced', handleOutboxSynced);
     window.addEventListener('sgrai:mision-sincronizada', handleMisionSincronizada);
+    window.addEventListener('sgrai:prevencion-actualizada', handleMisionSincronizada);
     return () => {
       window.removeEventListener('sgrai:outbox-synced', handleOutboxSynced);
       window.removeEventListener('sgrai:mision-sincronizada', handleMisionSincronizada);
+      window.removeEventListener('sgrai:prevencion-actualizada', handleMisionSincronizada);
     };
   }, [cargarDetalle]);
 
@@ -198,13 +204,16 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
 
   const trabajoTexto =
     (mision.datosAdicionales?.trabajo as string) || mision.direccion;
+  const esPrevencion = esMisionDePrevencion(mision);
   const esFinalizada =
     estadoNormalizado === 'FINALIZADA' ||
     estadoNormalizado === 'COMPLETADA' ||
     estadoNormalizado === 'CERRADA';
   const esSoloLectura = !unidadActiva || esFinalizada;
   const mostrarFormulariosTecnicos =
-    (unidadActiva && esEnCurso) || (tieneUnidadAsignada && esFinalizada);
+    !esPrevencion &&
+    Boolean(mision.incidenteId) &&
+    ((unidadActiva && esEnCurso) || (tieneUnidadAsignada && esFinalizada));
 
   return (
     <div className={styles.container}>
@@ -244,11 +253,15 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           className={styles.actionCard}
           aria-label="Confirmación de salida de patrulla"
         >
-          <h2 className={styles.actionTitle}>Confirmación de salida a terreno</h2>
+          <h2 className={styles.actionTitle}>
+            {esPrevencion
+              ? 'Confirmación de despliegue preventivo'
+              : 'Confirmación de salida a terreno'}
+          </h2>
           <p className={styles.actionDescription}>
-            Presione el botón para informar al Centro de Mando que la patrulla ha
-            tomado conocimiento de la emergencia y se dirige al lugar para iniciar
-            la evaluación.
+            {esPrevencion
+              ? 'Presione el botón para informar al Centro de Mando que la patrulla ha tomado conocimiento del evento preventivo y se dirige al punto crítico con los recursos asignados.'
+              : 'Presione el botón para informar al Centro de Mando que la patrulla ha tomado conocimiento de la emergencia y se dirige al lugar para iniciar la evaluación.'}
           </p>
 
           {errorAceptacion && (
@@ -271,27 +284,69 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         </section>
       )}
 
-      {/* Vista activa: En Trayecto / Evaluación (HU-36) */}
+      {/* Vista activa: En Trayecto / Evaluación (HU-36) o Operación Preventiva (HU-33) */}
       {unidadActiva && esEnCurso && (
         <MisionEstadoActivoCard
-          ariaLabel="Estado de traslado y evaluación"
-          icono={
-            <Navigation
-              size={20}
-              color="var(--color-primary-teal, #1B6F7D)"
-              aria-hidden="true"
-            />
+          ariaLabel={
+            esPrevencion
+              ? 'Estado de operación preventiva'
+              : 'Estado de traslado y evaluación'
           }
-          titulo="En Trayecto / Evaluación"
+          icono={
+            esPrevencion ? (
+              <ShieldCheck
+                size={20}
+                color="var(--color-primary-teal-dark, #14505A)"
+                aria-hidden="true"
+              />
+            ) : (
+              <Navigation
+                size={20}
+                color="var(--color-primary-teal, #1B6F7D)"
+                aria-hidden="true"
+              />
+            )
+          }
+          titulo={
+            esPrevencion
+              ? 'Operación Preventiva en Curso'
+              : 'En Trayecto / Evaluación'
+          }
           sincronizacionPendiente={Boolean(mision.sincronizacionPendiente)}
           mensajeOffline="Pendiente de sincronizar: La aceptación fue guardada en la cola local del dispositivo y se enviará automáticamente al recuperar conexión."
           mensajeConfirmacion={mensajeConfirmacion}
-          estadosCanonicos={[
-            { etiqueta: 'Misión', valor: 'En curso' },
-            { etiqueta: 'Patrulla', valor: 'En verificación' },
-            { etiqueta: 'Incidente', valor: 'Verificando' },
-          ]}
+          estadosCanonicos={
+            esPrevencion
+              ? [
+                  { etiqueta: 'Misión', valor: 'En curso' },
+                  { etiqueta: 'Patrulla', valor: 'En prevención' },
+                  { etiqueta: 'Operación', valor: 'Evento Preventivo' },
+                ]
+              : [
+                  { etiqueta: 'Misión', valor: 'En curso' },
+                  { etiqueta: 'Patrulla', valor: 'En verificación' },
+                  { etiqueta: 'Incidente', valor: 'Verificando' },
+                ]
+          }
         />
+      )}
+
+      {esPrevencion && (
+        <>
+          <PrevencionMisionCard
+            mision={mision}
+            esOffline={status === 'offline'}
+            onVerMapa={() => setMapaAbierto(true)}
+          />
+          {unidadActiva && esEnCurso && (
+            <NotaInformativaReporte testId="nota-operacion-preventiva">
+              Misión originada directamente sobre evento de prevención comunal
+              (§3.4), sin incidente previo asociado. Los formularios de
+              categorización, prioridad y dictamen de incidente no aplican para
+              despliegues preventivos.
+            </NotaInformativaReporte>
+          )}
+        </>
       )}
 
       {mostrarFormulariosTecnicos && (

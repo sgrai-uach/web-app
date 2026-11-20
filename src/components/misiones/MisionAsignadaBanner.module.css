@@ -194,3 +194,13 @@
   background-color: #ECEFF3;
 }
 
+
+.codigoEvento {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  background-color: var(--color-info-bg, #E0F2F1);
+  color: var(--color-primary-teal-dark, #14505A);
+  border: 1px solid var(--color-primary-teal, #1B6F7D);
+  border-radius: var(--radius-none, 0px);
+}

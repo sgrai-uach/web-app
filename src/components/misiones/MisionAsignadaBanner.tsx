@@ -1,7 +1,16 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, MapPin, Clock, ArrowRight, X, BellRing } from 'lucide-react';
+import {
+  AlertTriangle,
+  MapPin,
+  Clock,
+  ArrowRight,
+  X,
+  BellRing,
+  ShieldCheck,
+  Package,
+} from 'lucide-react';
 import type { MisionAsignadaAlerta } from '@/types/notificaciones';
 import { formatearFechaHora24h } from '@/lib/utils/formatters';
 import styles from './MisionAsignadaBanner.module.css';
@@ -30,6 +39,8 @@ export const MisionAsignadaBanner: React.FC<MisionAsignadaBannerProps> = ({
   }
 
   const clasePrioridad = obtenerClasePrioridad(alerta.prioridad);
+  const esPrevencion = alerta.tipoMision?.toUpperCase() === 'PREVENCION';
+  const totalRecursos = alerta.recursosAsignados?.length ?? 0;
 
   return (
     <aside
@@ -40,9 +51,13 @@ export const MisionAsignadaBanner: React.FC<MisionAsignadaBannerProps> = ({
     >
       <div className={styles.header}>
         <div className={styles.headerTitleWrapper}>
-          <BellRing className={styles.headerIcon} size={18} aria-hidden="true" />
+          {esPrevencion ? (
+            <ShieldCheck className={styles.headerIcon} size={18} aria-hidden="true" />
+          ) : (
+            <BellRing className={styles.headerIcon} size={18} aria-hidden="true" />
+          )}
           <h2 id="banner-mision-titulo" className={styles.headerTitle}>
-            Misión Asignada en Terreno
+            {esPrevencion ? 'Misión Preventiva Asignada' : 'Misión Asignada en Terreno'}
           </h2>
         </div>
         <span
@@ -59,6 +74,11 @@ export const MisionAsignadaBanner: React.FC<MisionAsignadaBannerProps> = ({
           <span className={styles.codigoMision} data-testid="codigo-mision-banner">
             {alerta.codigo}
           </span>
+          {esPrevencion && alerta.eventoPrevencionCodigo && (
+            <span className={styles.codigoEvento} data-testid="codigo-evento-banner">
+              Evento: {alerta.eventoPrevencionCodigo}
+            </span>
+          )}
           {alerta.incidenteFolio && (
             <span className={styles.folioIncidente} data-testid="folio-incidente-banner">
               Folio: {alerta.incidenteFolio}
@@ -67,8 +87,24 @@ export const MisionAsignadaBanner: React.FC<MisionAsignadaBannerProps> = ({
         </div>
 
         <div className={styles.afectacionTitulo} data-testid="afectacion-banner">
-          {alerta.tipoAfectacion || 'Verificación operativa de incidente'}
+          {esPrevencion
+            ? alerta.eventoPrevencionNombre ||
+              alerta.tipoAfectacion ||
+              'Despliegue preventivo en punto crítico'
+            : alerta.tipoAfectacion || 'Verificación operativa de incidente'}
         </div>
+
+        {esPrevencion && totalRecursos > 0 && (
+          <div className={styles.metaRow} data-testid="recursos-banner">
+            <Package className={styles.metaIcon} size={16} aria-hidden="true" />
+            <span className={styles.metaText}>
+              {totalRecursos}{' '}
+              {totalRecursos === 1
+                ? 'recurso logístico asignado'
+                : 'recursos logísticos asignados'}
+            </span>
+          </div>
+        )}
 
         {alerta.direccion && (
           <div className={styles.metaRow}>

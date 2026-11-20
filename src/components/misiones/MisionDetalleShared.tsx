@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   AlertCircle,
+  ShieldCheck,
   MapPin,
   Map,
   Calendar,
@@ -24,6 +25,7 @@ import {
   formatearPrioridad,
   formatearFechaHora24h,
   formatearTipologia,
+  esMisionDePrevencion,
 } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './MisionDetailLayout.module.css';
@@ -83,28 +85,45 @@ export function MisionDetalleHeaderCard({
   fechaCierre,
   onVerMapa,
 }: MisionDetalleHeaderCardProps) {
+  const esPrevencion = esMisionDePrevencion(mision);
+
   return (
     <div className={styles.missionHeader}>
       <div className={styles.headerRow}>
         <div className={styles.codeArea}>
-          <AlertCircle
-            size={20}
-            color="var(--color-primary-teal, #1B6F7D)"
-            aria-hidden="true"
-          />
+          {esPrevencion ? (
+            <ShieldCheck
+              size={20}
+              color="var(--color-primary-teal-dark, #14505A)"
+              aria-hidden="true"
+            />
+          ) : (
+            <AlertCircle
+              size={20}
+              color="var(--color-primary-teal, #1B6F7D)"
+              aria-hidden="true"
+            />
+          )}
           <span className={styles.code}>{mision.codigoIncidente}</span>
           <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
             {formatearPrioridad(mision.prioridad)}
           </Chip>
+          {esPrevencion && (
+            <Chip variant="teal" size="md">
+              Prevención territorial
+            </Chip>
+          )}
         </div>
         <EstadoBadge estado={mision.estado} size="md" />
       </div>
 
       <div className={styles.detailGrid}>
         <div className={styles.sectionBlock}>
-          <span className={styles.itemLabel}>Tipo</span>
+          <span className={styles.itemLabel}>
+            {esPrevencion ? 'Operación preventiva' : 'Tipo'}
+          </span>
           <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
-            {formatearTipologia(mision.tipologia)}
+            {esPrevencion ? mision.tipologia : formatearTipologia(mision.tipologia)}
           </span>
         </div>
 

@@ -126,3 +126,23 @@
   padding-top: var(--space-1, 4px);
   border-top: 1px solid var(--color-bg-light, #ECEFF3);
 }
+
+.cardPrevencion {
+  border-left-color: var(--color-primary-teal-dark, #14505A);
+}
+
+.prevencionRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.recursosRow {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: var(--color-primary-teal-dark, #14505A);
+  font-weight: 600;
+}

@@ -6,10 +6,12 @@ import { ChevronRight, CheckCircle, Clock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
+import { Chip } from '@/components/ui/Chip';
 import {
   formatearPrioridad,
   formatearFechaHora24h,
   ordenarMisionesPorPrioridadYFecha,
+  esMisionDePrevencion,
 } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './TerrenoSiguienteMision.module.css';
@@ -32,7 +34,7 @@ export function TerrenoSiguienteMision() {
         }
 
         const misiones = await sincronizarMisiones({
-          tipoMision: esCuadrilla ? 'ATENCION_CUADRILLA' : 'VERIFICACION',
+          ...(esCuadrilla ? { tipoMision: 'ATENCION_CUADRILLA' as const } : {}),
           patrullaId: !esCuadrilla ? usuario?.unidadId || undefined : undefined,
           cuadrillaId: esCuadrilla ? usuario?.unidadId || undefined : undefined,
         });
@@ -66,8 +68,18 @@ export function TerrenoSiguienteMision() {
 
     void buscarMisiones();
 
+    const handleSync = () => {
+      void buscarMisiones();
+    };
+    window.addEventListener('sgrai:outbox-synced', handleSync);
+    window.addEventListener('sgrai:mision-sincronizada', handleSync);
+    window.addEventListener('sgrai:prevencion-actualizada', handleSync);
+
     return () => {
       cancelado = true;
+      window.removeEventListener('sgrai:outbox-synced', handleSync);
+      window.removeEventListener('sgrai:mision-sincronizada', handleSync);
+      window.removeEventListener('sgrai:prevencion-actualizada', handleSync);
     };
   }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId]);
 
@@ -135,6 +147,11 @@ export function TerrenoSiguienteMision() {
                   <span className={`${styles.priorityChip} ${prioridadClase}`}>
                     {formatearPrioridad(mision.prioridad)}
                   </span>
+                  {esMisionDePrevencion(mision) && (
+                    <Chip variant="teal" size="sm">
+                      Prevención
+                    </Chip>
+                  )}
                   <EstadoBadge estado={mision.estado} />
                 </div>
                 <div className={styles.typology}>{mision.tipologia}</div>

@@ -1,10 +1,15 @@
 import React from 'react';
 import Link from 'next/link';
-import { MapPin, ChevronRight, Archive } from 'lucide-react';
+import { MapPin, ChevronRight, Archive, ShieldCheck, Package } from 'lucide-react';
 import { EstadoBadge } from './EstadoBadge';
 import { Chip } from '@/components/ui/Chip';
 import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
-import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
+import {
+  formatearPrioridad,
+  formatearFechaHora24h,
+  esMisionDePrevencion,
+} from '@/lib/utils/formatters';
+import { obtenerContextoPrevencionMision } from '@/services/prevencionService';
 import type { MisionLocal } from '@/types/offline';
 import styles from './MisionCard.module.css';
 
@@ -15,8 +20,16 @@ interface MisionCardProps {
 }
 
 export function MisionCard({ mision, href, esInactiva = false }: MisionCardProps) {
+  const esPrevencion = esMisionDePrevencion(mision);
+  const contextoPrevencion = esPrevencion ? obtenerContextoPrevencionMision(mision) : null;
+  const totalRecursos = contextoPrevencion?.recursosMision.length ?? 0;
+
   return (
-    <Link href={href} className={styles.card} tabIndex={0}>
+    <Link
+      href={href}
+      className={esPrevencion ? `${styles.card} ${styles.cardPrevencion}` : styles.card}
+      tabIndex={0}
+    >
       <div className={styles.headerRow}>
         <div className={styles.codeAndPriority}>
           <span className={styles.code}>{mision.codigoIncidente}</span>
@@ -30,12 +43,33 @@ export function MisionCard({ mision, href, esInactiva = false }: MisionCardProps
         </div>
       </div>
 
+      {esPrevencion && (
+        <div className={styles.prevencionRow}>
+          <Chip variant="teal" size="sm">
+            <ShieldCheck size={12} aria-hidden="true" />
+            Prevención territorial
+          </Chip>
+        </div>
+      )}
+
       <div className={styles.typology}>{mision.tipologia}</div>
 
       <div className={styles.locationRow}>
         <MapPin size={16} className={styles.locationIcon} aria-hidden="true" />
         <span>{mision.direccion}</span>
       </div>
+
+      {esPrevencion && totalRecursos > 0 && (
+        <div className={styles.recursosRow}>
+          <Package size={16} className={styles.locationIcon} aria-hidden="true" />
+          <span>
+            {totalRecursos}{' '}
+            {totalRecursos === 1
+              ? 'recurso logístico asignado'
+              : 'recursos logísticos asignados'}
+          </span>
+        </div>
+      )}
 
       <div className={styles.footerRow}>
         <span>Despachada: {formatearFechaHora24h(mision.fechaDespacho)}</span>

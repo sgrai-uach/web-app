@@ -18,6 +18,7 @@ import { useAuth } from '@/context/AuthContext';
 import { formatRolLabel } from '@/lib/utils/labels';
 import { formatearFechaHora24h } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import {
   obtenerMetricasPerfil,
@@ -62,8 +63,19 @@ export default function TerrenoPerfilPage() {
     }
 
     void cargarDatos();
+
+    const handleSync = () => {
+      void cargarDatos();
+    };
+    window.addEventListener('sgrai:outbox-synced', handleSync);
+    window.addEventListener('sgrai:mision-sincronizada', handleSync);
+    window.addEventListener('sgrai:prevencion-actualizada', handleSync);
+
     return () => {
       cancelado = true;
+      window.removeEventListener('sgrai:outbox-synced', handleSync);
+      window.removeEventListener('sgrai:mision-sincronizada', handleSync);
+      window.removeEventListener('sgrai:prevencion-actualizada', handleSync);
     };
   }, [usuario, esCuadrilla, tieneUnidadAsignada]);
 
@@ -152,6 +164,11 @@ export default function TerrenoPerfilPage() {
                 <>
                   <CheckCircle2 size={16} color="var(--color-success)" aria-hidden="true" />
                   <span className={styles.infoValue}>En servicio activo</span>
+                  {metricas.estadoOperativoUnidad === 'EN_PREVENCION' && (
+                    <Chip variant="teal" size="sm">
+                      En prevención
+                    </Chip>
+                  )}
                 </>
               ) : (
                 <>

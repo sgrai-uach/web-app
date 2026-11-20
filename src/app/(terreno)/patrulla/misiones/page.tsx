@@ -46,7 +46,6 @@ function PatrullaMisionesContenido() {
       }
 
       const locales = await sincronizarMisiones({
-        tipoMision: 'VERIFICACION',
         patrullaId: usuario?.unidadId || undefined,
       });
 
@@ -67,9 +66,11 @@ function PatrullaMisionesContenido() {
     };
     window.addEventListener('sgrai:outbox-synced', handleSync);
     window.addEventListener('sgrai:mision-sincronizada', handleSync);
+    window.addEventListener('sgrai:prevencion-actualizada', handleSync);
     return () => {
       window.removeEventListener('sgrai:outbox-synced', handleSync);
       window.removeEventListener('sgrai:mision-sincronizada', handleSync);
+      window.removeEventListener('sgrai:prevencion-actualizada', handleSync);
     };
   }, [cargarMisiones]);
 
