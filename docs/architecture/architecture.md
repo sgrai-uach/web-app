@@ -73,3 +73,13 @@ Para mantener actualizado el mapa operacional del Centro de Mando:
 - Todas las peticiones HTTP autenticadas inyectan el encabezado `Authorization: Bearer <jwt_token>`.
 - El token JWT y el perfil del usuario se almacenan en cookies seguras gestionadas por [src/lib/utils/cookieUtils.ts](file:///home/zetastormy/Development/SGRAI/web-app/src/lib/utils/cookieUtils.ts).
 - Restricción perimetral: el cliente verifica en el inicio de sesión que el rol sea `PATRULLA_VERIFICADORA` o `DELEGADO_CUADRILLA`. Cualquier intento de acceso con roles de oficina o externos es rechazado de inmediato con error 403.
+
+
+---
+
+## Flujo de Misiones de Prevención Territorial (HU-33)
+
+- **Regla §3.4 (Sin Incidente Previo):** Las misiones con `tipoMision = 'PREVENCION'` se originan directamente sobre un `evento_prevencion` y un punto crítico (`incidenteId` vacío o nulo).
+- **Capa de Servicios:** `src/services/prevencionService.ts` coordina extracción de geometrías GeoJSON `Point` (`extraerCoordenadasGeoJson`), normalización de recursos (`normalizarRecursosPrevencion`), filtrado por `mision_id` (`filtrarRecursosDeMision`) y caché local (`evento_prevencion_{id}`).
+- **Sincronización e Inventario de Misiones:** `src/services/misionesService.ts`, `src/app/(terreno)/patrulla/misiones/page.tsx` y `TerrenoSiguienteMision.tsx` sincronizan misiones de patrulla sin restringir exclusivamente a `VERIFICACION`, permitiendo visualizar en bandeja tanto verificaciones de incidentes como despliegues preventivos.
+- **Regla de Desacoplamiento en Detalle:** En `src/app/(terreno)/patrulla/misiones/[id]/page.tsx`, las misiones preventivas omiten los formularios de categorización, prioridad y dictamen de incidente (H37, H38, H39) y presentan `<PrevencionMisionCard />`.

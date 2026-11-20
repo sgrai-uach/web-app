@@ -80,3 +80,11 @@ Catálogo dinámico de módulos y funcionalidades habilitadas en terreno filtrad
 ## 6. `<ToastProvider />` y `useToast`
 
 Sistema universal de alertas flotantes montado en la raíz (`layout.tsx`).
+
+
+---
+
+## Componentes de Prevención Territorial (HU-33)
+
+- **`PrevencionMisionCard` (`src/components/misiones/PrevencionMisionCard.tsx`):** Reutiliza `BloqueFormularioReporte`, `CampoResumenReporte`, `NotaInformativaReporte`, `Chip` y `Button` bajo diseño plano (`border-radius: 0px`) e iconos `lucide-react` (`ShieldCheck`, `Package`, `Wrench`, `Map`). Presenta el evento preventivo, punto crítico monitoreado, acceso directo al mapa y listado de activos individuales e insumos a granel vinculados a `mision_id`.
+- **Indicadores en Cabeceras y Alertas:** `MisionAsignadaBanner`, `MisionCard`, `MisionDetalleHeaderCard` (`MisionDetalleShared.tsx`), `TerrenoSiguienteMision` y `/perfil` muestran las insignias semánticas `Prevención territorial`, `Prevención` y `En prevención` cuando corresponde.

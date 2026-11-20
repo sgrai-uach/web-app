@@ -29,6 +29,7 @@
 | **TC-16** | H68 | `CierreFaenaForm` | Online / Offline | Registrar observaciones y rendir 2 materiales consumidos (combustible, sacos). | Encola cierre en `outbox`, transiciona a `FINALIZADA` y libera cuadrilla. | APROBADO |
 | **TC-17** | H70 | `useTelemetry` | Online | Misión activa en curso. | Activa `watchPosition` de alta precisión, transmite coordenadas cada 15 segundos. | APROBADO |
 | **TC-18** | Core | `offlineQueue` / `useConnectivity` | Transición Offline $\to$ Online | Desconectar red celular, ejecutar acciones, reconectar red. | Badge muestra pendientes en gris carbón; al volver señal, sincroniza cola y cambia a verde sage. | APROBADO |
+| **TC-19** | H33 | `PrevencionMisionCard` / `PatrullaMisionDetailPage` / `notificacionesService` | Online / Offline | Recibir evento `prevencion:actualizada`, abrir misión `PREVENCION` sin incidente (§3.4), verificar recursos trazados por `mision_id` y aceptar misión. | Banner muestra código de evento y recursos; detalle muestra punto crítico y materiales separados por tipo sin desplegar formularios H37/H38/H39; patrulla adopta `EN_PREVENCION` y perfil muestra `En prevención`. | APROBADO |
 
 ---
 

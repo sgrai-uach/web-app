@@ -297,3 +297,21 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
        "timestamp": "2026-10-27T16:05:00Z"
      }
      ```
+
+
+---
+
+## Soporte de Misiones Preventivas de Patrulla (HU-33)
+
+### Endpoint de Consulta de Evento Preventivo
+
+- **Ruta:** `GET /api/eventos-atp/prevencion/{id}`
+- **Tipo de respuesta:** `EventoPrevencionDetalleResponse` (`src/types/api-generated.d.ts`), consumido mediante `openapi-fetch` desde `obtenerDetalleEventoPrevencion` en `src/services/prevencionService.ts`.
+- **Resiliencia Offline / RBAC:** Ante respuesta `401` invoca `handleUnauthorizedSession()`. Ante ausencia de cobertura celular o error `403`, degrada silenciosamente al caché local de `IndexedDB` (`catalogo` bajo clave `evento_prevencion_{id}`) y a los datos previamente persistidos desde el canal en tiempo real.
+- **Trazabilidad de Recursos:** Los elementos de `recursosAsignados[]` se filtran por `evento_prevencion_recurso.mision_id` mediante `filtrarRecursosDeMision`, diferenciando `Activo individual` (`esIndividual: true`) de `Insumo a granel` (`esIndividual: false`).
+
+### Evento WebSocket `prevencion:actualizada`
+
+- **Sala de escucha:** `patrulla:<patrullaId>` (`sala:patrulla:<patrullaId>`).
+- **Efecto en cliente:** `useTerrenoSocket.ts` y `NotificacionesTerrenoContext.tsx` procesan el payload con `procesarPrevencionActualizada` (`src/services/notificacionesService.ts`), generan alerta prioritaria inmediata con resumen de recursos y persisten la misión (`tipoMision: 'PREVENCION'`, `incidenteId: ''`) en `IndexedDB` sin emitir ACKs remotos para identificadores sintéticos `prev-*`.
+- **Estado de Unidad:** La patrulla asignada refleja `EN_PREVENCION` (`En prevención`) tras el despacho y la aceptación de misión.
