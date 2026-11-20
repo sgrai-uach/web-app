@@ -43,6 +43,14 @@ const CLAVES_EVALUACION_CACHEABLES = [
   'reporteCuadrillaEnviadoEn',
   'cuadrillaRecursos',
   'fechaCierre',
+  'tipoMision',
+  'eventoPrevencionId',
+  'eventoPrevencion',
+  'estadoEventoPrevencion',
+  'puntoCritico',
+  'recursosPrevencion',
+  'recursosEventoPrevencion',
+  'estadoPatrulla',
 ] as const;
 
 function leerMapaCacheEvaluaciones(): Record<string, Record<string, unknown>> {
@@ -85,6 +93,10 @@ function tieneDatosEvaluacion(datos?: Record<string, unknown>): boolean {
       datos.reporteCuadrillaEnviado ||
       datos.reporteCuadrilla ||
       datos.ultimoReportePrioridad ||
+      datos.eventoPrevencionId ||
+      datos.eventoPrevencion ||
+      datos.puntoCritico ||
+      (Array.isArray(datos.recursosPrevencion) && datos.recursosPrevencion.length > 0) ||
       (Array.isArray(datos.reportesPrioridad) && datos.reportesPrioridad.length > 0) ||
       (Array.isArray(datos.reportesTerreno) && datos.reportesTerreno.length > 0)
   );
@@ -159,7 +171,12 @@ export function fusionarDatosAdicionalesMision(
     ...actuales,
   };
 
-  for (const claveLista of ['reportesPrioridad', 'reportesTerreno'] as const) {
+  for (const claveLista of [
+    'reportesPrioridad',
+    'reportesTerreno',
+    'recursosPrevencion',
+    'recursosEventoPrevencion',
+  ] as const) {
     const listaActual = actuales[claveLista];
     const listaPrevia = combinadosPrevios[claveLista];
     if (
@@ -168,6 +185,18 @@ export function fusionarDatosAdicionalesMision(
       listaPrevia.length > 0
     ) {
       fusionados[claveLista] = listaPrevia;
+    }
+  }
+
+  for (const claveObj of [
+    'eventoPrevencionId',
+    'eventoPrevencion',
+    'estadoEventoPrevencion',
+    'puntoCritico',
+    'tipoMision',
+  ] as const) {
+    if (actuales[claveObj] === undefined && combinadosPrevios[claveObj] !== undefined) {
+      fusionados[claveObj] = combinadosPrevios[claveObj];
     }
   }
 
@@ -212,6 +241,9 @@ export function fusionarDatosAdicionalesMision(
 
   return {
     ...mision,
+    ...(mision.tipoMision === undefined && typeof combinadosPrevios.tipoMision === 'string'
+      ? { tipoMision: combinadosPrevios.tipoMision }
+      : {}),
     tipologia: tipologiaFinal,
     datosAdicionales: fusionados,
   };

@@ -1,5 +1,8 @@
 import { io, type Socket } from 'socket.io-client';
-import type { MisionAsignadaPayload } from '@/types/notificaciones';
+import type {
+  MisionAsignadaPayload,
+  PrevencionActualizadaPayload,
+} from '@/types/notificaciones';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
 
 let socketInstance: Socket | null = null;
@@ -146,6 +149,20 @@ export function onMisionAsignada(
   socket.on('mision:asignada', handler);
   return () => {
     socket.off('mision:asignada', handler);
+  };
+}
+
+/**
+ * Registra un callback para escuchar el evento `prevencion:actualizada` (HU-33).
+ * Devuelve una función para desuscribirse.
+ */
+export function onPrevencionActualizada(
+  handler: (payload: PrevencionActualizadaPayload) => void
+): () => void {
+  const socket = getSocket();
+  socket.on('prevencion:actualizada', handler);
+  return () => {
+    socket.off('prevencion:actualizada', handler);
   };
 }
 

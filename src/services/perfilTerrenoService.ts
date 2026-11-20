@@ -1,5 +1,6 @@
 import { sincronizarMisiones } from './misionesService';
 import { guardarCatalogoLocal, obtenerCatalogoLocal } from './offlineQueue';
+import { esMisionDePrevencion } from '@/lib/utils/formatters';
 import type {
   UsuarioPerfilSesion,
   HistorialUnidadOperador,
@@ -11,6 +12,7 @@ export interface MetricasPerfilTerreno {
   misionesPendientes: number;
   totalMisiones: number;
   especialidad: string;
+  estadoOperativoUnidad?: string | null;
 }
 
 const HISTORIAL_CATALOGO_PREFIJO = 'historial_unidades_';
@@ -141,6 +143,7 @@ export async function obtenerMetricasPerfil(
   let misionesEnCurso = 0;
   let misionesPendientes = 0;
   let totalMisiones = 0;
+  let estadoOperativoUnidad: string | null = null;
 
   try {
     if (usuario !== null && !usuario.unidadId) {
@@ -152,25 +155,52 @@ export async function obtenerMetricasPerfil(
         especialidad: esCuadrilla
           ? 'Cuadrilla de Respuesta Operativa y Despeje'
           : 'Operaciones de Terreno y Triage Primario',
+        estadoOperativoUnidad: null,
       };
     }
 
     const misiones = await sincronizarMisiones({
-      tipoMision: esCuadrilla ? 'ATENCION_CUADRILLA' : 'VERIFICACION',
+      ...(esCuadrilla ? { tipoMision: 'ATENCION_CUADRILLA' as const } : {}),
       patrullaId: !esCuadrilla && usuario?.unidadId ? usuario.unidadId : undefined,
       cuadrillaId: esCuadrilla && usuario?.unidadId ? usuario.unidadId : undefined,
     });
 
     totalMisiones = misiones.length;
+    let tienePrevencionActiva = false;
+    let tieneVerificacionActiva = false;
 
     for (const m of misiones) {
       const estado = m.estado?.toUpperCase() || '';
+      const esActiva =
+        estado === 'EN_CURSO' ||
+        estado === 'EN_TERRENO' ||
+        estado === 'EN_RUTA' ||
+        estado === 'ASIGNADA' ||
+        estado === 'DESPACHADA' ||
+        estado === 'PENDIENTE';
+
+      if (esActiva && !esCuadrilla) {
+        if (esMisionDePrevencion(m)) {
+          tienePrevencionActiva = true;
+        } else {
+          tieneVerificacionActiva = true;
+        }
+      }
+
       if (estado === 'FINALIZADA' || estado === 'COMPLETADA' || estado === 'CERRADA') {
         misionesAtendidas++;
       } else if (estado === 'EN_CURSO' || estado === 'EN_TERRENO' || estado === 'EN_RUTA') {
         misionesEnCurso++;
       } else if (estado === 'ASIGNADA' || estado === 'DESPACHADA' || estado === 'PENDIENTE') {
         misionesPendientes++;
+      }
+    }
+
+    if (!esCuadrilla) {
+      if (tienePrevencionActiva) {
+        estadoOperativoUnidad = 'EN_PREVENCION';
+      } else if (tieneVerificacionActiva) {
+        estadoOperativoUnidad = 'EN_VERIFICACION';
       }
     }
   } catch {
@@ -189,5 +219,6 @@ export async function obtenerMetricasPerfil(
     misionesPendientes,
     totalMisiones,
     especialidad,
+    estadoOperativoUnidad,
   };
 }

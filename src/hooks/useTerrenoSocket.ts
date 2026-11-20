@@ -74,6 +74,17 @@ export function useTerrenoSocket(): void {
       }
     };
 
+    const manejarPrevencionActualizada = (data?: unknown) => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('sgrai:prevencion-actualizada', { detail: data })
+        );
+        window.dispatchEvent(
+          new CustomEvent('sgrai:mision-sincronizada', { detail: data })
+        );
+      }
+    };
+
     const manejarVisibilidad = () => {
       if (
         typeof document !== 'undefined' &&
@@ -92,6 +103,7 @@ export function useTerrenoSocket(): void {
     socket.on('cuadrilla:actualizada', manejarSincronizacionMision);
     socket.on('patrulla:liberada', manejarSincronizacionMision);
     socket.on('mision:asignada', manejarSincronizacionMision);
+    socket.on('prevencion:actualizada', manejarPrevencionActualizada);
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', manejarVisibilidad);
     }
@@ -106,6 +118,7 @@ export function useTerrenoSocket(): void {
       socket.off('cuadrilla:actualizada', manejarSincronizacionMision);
       socket.off('patrulla:liberada', manejarSincronizacionMision);
       socket.off('mision:asignada', manejarSincronizacionMision);
+      socket.off('prevencion:actualizada', manejarPrevencionActualizada);
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', manejarVisibilidad);
       }

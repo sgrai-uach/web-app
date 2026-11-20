@@ -15,10 +15,12 @@ import {
   unirseASalaPatrulla,
   salirDeSalaPatrulla,
   onMisionAsignada,
+  onPrevencionActualizada,
   onSocketConnect,
 } from '@/lib/socket/socketClient';
 import {
   procesarMisionAsignada,
+  procesarPrevencionActualizada,
   emitirAckLectura,
   consultarMisionesPendientes,
 } from '@/services/notificacionesService';
@@ -27,6 +29,7 @@ import { MisionAsignadaBanner } from '@/components/misiones/MisionAsignadaBanner
 import type {
   MisionAsignadaAlerta,
   MisionAsignadaPayload,
+  PrevencionActualizadaPayload,
 } from '@/types/notificaciones';
 
 export interface NotificacionesTerrenoContextValue {
@@ -137,6 +140,46 @@ export function NotificacionesTerrenoProvider({
     [usuario?.unidadId]
   );
 
+  const unidadIdPatrulla = usuario?.unidadId;
+
+  /**
+   * Manejador de evento WebSocket `prevencion:actualizada` (HU-33).
+   */
+  const handlePrevencionActualizada = useCallback(
+    async (payload: PrevencionActualizadaPayload) => {
+      if (
+        payload.patrulla?.id &&
+        unidadIdPatrulla &&
+        payload.patrulla.id !== unidadIdPatrulla
+      ) {
+        return;
+      }
+
+      if (typeof procesarPrevencionActualizada !== 'function') {
+        return;
+      }
+
+      const resultado = await procesarPrevencionActualizada(
+        payload,
+        unidadIdPatrulla || ''
+      );
+      if (!resultado) return;
+
+      if (!resultado.esDuplicado) {
+        activarAlertaSensorialMision();
+        setAlertaActiva(resultado.alerta);
+        setHistorialAlertas((prev) => [resultado.alerta, ...prev]);
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('sgrai:mision-sincronizada', { detail: payload })
+        );
+      }
+    },
+    [unidadIdPatrulla]
+  );
+
   /**
    * Descartar o cerrar el banner emergente.
    */
@@ -153,7 +196,12 @@ export function NotificacionesTerrenoProvider({
   const verMision = useCallback(
     async (alerta: MisionAsignadaAlerta) => {
       setAlertaActiva(null);
-      void emitirAckLectura(alerta.notificacionId, alerta.misionId);
+      if (
+        !alerta.esEventoSinteticoPrevencion &&
+        !alerta.notificacionId.startsWith('prev-')
+      ) {
+        void emitirAckLectura(alerta.notificacionId, alerta.misionId);
+      }
       router.push(`/patrulla/misiones/${alerta.misionId}`);
     },
     [router]
@@ -169,8 +217,12 @@ export function NotificacionesTerrenoProvider({
     conectarSocket(token || undefined);
     unirseASalaPatrulla(patrullaId);
 
-    // Escucha de misiones asignadas
+    // Escucha de misiones asignadas y despachos preventivos (HU-33)
     const unsuscribeMision = onMisionAsignada(handleMisionAsignada);
+    const unsuscribePrevencion =
+      typeof onPrevencionActualizada === 'function'
+        ? onPrevencionActualizada(handlePrevencionActualizada)
+        : () => {};
 
     // Reconciliar al conectar o reconectar el WebSocket
     const unsubscribeConnect = onSocketConnect(() => {
@@ -225,6 +277,7 @@ export function NotificacionesTerrenoProvider({
 
     return () => {
       unsuscribeMision();
+      unsuscribePrevencion();
       unsubscribeConnect();
       window.removeEventListener('online', handleOnline);
       if (typeof window !== 'undefined') {
@@ -232,7 +285,14 @@ export function NotificacionesTerrenoProvider({
       }
       salirDeSalaPatrulla(patrullaId);
     };
-  }, [esPatrulla, usuario?.unidadId, token, handleMisionAsignada, reconciliarMisiones]);
+  }, [
+    esPatrulla,
+    usuario?.unidadId,
+    token,
+    handleMisionAsignada,
+    handlePrevencionActualizada,
+    reconciliarMisiones,
+  ]);
 
   return (
     <NotificacionesTerrenoContext.Provider

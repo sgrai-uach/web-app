@@ -17,7 +17,22 @@ import {
   obtenerEvaluacionMisionCache,
   fusionarDatosAdicionalesMision,
 } from '@/services/offlineQueue';
-import { limpiarTituloMision, formatearTipologia } from '@/lib/utils/formatters';
+import {
+  limpiarTituloMision,
+  formatearTipologia,
+  esMisionDePrevencion,
+} from '@/lib/utils/formatters';
+import {
+  extraerCoordenadasGeoJson,
+  filtrarRecursosDeMision,
+  normalizarRecursosPrevencion,
+  obtenerDetalleEventoPrevencion,
+} from '@/services/prevencionService';
+import type {
+  EventoPrevencionResumenLocal,
+  PuntoCriticoPrevencionLocal,
+  RecursoPrevencionLocal,
+} from '@/types/offline';
 
 type TipoMisionFiltro =
   | 'VERIFICACION'
@@ -260,14 +275,61 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
             ? tipologiaConstatadaPrevia
             : tipologiaRemota || tipologiaConstatadaPrevia || limpiarTituloMision(item.titulo);
 
+        const eventoPrevencionPrevio = datosPrevios.eventoPrevencion as
+          | EventoPrevencionResumenLocal
+          | undefined;
+        const itemExtra = item as Record<string, unknown>;
+        const itemPrevencion =
+          itemExtra.prevencion && typeof itemExtra.prevencion === 'object'
+            ? (itemExtra.prevencion as Record<string, unknown>)
+            : undefined;
+        const eventoPrevencionIdItem =
+          (typeof itemExtra.eventoPrevencionId === 'string'
+            ? itemExtra.eventoPrevencionId
+            : undefined) ||
+          (typeof itemPrevencion?.eventoPrevencionId === 'string'
+            ? itemPrevencion.eventoPrevencionId
+            : undefined) ||
+          (typeof datosPrevios.eventoPrevencionId === 'string'
+            ? datosPrevios.eventoPrevencionId
+            : undefined);
+
+        const latItem =
+          typeof itemExtra.latitud === 'number'
+            ? itemExtra.latitud
+            : typeof itemPrevencion?.latitud === 'number'
+              ? itemPrevencion.latitud
+              : undefined;
+        const lngItem =
+          typeof itemExtra.longitud === 'number'
+            ? itemExtra.longitud
+            : typeof itemPrevencion?.longitud === 'number'
+              ? itemPrevencion.longitud
+              : undefined;
+        const coordenadasItem =
+          latItem != null && lngItem != null
+            ? { lat: latItem, lng: lngItem }
+            : extraerCoordenadasGeoJson(
+                itemPrevencion?.ubicacionGeoJson ?? itemExtra.ubicacionGeoJson
+              ) ?? previa?.coordenadas;
+
+        const esPrevencionItem =
+          item.tipoMision === 'PREVENCION' || Boolean(eventoPrevencionIdItem);
+
         return {
           id: item.id,
           incidenteId: item.incidenteId || '',
-          codigoIncidente: item.incidenteCodigo || item.codigo,
+          codigoIncidente:
+            item.incidenteCodigo || eventoPrevencionPrevio?.codigo || item.codigo,
+          tipoMision: item.tipoMision,
           tipologia: tipologiaFinal,
           direccion:
+            eventoPrevencionPrevio?.direccionTexto ||
+            eventoPrevencionPrevio?.sector ||
+            (typeof itemPrevencion?.nombre === 'string' ? itemPrevencion.nombre : '') ||
             item.descripcion ||
             (item.delegacionNombre ? `Sector ${item.delegacionNombre}` : 'Valdivia'),
+          ...(coordenadasItem ? { coordenadas: coordenadasItem } : {}),
           prioridad: item.prioridad,
           estado: mantenerOptimista && previa ? previa.estado : item.estado,
           fechaDespacho: item.fechaInicio || item.creadoEn,
@@ -278,6 +340,11 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
             : Boolean(previa?.sincronizacionPendiente),
           datosAdicionales: {
             ...datosPrevios,
+            tipoMision: item.tipoMision,
+            ...(esPrevencionItem ? { estadoIncidente: null } : {}),
+            ...(eventoPrevencionIdItem
+              ? { eventoPrevencionId: eventoPrevencionIdItem }
+              : {}),
             trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
             titulo: item.titulo,
             patrullaId: (item as Record<string, unknown>).patrullaId as string | null | undefined,
@@ -516,14 +583,139 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
           ? datosPrevios.cuadrillaRecursos
           : undefined;
 
+      const esPrevencion =
+        d.tipoMision === 'PREVENCION' || (!d.incidente && Boolean(d.prevencion));
+      const dExtra = d as Record<string, unknown>;
+      const prevExtra = d.prevencion as Record<string, unknown> | null | undefined;
+      const eventoPrevencionId =
+        (typeof dExtra.eventoPrevencionId === 'string' && dExtra.eventoPrevencionId) ||
+        (typeof prevExtra?.eventoPrevencionId === 'string' && prevExtra.eventoPrevencionId) ||
+        (typeof datosPrevios.eventoPrevencionId === 'string'
+          ? datosPrevios.eventoPrevencionId
+          : undefined);
+
+      const detalleEvento =
+        esPrevencion && eventoPrevencionId
+          ? await obtenerDetalleEventoPrevencion(eventoPrevencionId)
+          : null;
+
+      const eventoPrevencionPrevio =
+        datosPrevios.eventoPrevencion && typeof datosPrevios.eventoPrevencion === 'object'
+          ? (datosPrevios.eventoPrevencion as EventoPrevencionResumenLocal)
+          : undefined;
+
+      const eventoPrevencionFinal: EventoPrevencionResumenLocal | undefined = detalleEvento
+        ? {
+            id: detalleEvento.id,
+            codigo: detalleEvento.codigo,
+            nombre: detalleEvento.nombre,
+            descripcion: detalleEvento.descripcion,
+            sector: detalleEvento.sector,
+            direccionTexto: detalleEvento.direccionTexto,
+            estado: detalleEvento.estado,
+            prioridad: detalleEvento.prioridad,
+            latitud: detalleEvento.latitud,
+            longitud: detalleEvento.longitud,
+            delegacionNombre: detalleEvento.delegacion?.nombre ?? d.prevencion?.delegacionNombre ?? null,
+            fechaEstimadaFin: detalleEvento.fechaEstimadaFin ?? null,
+          }
+        : eventoPrevencionPrevio;
+
+      const puntoCriticoFinal: PuntoCriticoPrevencionLocal | undefined =
+        detalleEvento?.puntoCritico
+          ? {
+              id: detalleEvento.puntoCritico.id,
+              codigo: detalleEvento.puntoCritico.codigo,
+              nombre: detalleEvento.puntoCritico.nombre,
+              descripcion: detalleEvento.puntoCritico.descripcion,
+              tipoRiesgo: detalleEvento.puntoCritico.tipoRiesgo,
+              prioridad: detalleEvento.puntoCritico.prioridad,
+              latitud: detalleEvento.puntoCritico.latitud,
+              longitud: detalleEvento.puntoCritico.longitud,
+              delegacionNombre:
+                d.prevencion?.delegacionNombre ?? detalleEvento.delegacion?.nombre ?? null,
+            }
+          : d.prevencion
+            ? {
+                id: d.prevencion.id,
+                codigo: d.prevencion.codigo,
+                nombre: d.prevencion.nombre,
+                descripcion: d.prevencion.descripcion,
+                latitud: d.prevencion.latitud,
+                longitud: d.prevencion.longitud,
+                delegacionNombre: d.prevencion.delegacionNombre,
+              }
+            : (datosPrevios.puntoCritico as PuntoCriticoPrevencionLocal | undefined);
+
+      const recursosDesdeEvento = detalleEvento
+        ? filtrarRecursosDeMision(
+            normalizarRecursosPrevencion(detalleEvento.recursosAsignados),
+            d.id,
+            detalleEvento.misiones?.length
+          )
+        : null;
+
+      const recursosPrevencionFinal: RecursoPrevencionLocal[] | undefined =
+        recursosDesdeEvento !== null
+          ? recursosDesdeEvento.propios
+          : Array.isArray(datosPrevios.recursosPrevencion)
+            ? normalizarRecursosPrevencion(datosPrevios.recursosPrevencion, d.id)
+            : undefined;
+
+      const recursosEventoPrevencionFinal: RecursoPrevencionLocal[] | undefined =
+        recursosDesdeEvento !== null
+          ? recursosDesdeEvento.otrosEvento
+          : Array.isArray(datosPrevios.recursosEventoPrevencion)
+            ? normalizarRecursosPrevencion(datosPrevios.recursosEventoPrevencion)
+            : undefined;
+
+      const coordenadasResueltas =
+        d.incidente?.latitud != null && d.incidente?.longitud != null
+          ? { lat: d.incidente.latitud, lng: d.incidente.longitud }
+          : d.prevencion?.latitud != null && d.prevencion?.longitud != null
+            ? { lat: d.prevencion.latitud, lng: d.prevencion.longitud }
+            : detalleEvento?.latitud != null && detalleEvento?.longitud != null
+              ? { lat: detalleEvento.latitud, lng: detalleEvento.longitud }
+              : extraerCoordenadasGeoJson(
+                  detalleEvento?.puntoCritico?.ubicacionGeoJson ??
+                    detalleEvento?.ubicacionGeoJson
+                ) ?? previaLocal?.coordenadas;
+
+      const direccionPrevencion =
+        eventoPrevencionFinal?.direccionTexto ||
+        eventoPrevencionFinal?.sector ||
+        (d.prevencion
+          ? [d.prevencion.nombre, d.prevencion.delegacionNombre].filter(Boolean).join(' — ')
+          : '') ||
+        (puntoCriticoFinal
+          ? [puntoCriticoFinal.nombre, puntoCriticoFinal.delegacionNombre]
+              .filter(Boolean)
+              .join(' — ')
+          : '');
+
       const datosBaseMision = {
         ...datosPrevios,
+        tipoMision: d.tipoMision,
+        ...(eventoPrevencionId ? { eventoPrevencionId } : {}),
+        ...(eventoPrevencionFinal ? { eventoPrevencion: eventoPrevencionFinal } : {}),
+        ...(eventoPrevencionFinal?.estado
+          ? { estadoEventoPrevencion: eventoPrevencionFinal.estado }
+          : {}),
+        ...(puntoCriticoFinal ? { puntoCritico: puntoCriticoFinal } : {}),
+        ...(recursosPrevencionFinal !== undefined
+          ? { recursosPrevencion: recursosPrevencionFinal }
+          : {}),
+        ...(recursosEventoPrevencionFinal !== undefined
+          ? { recursosEventoPrevencion: recursosEventoPrevencionFinal }
+          : {}),
         trabajo:
           d.descripcion ||
           d.incidente?.descripcion ||
+          eventoPrevencionFinal?.descripcion ||
           'Sin instrucciones adicionales especificadas.',
         titulo: d.titulo,
-        estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION',
+        estadoPatrulla:
+          d.patrulla?.estado || (esPrevencion ? 'EN_PREVENCION' : 'EN_VERIFICACION'),
         ...(d.cuadrilla?.estado ? { estadoCuadrilla: d.cuadrilla.estado } : {}),
         ...(cuadrillaRecursosMapeados !== undefined
           ? { cuadrillaRecursos: cuadrillaRecursosMapeados }
@@ -532,7 +724,7 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
           d.fechaCierre ??
           (datosPrevios.fechaCierre as string | null | undefined) ??
           null,
-        estadoIncidente: d.incidente?.estado || 'VERIFICANDO',
+        estadoIncidente: d.incidente?.estado ?? (esPrevencion ? null : 'VERIFICANDO'),
         reporteTerrenoId:
           ultimoReporteCuadrillaRemoto?.id ??
           ultimoReporteCierreRemoto?.id ??
@@ -580,15 +772,23 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
       const misionLocal: MisionLocal = {
         id: d.id,
         incidenteId: d.incidente?.id || '',
-        codigoIncidente: d.incidente?.codigo || d.codigo,
+        codigoIncidente:
+          d.incidente?.codigo ||
+          eventoPrevencionFinal?.codigo ||
+          d.prevencion?.codigo ||
+          d.codigo,
+        tipoMision: d.tipoMision,
         tipologia: d.incidente?.tipoAfectacion
           ? formatearTipologia(d.incidente.tipoAfectacion)
-          : limpiarTituloMision(d.titulo),
-        direccion: d.incidente?.direccion || d.descripcion || 'Valdivia',
-        coordenadas:
-          d.incidente?.latitud && d.incidente?.longitud
-            ? { lat: d.incidente.latitud, lng: d.incidente.longitud }
-            : undefined,
+          : esPrevencion
+            ? eventoPrevencionFinal?.nombre || limpiarTituloMision(d.titulo)
+            : limpiarTituloMision(d.titulo),
+        direccion:
+          d.incidente?.direccion ||
+          direccionPrevencion ||
+          d.descripcion ||
+          'Valdivia',
+        coordenadas: coordenadasResueltas,
         prioridad: d.prioridad,
         estado: mantenerOptimista && previaLocal ? previaLocal.estado : d.estado,
         fechaDespacho: d.fechaInicio || d.creadoEn,
@@ -649,6 +849,8 @@ export async function aceptarMisionPatrulla(
       actualizadoEn: new Date().toISOString(),
     };
 
+  const esPrevencionBase = esMisionDePrevencion(misionBase);
+
   const estaOffline =
     typeof window !== 'undefined' &&
     typeof navigator !== 'undefined' &&
@@ -665,11 +867,14 @@ export async function aceptarMisionPatrulla(
 
       if (!error && data && data.data) {
         const resData: AceptarMisionApiData['data'] = data.data;
+        const esPrevencion =
+          esPrevencionBase || resData.mision.tipoMision === 'PREVENCION';
         const misionActualizada: MisionLocal = {
           ...misionBase,
           id: resData.mision.id || misionId,
           incidenteId: resData.mision.incidenteId || misionBase.incidenteId,
           codigoIncidente: resData.incidente?.codigo || misionBase.codigoIncidente,
+          tipoMision: resData.mision.tipoMision || misionBase.tipoMision,
           estado: resData.mision.estado || 'EN_CURSO',
           prioridad: resData.mision.prioridad || misionBase.prioridad,
           fechaDespacho: resData.mision.fechaInicio || misionBase.fechaDespacho,
@@ -677,8 +882,12 @@ export async function aceptarMisionPatrulla(
           sincronizacionPendiente: false,
           datosAdicionales: {
             ...(misionBase.datosAdicionales || {}),
-            estadoPatrulla: resData.patrulla?.estado || 'EN_VERIFICACION',
-            estadoIncidente: resData.incidente?.estado || 'VERIFICANDO',
+            ...(resData.mision.tipoMision ? { tipoMision: resData.mision.tipoMision } : {}),
+            estadoPatrulla:
+              resData.patrulla?.estado ||
+              (esPrevencion ? 'EN_PREVENCION' : 'EN_VERIFICACION'),
+            estadoIncidente:
+              resData.incidente?.estado ?? (esPrevencion ? null : 'VERIFICANDO'),
             hitoAceptacion: resData.hito?.descripcion || 'Misión Aceptada por Patrulla',
           },
           actualizadoEn: resData.mision.actualizadoEn || new Date().toISOString(),
@@ -691,7 +900,9 @@ export async function aceptarMisionPatrulla(
           enColaOffline: false,
           mensaje:
             data.message ||
-            'Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación.',
+            (esPrevencion
+              ? 'Misión preventiva aceptada exitosamente. La patrulla se dirige al punto crítico con los recursos asignados.'
+              : 'Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación.'),
         };
       }
 
@@ -722,8 +933,8 @@ export async function aceptarMisionPatrulla(
           sincronizacionPendiente: false,
           datosAdicionales: {
             ...(misionBase.datosAdicionales || {}),
-            estadoPatrulla: 'EN_VERIFICACION',
-            estadoIncidente: 'VERIFICANDO',
+            estadoPatrulla: esPrevencionBase ? 'EN_PREVENCION' : 'EN_VERIFICACION',
+            estadoIncidente: esPrevencionBase ? null : 'VERIFICANDO',
             hitoAceptacion: 'Misión Aceptada por Patrulla',
           },
           actualizadoEn: ahoraIso,
@@ -735,7 +946,9 @@ export async function aceptarMisionPatrulla(
           mision: misionIdempotente,
           enColaOffline: false,
           yaAceptadaPreviamente: true,
-          mensaje: 'La misión ya se encuentra en curso (En Trayecto / Evaluación).',
+          mensaje: esPrevencionBase
+            ? 'La misión preventiva ya se encuentra en curso.'
+            : 'La misión ya se encuentra en curso (En Trayecto / Evaluación).',
         };
       }
 
@@ -775,8 +988,8 @@ export async function aceptarMisionPatrulla(
     sincronizacionPendiente: true,
     datosAdicionales: {
       ...(misionBase.datosAdicionales || {}),
-      estadoPatrulla: 'EN_VERIFICACION',
-      estadoIncidente: 'VERIFICANDO',
+      estadoPatrulla: esPrevencionBase ? 'EN_PREVENCION' : 'EN_VERIFICACION',
+      estadoIncidente: esPrevencionBase ? null : 'VERIFICANDO',
       hitoAceptacion: 'Misión Aceptada por Patrulla (Pendiente de sincronizar)',
     },
     actualizadoEn: ahoraOffline,
