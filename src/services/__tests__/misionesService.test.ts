@@ -16,6 +16,7 @@ vi.mock('@/lib/api/client', () => ({
     GET: vi.fn(),
     POST: vi.fn(),
   },
+  handleUnauthorizedSession: vi.fn(),
 }));
 
 vi.mock('@/services/offlineQueue', () => ({
@@ -26,6 +27,8 @@ vi.mock('@/services/offlineQueue', () => ({
   obtenerMisionLocalPorId: vi.fn(),
   encolarAccionOutbox: vi.fn(),
   obtenerEvaluacionMisionCache: vi.fn(),
+  guardarCatalogoLocal: vi.fn(),
+  obtenerCatalogoLocal: vi.fn(),
   fusionarDatosAdicionalesMision: vi.fn((mision, previos) =>
     previos
       ? {
@@ -846,6 +849,179 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
         email: 'patrulla@valdivia.cl',
         rut: null,
       });
+    });
+
+    it('sincroniza y enriquece misión PREVENCION sin incidente previo (§3.4) y preserva estado EN_PREVENCION al aceptar (HU-33)', async () => {
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          data: [
+            {
+              id: 'mis-prev-h33',
+              codigo: 'MIS-PREV-33',
+              titulo: 'Despliegue preventivo Humedal Krahmer',
+              descripcion: 'Inspección y posicionamiento de bombas',
+              tipoMision: 'PREVENCION',
+              estado: 'DESPACHADA',
+              fechaDespacho: '2026-11-19T15:00:00Z',
+              actualizadoEn: '2026-11-19T15:00:00Z',
+              incidente: null,
+              prevencion: {
+                id: 'pc-33',
+                codigo: 'PC-33',
+                nombre: 'Humedal Krahmer',
+                sector: 'Sector Krahmer',
+                descripcion: 'Riesgo de desborde invernal',
+                tipoRiesgo: 'Anegamiento',
+                prioridad: 'ALTA',
+                ubicacionGeoJson: {
+                  type: 'Point',
+                  coordinates: [-73.235, -39.825],
+                },
+                delegacionNombre: 'Centro',
+                eventoPrevencionId: 'ev-33',
+                eventoPrevencion: {
+                  id: 'ev-33',
+                  codigo: 'EVP-2026-33',
+                  nombre: 'Plan Invierno Krahmer',
+                  estado: 'EN_CURSO',
+                  prioridad: 'ALTA',
+                  sector: 'Krahmer',
+                },
+              },
+              cuadrilla: null,
+              patrulla: {
+                id: 'pat-1',
+                nombre: 'Patrulla Móvil 01',
+                estado: 'EN_PREVENCION',
+              },
+            },
+          ],
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      vi.mocked(offlineQueue.obtenerMisionesLocales).mockResolvedValue([]);
+
+      const sincronizadas = await sincronizarMisiones({ patrullaId: 'pat-1' });
+      expect(sincronizadas).toHaveLength(1);
+      expect(sincronizadas[0].tipoMision).toBe('PREVENCION');
+      expect(sincronizadas[0].incidenteId).toBe('');
+      expect(sincronizadas[0].coordenadas).toEqual({ lat: -39.825, lng: -73.235 });
+      expect(sincronizadas[0].datosAdicionales?.estadoIncidente).toBeNull();
+      expect(sincronizadas[0].datosAdicionales?.eventoPrevencionId).toBe('ev-33');
+
+      // Detalle enriquece recursos del evento filtrados por mision_id
+      vi.mocked(apiClient.GET)
+        .mockResolvedValueOnce({
+          data: {
+            data: {
+              id: 'mis-prev-h33',
+              codigo: 'MIS-PREV-33',
+              titulo: 'Despliegue preventivo Humedal Krahmer',
+              tipoMision: 'PREVENCION',
+              estado: 'DESPACHADA',
+              fechaDespacho: '2026-11-19T15:00:00Z',
+              actualizadoEn: '2026-11-19T15:00:00Z',
+              incidente: null,
+              prevencion: {
+                id: 'pc-33',
+                codigo: 'PC-33',
+                nombre: 'Humedal Krahmer',
+                eventoPrevencionId: 'ev-33',
+              },
+              patrulla: {
+                id: 'pat-1',
+                nombre: 'Patrulla Móvil 01',
+                estado: 'EN_PREVENCION',
+              },
+            },
+          },
+          error: undefined,
+          response: new Response(),
+        } as never)
+        .mockResolvedValueOnce({
+          data: {
+            data: {
+              id: 'ev-33',
+              codigo: 'EVP-2026-33',
+              nombre: 'Plan Invierno Krahmer',
+              descripcion: 'Control preventivo',
+              sector: 'Krahmer',
+              direccionTexto: 'Av. Krahmer',
+              prioridad: 'ALTA',
+              estado: 'EN_CURSO',
+              latitud: -39.825,
+              longitud: -73.235,
+              puntoCritico: {
+                id: 'pc-33',
+                codigo: 'PC-33',
+                nombre: 'Humedal Krahmer',
+                descripcion: 'Canal receptor',
+                tipoRiesgo: 'Anegamiento',
+                prioridad: 'ALTA',
+                latitud: -39.825,
+                longitud: -73.235,
+              },
+              delegacion: { id: 'd-1', codigo: 'DEL-1', nombre: 'Centro' },
+              misiones: [
+                {
+                  id: 'mis-prev-h33',
+                  codigo: 'MIS-PREV-33',
+                  titulo: 'Despliegue preventivo',
+                  estado: 'DESPACHADA',
+                  tipoMision: 'PREVENCION',
+                  fechaInicio: null,
+                  fechaCierre: null,
+                  creadoEn: '2026-11-19T15:00:00Z',
+                },
+              ],
+              recursosAsignados: [
+                {
+                  id: 'epr-1',
+                  recursoId: 'rec-propio',
+                  nombre: 'Motobomba 1',
+                  esIndividual: true,
+                  cantidadAsignada: 1,
+                  misionId: 'mis-prev-h33',
+                  creadoEn: '2026-11-19T15:00:00Z',
+                },
+                {
+                  id: 'epr-2',
+                  recursoId: 'rec-otro',
+                  nombre: 'Generador',
+                  esIndividual: true,
+                  cantidadAsignada: 1,
+                  misionId: 'mis-prev-otra',
+                  creadoEn: '2026-11-19T15:00:00Z',
+                },
+              ],
+              creadoPorId: 'enc-1',
+              creadoEn: '2026-11-19T15:00:00Z',
+              actualizadoEn: '2026-11-19T15:00:00Z',
+            },
+          },
+          error: undefined,
+          response: new Response(),
+        } as never);
+
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue(sincronizadas[0]);
+
+      const detallePrev = await obtenerDetalleMision('mis-prev-h33');
+      expect(detallePrev?.datosAdicionales?.recursosPrevencion).toHaveLength(1);
+      expect(detallePrev?.datosAdicionales?.recursosEventoPrevencion).toHaveLength(1);
+
+      // Aceptar misión preventiva mantiene estadoPatrulla = EN_PREVENCION y estadoIncidente = null
+      Object.defineProperty(navigator, 'onLine', {
+        value: false,
+        configurable: true,
+      });
+      const aceptada = await aceptarMisionPatrulla('mis-prev-h33', {
+        misionActual: detallePrev!,
+      });
+      expect(aceptada.mision.estado).toBe('EN_CURSO');
+      expect(aceptada.mision.datosAdicionales?.estadoPatrulla).toBe('EN_PREVENCION');
+      expect(aceptada.mision.datosAdicionales?.estadoIncidente).toBeNull();
     });
   });
 });

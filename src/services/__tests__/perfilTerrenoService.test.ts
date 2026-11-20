@@ -49,6 +49,44 @@ describe('perfilTerrenoService — Estadísticas y especialidad del operador', (
     expect(metricas.especialidad).toBe('Cuadrilla de Respuesta Operativa y Despeje');
   });
 
+  it('incluye misiones PREVENCION sin filtrar tipoMision y marca estadoOperativoUnidad EN_PREVENCION (HU-33)', async () => {
+    const mockMisiones: Partial<MisionLocal>[] = [
+      { id: 'prev-1', tipoMision: 'PREVENCION', estado: 'EN_CURSO' },
+      { id: 'ver-1', tipoMision: 'VERIFICACION', estado: 'FINALIZADA' },
+    ];
+
+    vi.mocked(misionesService.sincronizarMisiones).mockResolvedValue(
+      mockMisiones as MisionLocal[]
+    );
+
+    const metricas = await obtenerMetricasPerfil(
+      {
+        id: 'u-pat-1',
+        rut: '12.345.678-9',
+        nombre: 'Patrullero 1',
+        email: 'p1@valdivia.cl',
+        rolId: 'r-1',
+        rolNombre: 'Patrulla Verificadora',
+        rolCodigo: 'PATRULLA_VERIFICADORA',
+        delegacionId: 'd-1',
+        delegacionNombre: 'Centro',
+        permisos: [],
+        unidadId: 'pat-01',
+        unidadNombre: 'Patrulla Alfa',
+        unidadActiva: true,
+      },
+      false
+    );
+
+    expect(misionesService.sincronizarMisiones).toHaveBeenCalledWith({
+      patrullaId: 'pat-01',
+      cuadrillaId: undefined,
+    });
+    expect(metricas.estadoOperativoUnidad).toBe('EN_PREVENCION');
+    expect(metricas.misionesEnCurso).toBe(1);
+    expect(metricas.misionesAtendidas).toBe(1);
+  });
+
   describe('Historial de Patrullas del Funcionario (H85)', () => {
     it('no registra nada si el usuario no tiene unidad asignada', async () => {
       const usuarioSinUnidad: Partial<UsuarioPerfilSesion> = {

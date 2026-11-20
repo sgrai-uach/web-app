@@ -343,5 +343,103 @@ describe('PatrullaMisionDetailPage — Confirmar y aceptar misión asignada (HU-
       screen.queryByRole('button', { name: /aceptar misi[oó]n/i })
     ).not.toBeInTheDocument();
   });
+
+  it('muestra tarjeta preventiva y recursos en misión PREVENCION, acepta con estado EN_PREVENCION y excluye formularios H37/H38/H39 (HU-33 / §3.4)', async () => {
+    configurarAuthMock({ unidadActiva: true, permisoVerificar: true });
+
+    const misionPrevencionMock: MisionLocal = {
+      id: '60000000-0000-4000-8000-000000000033',
+      incidenteId: '',
+      codigoIncidente: 'MIS-PREV-033',
+      tipoMision: 'PREVENCION',
+      tipologia: 'Control preventivo sector Barrios Bajos',
+      direccion: 'Pérez Rosales 880, Valdivia',
+      coordenadas: { lat: -39.819, lng: -73.245 },
+      prioridad: 'ALTA',
+      estado: 'DESPACHADA',
+      fechaDespacho: '2026-11-19T14:00:00.000Z',
+      actualizadoEn: '2026-11-19T14:00:00.000Z',
+      sincronizacionPendiente: false,
+      datosAdicionales: {
+        eventoPrevencion: {
+          id: 'ev-33',
+          codigo: 'EVP-2026-33',
+          nombre: 'Operativo Preventivo Invierno',
+          estado: 'EN_CURSO',
+          prioridad: 'ALTA',
+        },
+        puntoCritico: {
+          id: 'pc-33',
+          codigo: 'PC-33',
+          nombre: 'Colector Barrios Bajos',
+          tipoRiesgo: 'Anegamiento',
+        },
+        recursosPrevencion: [
+          {
+            recursoId: 'rec-mb-1',
+            nombre: 'Motobomba Honda',
+            esIndividual: true,
+            cantidadAsignada: 1,
+            estadoRecurso: 'ASIGNADO',
+            misionId: '60000000-0000-4000-8000-000000000033',
+          },
+        ],
+      },
+    };
+
+    const misionPrevencionEnCurso: MisionLocal = {
+      ...misionPrevencionMock,
+      estado: 'EN_CURSO',
+      fechaInicio: '2026-11-19T14:05:00.000Z',
+      datosAdicionales: {
+        ...misionPrevencionMock.datosAdicionales,
+        estadoPatrulla: 'EN_PREVENCION',
+        estadoIncidente: null,
+      },
+    };
+
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(
+      misionPrevencionMock
+    );
+    vi.mocked(misionesService.aceptarMisionPatrulla).mockResolvedValue({
+      mision: misionPrevencionEnCurso,
+      enColaOffline: false,
+      mensaje: 'Misión preventiva aceptada.',
+    });
+
+    await act(async () => {
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <PatrullaMisionDetailPage
+            params={Promise.resolve({ id: misionPrevencionMock.id })}
+          />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('prevencion-mision-card')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('MIS-PREV-033')).toBeInTheDocument();
+    expect(screen.getAllByText('Prevención territorial').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Motobomba Honda')).toBeInTheDocument();
+    expect(screen.getByText(/Confirmación de despliegue preventivo/i)).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('formularios-reporte-tecnico')
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /aceptar misi[oó]n/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Operación Preventiva en Curso')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('En prevención')).toBeInTheDocument();
+    expect(screen.getByTestId('nota-operacion-preventiva')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('formularios-reporte-tecnico')
+    ).not.toBeInTheDocument();
+  });
 });
 

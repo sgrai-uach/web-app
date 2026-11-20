@@ -113,5 +113,49 @@ describe('MisionAsignadaBanner (HU-35)', () => {
     fireEvent.click(screen.getByTestId('btn-cerrar-banner'));
     expect(onCerrarMock).toHaveBeenCalled();
   });
+
+  it('muestra encabezado preventivo, código de evento y resumen logístico en misiones PREVENCION (HU-33)', () => {
+    const alertaPrevencion = {
+      ...alertaEjemplo,
+      notificacionId: 'prev-mis-100',
+      tipoMision: 'PREVENCION',
+      incidenteId: '',
+      incidenteFolio: undefined,
+      eventoPrevencionCodigo: 'EVP-2026-01',
+      eventoPrevencionNombre: 'Limpieza preventiva canal Angachilla',
+      recursosAsignados: [
+        {
+          recursoId: 'rec-1',
+          nombre: 'Sacos de arena',
+          esIndividual: false,
+          cantidadAsignada: 30,
+        },
+        {
+          recursoId: 'rec-2',
+          nombre: 'Motobomba',
+          esIndividual: true,
+          cantidadAsignada: 1,
+        },
+      ],
+      esEventoSinteticoPrevencion: true,
+    };
+
+    render(
+      <MisionAsignadaBanner
+        alerta={alertaPrevencion}
+        onVerMision={vi.fn()}
+        onCerrar={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Misión Preventiva Asignada')).toBeInTheDocument();
+    expect(screen.getByTestId('codigo-evento-banner')).toHaveTextContent('Evento: EVP-2026-01');
+    expect(screen.getByTestId('afectacion-banner')).toHaveTextContent(
+      'Limpieza preventiva canal Angachilla'
+    );
+    expect(screen.getByTestId('recursos-banner')).toHaveTextContent(
+      '2 recursos logísticos asignados'
+    );
+  });
 });
 

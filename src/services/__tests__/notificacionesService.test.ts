@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   procesarMisionAsignada,
+  procesarPrevencionActualizada,
   emitirAckLectura,
   consultarMisionesPendientes,
   limpiarCacheNotificacionesMemoria,
@@ -205,5 +206,56 @@ describe('notificacionesService (HU-35)', () => {
     const pendientes = await consultarMisionesPendientes('pat-1');
     expect(pendientes).toHaveLength(1);
     expect(pendientes[0].codigoMision).toBe('MIS-2026-0001');
+  });
+
+  it('procesarPrevencionActualizada persiste misión PREVENCION en IndexedDB sin emitir ACK remoto (HU-33)', async () => {
+    limpiarCacheNotificacionesMemoria();
+
+    const resultado = await procesarPrevencionActualizada({
+      id: 'ev-200',
+      codigo: 'EVP-2026-02',
+      nombre: 'Despliegue preventivo Sector Norte',
+      evento: {
+        id: 'ev-200',
+        codigo: 'EVP-2026-02',
+        nombre: 'Despliegue preventivo Sector Norte',
+        estado: 'EN_CURSO',
+        prioridad: 'ALTA',
+        sector: 'Las Ánimas',
+        latitud: -39.81,
+        longitud: -73.22,
+      },
+      mision: {
+        id: 'mis-prev-200',
+        codigo: 'MIS-PREV-200',
+        titulo: 'Control de canales',
+        estado: 'DESPACHADA',
+        tipoMision: 'PREVENCION',
+      },
+      patrulla: {
+        id: 'pat-1',
+        nombre: 'Patrulla Móvil 01',
+        estado: 'EN_PREVENCION',
+      },
+      recursos: [
+        {
+          recursoId: 'rec-sacos',
+          nombre: 'Sacos de arena',
+          esIndividual: false,
+          cantidadAsignada: 25,
+          cantidadEnUso: 25,
+          estadoRecurso: 'DISPONIBLE',
+        },
+      ],
+      asignadoEn: '2026-11-19T14:00:00Z',
+    });
+
+    expect(resultado).not.toBeNull();
+    expect(resultado?.esDuplicado).toBe(false);
+    expect(resultado?.alerta.notificacionId).toBe('prev-mis-prev-200');
+    expect(resultado?.mision.tipoMision).toBe('PREVENCION');
+    expect(resultado?.mision.incidenteId).toBe('');
+    expect(socketClient.emitirAckNotificacionSocket).not.toHaveBeenCalled();
+    expect(apiClient.PATCH).not.toHaveBeenCalled();
   });
 });

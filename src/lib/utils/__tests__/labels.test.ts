@@ -5,7 +5,9 @@ import {
   ETIQUETAS_ESTADO,
   ETIQUETAS_PRIORIDAD,
   ETIQUETAS_TIPOLOGIA,
+  ETIQUETAS_TIPO_MISION,
 } from '../labels';
+import { formatearTipoMision, esMisionDePrevencion } from '../formatters';
 
 describe('labels — Mapeo estricto a lenguaje natural y respaldo seguro', () => {
   it('mapea correctamente enums conocidos de estado', () => {
@@ -34,5 +36,19 @@ describe('labels — Mapeo estricto a lenguaje natural y respaldo seguro', () =>
     expect(limpiarTituloMision('Evaluación de anegamiento en calzada')).toBe('anegamiento en calzada');
     expect(limpiarTituloMision('Verificación: Anegamiento - INC-592395-562')).toBe('Anegamiento');
     expect(limpiarTituloMision('Despeje regular')).toBe('Despeje regular');
+  });
+
+  it('mapea estados y tipología de misiones preventivas (HU-33)', () => {
+    expect(formatearEtiquetaSegura('EN_PREVENCION', ETIQUETAS_ESTADO)).toBe('En prevención');
+    expect(formatearEtiquetaSegura('BAJO_STOCK', ETIQUETAS_ESTADO)).toBe('Bajo stock');
+    expect(formatearEtiquetaSegura('ASIGNADO', ETIQUETAS_ESTADO)).toBe('Asignado');
+    expect(formatearEtiquetaSegura('PREVENCION', ETIQUETAS_TIPO_MISION)).toBe(
+      'Prevención territorial'
+    );
+    expect(formatearTipoMision('PREVENCION')).toBe('Prevención territorial');
+    expect(esMisionDePrevencion({ tipoMision: 'PREVENCION' })).toBe(true);
+    expect(esMisionDePrevencion({ tipoMision: 'VERIFICACION' })).toBe(
+      false
+    );
   });
 });

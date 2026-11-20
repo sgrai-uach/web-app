@@ -53,7 +53,6 @@ describe('PatrullaMisionesPage — Modo Histórico y Filtro por Patrulla (H85 / 
 
     await waitFor(() => {
       expect(misionesService.sincronizarMisiones).toHaveBeenCalledWith({
-        tipoMision: 'VERIFICACION',
         patrullaId: 'pat-02',
       });
       expect(
@@ -98,7 +97,6 @@ describe('PatrullaMisionesPage — Modo Histórico y Filtro por Patrulla (H85 / 
 
     await waitFor(() => {
       expect(misionesService.sincronizarMisiones).toHaveBeenCalledWith({
-        tipoMision: 'VERIFICACION',
         patrullaId: 'pat-01',
       });
       expect(
@@ -142,5 +140,73 @@ describe('PatrullaMisionesPage — Modo Histórico y Filtro por Patrulla (H85 / 
 
     expect(screen.getByText(/Sin Patrulla Asignada — Mario Patrullero/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: /^misiones$/i })).toBeInTheDocument();
+  });
+
+  it('muestra misiones PREVENCION con insignia de prevención territorial y conteo de recursos asignados (HU-33)', async () => {
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: {
+        id: 'u-pat-3',
+        rut: '12.345.678-5',
+        nombre: 'Mario Patrullero',
+        email: 'mpatrullero@valdivia.cl',
+        rolId: 'r-pat-1',
+        rolNombre: 'Patrulla Verificadora',
+        rolCodigo: 'PATRULLA_VERIFICADORA',
+        delegacionId: 'del-1',
+        delegacionNombre: 'Valdivia Sur',
+        permisos: ['misiones:terreno:verificar'],
+        unidadId: 'pat-01',
+        unidadNombre: 'Patrulla Costa-1',
+        unidadActiva: true,
+      },
+      token: 'mock-token',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: true,
+      esCuadrilla: false,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
+    });
+
+    vi.mocked(misionesService.sincronizarMisiones).mockResolvedValueOnce([
+      {
+        id: 'mis-prev-pat-1',
+        incidenteId: '',
+        codigoIncidente: 'MIS-PREV-900',
+        tipoMision: 'PREVENCION',
+        tipologia: 'Limpieza preventiva canal Angachilla',
+        prioridad: 'ALTA',
+        estado: 'DESPACHADA',
+        direccion: 'Pasaje Los Robles s/n',
+        fechaDespacho: '2026-11-19T15:00:00Z',
+        actualizadoEn: '2026-11-19T15:00:00Z',
+        sincronizacionPendiente: false,
+        datosAdicionales: {
+          recursosPrevencion: [
+            {
+              recursoId: 'rec-1',
+              nombre: 'Sacos de arena',
+              esIndividual: false,
+              cantidadAsignada: 20,
+              misionId: 'mis-prev-pat-1',
+            },
+          ],
+        },
+      },
+    ]);
+
+    render(<PatrullaMisionesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('MIS-PREV-900')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Prevención territorial')).toBeInTheDocument();
+    expect(screen.getByText('1 recurso logístico asignado')).toBeInTheDocument();
   });
 });

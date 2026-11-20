@@ -259,5 +259,63 @@ describe('useTerrenoSocket hook (H85)', () => {
     expect(mockSocket.off).toHaveBeenCalledWith('mision:actualizada', expect.any(Function));
     expect(mockSocket.off).toHaveBeenCalledWith('incidente:actualizado', expect.any(Function));
   });
+
+  it('suscribe a prevencion:actualizada y dispara sgrai:prevencion-actualizada y sgrai:mision-sincronizada (HU-33)', () => {
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: {
+        id: 'u-pat-3',
+        rut: '12.345.678-9',
+        nombre: 'Personal 3',
+        email: 'p3@valdivia.cl',
+        rolId: 'r-1',
+        rolNombre: 'Patrulla Verificadora',
+        rolCodigo: 'PATRULLA_VERIFICADORA',
+        delegacionId: 'del-1',
+        delegacionNombre: 'Centro',
+        permisos: [],
+        unidadId: 'pat-123',
+        unidadNombre: 'Patrulla 1',
+        unidadActiva: true,
+      },
+      token: 'jwt-patrulla',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: true,
+      esCuadrilla: false,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: recargarSesionMock,
+    });
+
+    const syncListener = vi.fn();
+    const prevListener = vi.fn();
+    window.addEventListener('sgrai:mision-sincronizada', syncListener);
+    window.addEventListener('sgrai:prevencion-actualizada', prevListener);
+
+    const { unmount } = renderHook(() => useTerrenoSocket());
+
+    act(() => {
+      mockSocket.trigger('prevencion:actualizada', {
+        id: 'ev-1',
+        patrulla: { id: 'pat-123', nombre: 'Patrulla 1', estado: 'EN_PREVENCION' },
+      });
+    });
+
+    expect(prevListener).toHaveBeenCalledTimes(1);
+    expect(syncListener).toHaveBeenCalledTimes(1);
+
+    unmount();
+    window.removeEventListener('sgrai:mision-sincronizada', syncListener);
+    window.removeEventListener('sgrai:prevencion-actualizada', prevListener);
+    expect(mockSocket.off).toHaveBeenCalledWith(
+      'prevencion:actualizada',
+      expect.any(Function)
+    );
+  });
 });
 

@@ -9,7 +9,10 @@ import * as AuthContextModule from '@/context/AuthContext';
 import * as socketClient from '@/lib/socket/socketClient';
 import * as notificacionesService from '@/services/notificacionesService';
 import * as alertaSonora from '@/lib/utils/alertaSonora';
-import type { MisionAsignadaPayload } from '@/types/notificaciones';
+import type {
+  MisionAsignadaPayload,
+  PrevencionActualizadaPayload,
+} from '@/types/notificaciones';
 
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -24,12 +27,14 @@ vi.mock('@/lib/socket/socketClient', () => ({
   unirseASalaPatrulla: vi.fn(),
   salirDeSalaPatrulla: vi.fn(),
   onMisionAsignada: vi.fn(),
+  onPrevencionActualizada: vi.fn(),
   onSocketConnect: vi.fn(),
   emitirAckNotificacionSocket: vi.fn(),
 }));
 
 vi.mock('@/services/notificacionesService', () => ({
   procesarMisionAsignada: vi.fn(),
+  procesarPrevencionActualizada: vi.fn(),
   emitirAckLectura: vi.fn(),
   consultarMisionesPendientes: vi.fn(),
 }));
@@ -58,6 +63,7 @@ function TestConsumer() {
 
 describe('NotificacionesTerrenoContext (HU-35)', () => {
   let socketHandler: (payload: MisionAsignadaPayload) => void = () => {};
+  let prevencionHandler: (payload: PrevencionActualizadaPayload) => void = () => {};
   let connectHandler: () => void = () => {};
 
   const usuarioPatrulla = {
@@ -81,6 +87,11 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
 
     vi.mocked(socketClient.onMisionAsignada).mockImplementation((fn) => {
       socketHandler = fn;
+      return () => {};
+    });
+
+    vi.mocked(socketClient.onPrevencionActualizada).mockImplementation((fn) => {
+      prevencionHandler = fn;
       return () => {};
     });
 
@@ -252,5 +263,93 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
         codigo: 'MIS-2026-0077',
       })
     );
+  });
+
+  it('procesa prevencion:actualizada para la patrulla asignada, activa alerta sin ACK remoto y navega al detalle (HU-33)', async () => {
+    vi.mocked(notificacionesService.procesarPrevencionActualizada).mockResolvedValue({
+      esDuplicado: false,
+      alerta: {
+        notificacionId: 'prev-mis-prev-1',
+        misionId: 'mis-prev-1',
+        codigo: 'MIS-PREV-01',
+        tipoMision: 'PREVENCION',
+        prioridad: 'ALTA',
+        patrullaId: 'patrulla-uuid-999',
+        incidenteId: '',
+        tipoAfectacion: 'Limpieza canal Las Ánimas',
+        direccion: 'Sector Las Ánimas',
+        asignadoEn: '2026-11-19T12:00:00Z',
+        eventoPrevencionId: 'ev-1',
+        eventoPrevencionCodigo: 'EVP-01',
+        eventoPrevencionNombre: 'Limpieza canal Las Ánimas',
+        esEventoSinteticoPrevencion: true,
+        recursosAsignados: [
+          {
+            recursoId: 'rec-1',
+            nombre: 'Motobomba',
+            esIndividual: true,
+            cantidadAsignada: 1,
+          },
+        ],
+      },
+      mision: {
+        id: 'mis-prev-1',
+        incidenteId: '',
+        codigoIncidente: 'MIS-PREV-01',
+        tipoMision: 'PREVENCION',
+        tipologia: 'Limpieza canal Las Ánimas',
+        direccion: 'Sector Las Ánimas',
+        prioridad: 'ALTA',
+        estado: 'DESPACHADA',
+        fechaDespacho: '2026-11-19T12:00:00Z',
+        actualizadoEn: '2026-11-19T12:00:00Z',
+      },
+    });
+
+    render(
+      <NotificacionesTerrenoProvider>
+        <TestConsumer />
+      </NotificacionesTerrenoProvider>
+    );
+
+    await act(async () => {
+      prevencionHandler({
+        id: 'ev-1',
+        codigo: 'EVP-01',
+        nombre: 'Limpieza canal Las Ánimas',
+        mision: {
+          id: 'mis-prev-1',
+          codigo: 'MIS-PREV-01',
+          titulo: 'Despliegue preventivo',
+          estado: 'DESPACHADA',
+          tipoMision: 'PREVENCION',
+        },
+        patrulla: {
+          id: 'patrulla-uuid-999',
+          nombre: 'Patrulla Costa-1',
+          estado: 'EN_PREVENCION',
+        },
+        recursos: [
+          {
+            recursoId: 'rec-1',
+            nombre: 'Motobomba',
+            esIndividual: true,
+            cantidadAsignada: 1,
+            cantidadEnUso: 1,
+            estadoRecurso: 'ASIGNADO',
+          },
+        ],
+        asignadoEn: '2026-11-19T12:00:00Z',
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('estado-alerta')).toHaveTextContent('MIS-PREV-01');
+    });
+    expect(alertaSonora.activarAlertaSensorialMision).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('btn-ver-mision-banner'));
+    expect(notificacionesService.emitirAckLectura).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/patrulla/misiones/mis-prev-1');
   });
 });
