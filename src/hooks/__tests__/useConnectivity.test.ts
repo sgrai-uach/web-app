@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useConnectivity } from '../useConnectivity';
 import * as offlineQueue from '@/services/offlineQueue';
 
 vi.mock('@/services/offlineQueue');
+vi.mock('@/services/misionesService', () => ({
+  obtenerDetalleMision: vi.fn(),
+}));
 
 describe('useConnectivity hook', () => {
   beforeEach(() => {
@@ -45,6 +48,26 @@ describe('useConnectivity hook', () => {
     });
 
     expect(result.current.online).toBe(true);
+  });
+
+  it('dispara sincronización automática al montar con conexión si hay pendientes y reporta status syncing mientras existan pendientes (BUG-H36-PWA-04)', async () => {
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+    vi.mocked(offlineQueue.contarAccionesPendientes)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(1);
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockResolvedValue({
+      total: 1,
+      exitosas: 0,
+      fallidas: 1,
+    });
+
+    const { result } = renderHook(() => useConnectivity());
+
+    await waitFor(() => {
+      expect(offlineQueue.sincronizarColaOutbox).toHaveBeenCalled();
+      expect(result.current.pendientes).toBe(1);
+      expect(result.current.status).toBe('syncing');
+    });
   });
 
   it('sincroniza acción RECHAZAR_MISION y limpia sincronizacionPendiente en IndexedDB', async () => {
@@ -99,4 +122,5 @@ describe('useConnectivity hook', () => {
       })
     );
   });
+
 });

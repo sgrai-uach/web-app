@@ -23,22 +23,6 @@ import { registrarPatrullaEnHistorial } from '@/services/perfilTerrenoService';
 
 const SESSION_PROFILE_KEY = 'sgrai_usuario_sesion';
 
-const PERFIL_DEMO_PATRULLA: UsuarioPerfilSesion = {
-  id: '00000000-0000-4000-8000-000000000004',
-  rut: '12.345.678-5',
-  nombre: 'Operador Patrulla Terreno',
-  email: 'patrulla@valdivia.cl',
-  rolId: 'rol-patrulla-01',
-  rolNombre: 'Patrulla Verificadora',
-  rolCodigo: 'PATRULLA_VERIFICADORA',
-  delegacionId: 'del-01',
-  delegacionNombre: 'Valdivia Norte',
-  unidadId: 'f1000000-0000-4000-8000-000000000050',
-  unidadNombre: 'Patrulla Rápida Costa-1',
-  unidadActiva: true,
-  permisos: ['misiones:terreno:verificar', 'misiones:terreno:reportar'],
-};
-
 function leerPerfilGuardado(): UsuarioPerfilSesion | null {
   if (typeof window === 'undefined' || !window.sessionStorage) return null;
   try {
@@ -105,9 +89,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         rolId: detalle.rol?.id || '',
         rolNombre: detalle.rol?.nombre || '',
         rolCodigo: detalle.rol?.codigo || '',
-        delegacionId: detalle.delegacionId ?? null,
-        delegacionNombre: detalle.delegacionNombre ?? null,
-        permisos: Array.isArray(detalle.permisos) ? detalle.permisos : [],
+        delegacionId: detalle.delegacionId ?? (detalle as unknown as { delegacion?: { id?: string } })?.delegacion?.id ?? null,
+        delegacionNombre: detalle.delegacionNombre ?? (detalle as unknown as { delegacion?: { nombre?: string } })?.delegacion?.nombre ?? null,
+        permisos: Array.isArray(detalle.permisos)
+          ? detalle.permisos
+          : (detalle.rol as unknown as { permisos?: string[] } | undefined)?.permisos || [],
         unidadId: detalle.unidadId ?? null,
         unidadNombre: detalle.unidadNombre ?? null,
         unidadActiva: detalle.unidadActiva,
@@ -126,14 +112,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (cookieToken === 'dev-patrulla-token') {
-      const guardado = leerPerfilGuardado() || PERFIL_DEMO_PATRULLA;
-      setToken(cookieToken);
-      setUsuario(guardado);
-      setCargando(false);
-      return;
-    }
-
     try {
       const detalle = await obtenerUsuarioActivo();
       const perfil = mapDetalleAUsuarioPerfil(detalle);
@@ -144,7 +122,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(null);
         try {
           if (typeof window !== 'undefined' && window.location) {
-            window.location.assign('/gestion');
+            const gestionUrl = new URL('/gestion', window.location.origin).toString();
+            window.location.assign(gestionUrl);
           }
         } catch {
           // Ignorado en pruebas unitarias
@@ -230,7 +209,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const target = window.location.pathname.startsWith('/terreno')
           ? '/terreno/login'
           : '/login';
-        window.location.assign(target);
+        const targetUrl = new URL(target, window.location.origin).toString();
+        window.location.assign(targetUrl);
       }
     } catch {
       // Ignorado en pruebas unitarias
@@ -256,12 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (listaPermisos.includes('*') || listaPermisos.includes(permiso)) {
         return true;
       }
-      // Fallback por rol canónico de terreno cuando el token o mock no desglosa permisos granulares
-      if (
-        esPatrulla &&
-        (permiso.startsWith('patrulla:') ||
-          (listaPermisos.length === 0 && permiso === 'misiones:terreno:verificar'))
-      ) {
+      if (esPatrulla && permiso.startsWith('patrulla:')) {
         return true;
       }
       if (esCuadrilla && permiso.startsWith('cuadrilla:')) {

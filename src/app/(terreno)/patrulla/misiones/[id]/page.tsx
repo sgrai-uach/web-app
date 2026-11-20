@@ -68,11 +68,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     setCargando(true);
     try {
       const encontrada = await obtenerDetalleMision(misionId);
-      if (encontrada) {
-        setMision(encontrada);
-      } else {
-        setMision(null);
-      }
+      setMision(encontrada || null);
     } finally {
       setCargando(false);
     }
@@ -133,25 +129,42 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             <ArrowLeft size={16} aria-hidden="true" />
             <span>Misiones</span>
           </Link>
+          <ConnectionStatusBadge
+            status={status}
+            pendingCount={pendientes}
+            onRetry={sincronizar}
+          />
         </div>
-        <div className={styles.detailCard} style={{ textAlign: 'center', padding: 'var(--space-6)' }}>
-          <AlertCircle size={40} color="var(--color-text-muted)" aria-hidden="true" style={{ margin: '0 auto var(--space-3)' }} />
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 700, margin: '0 0 var(--space-2)' }}>
+        <div
+          style={{
+            backgroundColor: 'var(--color-white)',
+            border: '1px solid var(--color-border)',
+            padding: 'var(--space-6)',
+            textAlign: 'center',
+          }}
+          role="alert"
+        >
+          <p style={{ fontWeight: 700, margin: '0 0 var(--space-2) 0' }}>
             Misión no encontrada
-          </h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: '0 0 var(--space-4)' }}>
-            La misión solicitada no existe o no se encuentra asignada a su unidad operativa.
+          </p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: 0 }}>
+            La misión solicitada no existe o no se encuentra asignada a su unidad operativa, o no
+            está disponible en caché local.
           </p>
           <Link
             href="/patrulla/misiones"
             style={{
               display: 'inline-block',
+              marginTop: 'var(--space-4)',
               padding: 'var(--space-2) var(--space-4)',
               background: 'var(--color-primary-teal)',
               color: 'var(--color-white)',
               textDecoration: 'none',
               fontWeight: 600,
               fontSize: '0.875rem',
+              borderRadius: 0,
+              minHeight: '48px',
+              lineHeight: '48px',
             }}
           >
             Volver a la bandeja

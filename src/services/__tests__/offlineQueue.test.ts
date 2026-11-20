@@ -87,6 +87,31 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
     expect(listaActual.some((a) => a.id === accion1.id)).toBe(false);
   });
 
+  it('deduplica acciones en outbox con mismo tipo y url (BUG-H36-PWA-04)', async () => {
+    const primera = await encolarAccionOutbox({
+      tipo: 'ACEPTAR_MISION',
+      url: '/api/misiones/mision-dup/aceptar',
+      metodo: 'POST',
+      payload: { latitud: -39.81, longitud: -73.24 },
+    });
+
+    const segunda = await encolarAccionOutbox({
+      tipo: 'ACEPTAR_MISION',
+      url: '/api/misiones/mision-dup/aceptar',
+      metodo: 'POST',
+      payload: { latitud: -39.82, longitud: -73.25 },
+    });
+
+    expect(segunda.id).toBe(primera.id);
+    const accionesMismoTipoUrl = (await obtenerAccionesOutbox()).filter(
+      (a) => a.tipo === 'ACEPTAR_MISION' && a.url === '/api/misiones/mision-dup/aceptar'
+    );
+    expect(accionesMismoTipoUrl).toHaveLength(1);
+    expect(accionesMismoTipoUrl[0].payload).toEqual({ latitud: -39.82, longitud: -73.25 });
+
+    await eliminarAccionOutbox(primera.id);
+  });
+
   it('limpia almacenamiento offline y misiones locales correctamente', async () => {
     await guardarMisionesLocales([misionEjemplo]);
     await encolarAccionOutbox({
@@ -104,4 +129,5 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
     const pendientes = await contarAccionesPendientes();
     expect(pendientes).toBe(0);
   });
+
 });
