@@ -3905,6 +3905,24 @@ export interface paths {
                                         /** Format: email */
                                         email: string;
                                     } | null;
+                                    /** @description Inventario de recursos asignados a la patrulla en misiones preventivas */
+                                    recursos?: {
+                                        /**
+                                         * Format: uuid
+                                         * @description Identificador del recurso
+                                         */
+                                        id: string;
+                                        /** @description Nombre o descripción del recurso */
+                                        nombre: string;
+                                        /** @description Categoría del recurso (HERRAMIENTA, VEHICULO, EQUIPO, etc.) */
+                                        tipo: string;
+                                        /** @description Cantidad física asignada a la patrulla */
+                                        cantidadAsignada: number;
+                                        /** @description Indica si es maquinaria/vehículo individual (true) o insumo consumible/granel (false) */
+                                        esIndividual?: boolean;
+                                        /** @description Unidad de medida declarada en el detalle del recurso */
+                                        unidad?: string | null;
+                                    }[];
                                 } | null;
                                 /** @description Hitos cronológicos de tiempo de la misión para análisis táctico (HU-17) */
                                 bitacoraTiempos: {
@@ -10679,46 +10697,68 @@ export interface components {
              * @description Identificador del usuario asignado como delegado de cuadrilla
              * @example 00000000-0000-4000-8000-000000000005
              */
-            usuarioDelegadoId: string;
-        };
-        /**
-         * CrearCuadrillaResponse
-         * @description Respuesta de éxito tras registrar una nueva cuadrilla operativa
-         */
-        CrearCuadrillaResponse: {
-            /** @example Cuadrilla operativa creada exitosamente */
-            message: string;
-            /**
-             * CuadrillaResponse
-             * @description Información detallada de la cuadrilla operativa y su dotación
-             */
-            data: {
-                /** Format: uuid */
-                id: string;
-                nombre: string;
-                /** @enum {string} */
-                estado: "DISPONIBLE" | "EN_MISION" | "NO_DISPONIBLE";
-                delegacion?: {
-                    /** Format: uuid */
-                    id?: string | null;
-                    nombre?: string | null;
-                    codigo?: string | null;
-                } | null;
-                delegado?: {
-                    /** Format: uuid */
-                    id?: string | null;
-                    nombre?: string | null;
-                    email?: (string | null) | "" | unknown;
-                    rut?: string | null;
-                } | null;
+                    recursoId: string;
+                    nombre: string;
+                    cantidadAsignada: number;
+                    esIndividual: boolean;
+                    descripcion?: string | null;
+                    detalles?: {
+                        [key: string]: unknown;
+                    } | null;
+                    especificaciones?: {
+                        [key: string]: unknown;
+                    } | null;
+                }[];
                 /** @default [] */
-                recursos: {
+                trabajadores: {
                     /** Format: uuid */
                     id: string;
                     /** Format: uuid */
-             * @description Tipo de misión táctica
-    * @example ATENCION_CUADRILLA
-        */
+                    personalId: string;
+                    /** Format: uuid */
+                    usuarioId: string;
+                    nombre: string;
+                    rut?: string | null;
+                    cargo?: string | null;
+                    especialidad?: string | null;
+                    telefono?: string | null;
+                    asignadoEn: string;
+                }[];
+                /**
+                 * @description Cantidad total de recursos asignados
+                 * @example 1
+                 */
+                totalRecursos: number;
+                /**
+                 * @description Cantidad total de trabajadores asignados
+                 * @example 1
+                 */
+                totalTrabajadores: number;
+                /**
+                 * MisionActivaCuadrilla
+                 * @description Detalle de la misión táctica activa que la cuadrilla se encuentra atendiendo
+                 */
+                misionActiva?: {
+                    /**
+                     * Format: uuid
+                     * @description Identificador de la misión
+                     * @example 50000000-0000-4000-8000-000000000001
+                     */
+                    id: string;
+                    /**
+                     * @description Código de la misión
+                     * @example MIS-2026-0012
+                     */
+                    codigo: string;
+                    /**
+                     * @description Título de la misión
+                     * @example Atención anegamiento en Isla Teja
+                     */
+                    titulo: string;
+                    /**
+                     * @description Tipo de misión táctica
+                     * @example ATENCION_CUADRILLA
+                     */
 tipoMision: string;
 /**
  * @description Estado de la misión (DESPACHADA o EN_CURSO)

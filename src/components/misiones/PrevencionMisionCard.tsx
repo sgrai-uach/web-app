@@ -14,7 +14,7 @@ import {
   obtenerVarianteChipEstadoRecurso,
   obtenerVarianteChipPrioridad,
 } from '@/lib/utils/chipVariants';
-import { formatearEstado, formatearPrioridad } from '@/lib/utils/formatters';
+import { formatearEstado, formatearPrioridad, formatearTipologia } from '@/lib/utils/formatters';
 import { obtenerContextoPrevencionMision } from '@/services/prevencionService';
 import type { MisionLocal } from '@/types/offline';
 import styles from './PrevencionMisionCard.module.css';
@@ -30,7 +30,7 @@ export function PrevencionMisionCard({
   esOffline = false,
   onVerMapa,
 }: PrevencionMisionCardProps) {
-  const { eventoPrevencion, puntoCritico, recursosMision, recursosOtrosEvento } =
+  const { eventoPrevencion, puntoCritico, recursosMision } =
     obtenerContextoPrevencionMision(mision);
 
   const estadoEvento =
@@ -106,7 +106,7 @@ export function PrevencionMisionCard({
               {puntoCritico.tipoRiesgo && (
                 <CampoResumenReporte
                   label="Amenaza recurrente"
-                  valor={puntoCritico.tipoRiesgo}
+                  valor={formatearTipologia(puntoCritico.tipoRiesgo)}
                 />
               )}
               {puntoCritico.descripcion && (
@@ -121,7 +121,7 @@ export function PrevencionMisionCard({
 
           {!eventoPrevencion && !puntoCritico && (
             <NotaInformativaReporte testId="nota-prevencion-resumen-basico">
-              Operación preventiva programada sin incidente previo (§3.4).
+              Operación preventiva programada sin incidente previo.
               {esOffline
                 ? ' El detalle extendido del punto crítico se sincronizará al recuperar cobertura.'
                 : ''}
@@ -221,16 +221,6 @@ export function PrevencionMisionCard({
             {esOffline
               ? 'Sin recursos cacheados localmente para esta misión. Conéctese a la red para sincronizar el detalle logístico.'
               : 'Esta misión preventiva no registra materiales o activos individuales asignados hasta el momento.'}
-          </NotaInformativaReporte>
-        )}
-
-        {recursosOtrosEvento.length > 0 && (
-          <NotaInformativaReporte testId="otros-recursos-evento">
-            Existen {recursosOtrosEvento.length}{' '}
-            {recursosOtrosEvento.length === 1
-              ? 'recurso adicional asignado'
-              : 'recursos adicionales asignados'}{' '}
-            a otras misiones dentro de este mismo evento preventivo.
           </NotaInformativaReporte>
         )}
       </BloqueFormularioReporte>

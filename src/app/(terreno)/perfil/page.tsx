@@ -173,7 +173,7 @@ export default function TerrenoPerfilPage() {
               ) : (
                 <>
                   <AlertCircle size={16} color="var(--color-warning)" aria-hidden="true" />
-                  <span className={styles.infoValue}>Unidad retirada del turno (§3.7 de baja)</span>
+                  <span className={styles.infoValue}>Unidad retirada del turno</span>
                 </>
               )}
             </div>

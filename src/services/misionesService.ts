@@ -21,6 +21,7 @@ import {
   limpiarTituloMision,
   formatearTipologia,
   esMisionDePrevencion,
+  humanizarTextoConEnums,
 } from '@/lib/utils/formatters';
 import {
   extraerCoordenadasGeoJson,
@@ -647,6 +648,19 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
               }
             : (datosPrevios.puntoCritico as PuntoCriticoPrevencionLocal | undefined);
 
+      const recursosDesdePatrulla: RecursoPrevencionLocal[] | null =
+        Array.isArray(d.patrulla?.recursos) && d.patrulla.recursos.length > 0
+          ? d.patrulla.recursos.map((r) => ({
+              id: r.id,
+              recursoId: r.id,
+              nombre: r.nombre,
+              esIndividual: Boolean(r.esIndividual),
+              cantidadAsignada: r.cantidadAsignada,
+              misionId: d.id,
+              unidad: r.unidad ?? null,
+            }))
+          : null;
+
       const recursosDesdeEvento = detalleEvento
         ? filtrarRecursosDeMision(
             normalizarRecursosPrevencion(detalleEvento.recursosAsignados),
@@ -656,11 +670,13 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         : null;
 
       const recursosPrevencionFinal: RecursoPrevencionLocal[] | undefined =
-        recursosDesdeEvento !== null
-          ? recursosDesdeEvento.propios
-          : Array.isArray(datosPrevios.recursosPrevencion)
-            ? normalizarRecursosPrevencion(datosPrevios.recursosPrevencion, d.id)
-            : undefined;
+        recursosDesdePatrulla !== null
+          ? recursosDesdePatrulla
+          : recursosDesdeEvento !== null
+            ? recursosDesdeEvento.propios
+            : Array.isArray(datosPrevios.recursosPrevencion)
+              ? normalizarRecursosPrevencion(datosPrevios.recursosPrevencion, d.id)
+              : undefined;
 
       const recursosEventoPrevencionFinal: RecursoPrevencionLocal[] | undefined =
         recursosDesdeEvento !== null
@@ -920,8 +936,10 @@ export async function aceptarMisionPatrulla(
           }
           throw new MisionServiceError(
             409,
-            msgConflict ||
-              'La misión no puede ser aceptada porque ya no se encuentra en estado DESPACHADA.'
+            humanizarTextoConEnums(
+              msgConflict ||
+                'La misión no puede ser aceptada porque ya no se encuentra en estado Despachada.'
+            )
           );
         }
 
@@ -969,7 +987,7 @@ export async function aceptarMisionPatrulla(
               : status === 404
                 ? 'La misión solicitada no fue encontrada.'
                 : 'No fue posible procesar la aceptación de la misión.');
-        throw new MisionServiceError(status, msgError);
+        throw new MisionServiceError(status, humanizarTextoConEnums(msgError));
       }
     } catch (err) {
       if (err instanceof MisionServiceError) {
@@ -1111,9 +1129,9 @@ export async function rechazarMision(
               : status === 404
                 ? 'La misión solicitada no fue encontrada.'
                 : status === 409
-                  ? 'La misión no se encuentra en estado DESPACHADA para ser rechazada.'
+                  ? 'La misión no se encuentra en estado Despachada para ser rechazada.'
                   : `Error al rechazar la misión (${status}).`);
-      throw new MisionServiceError(status, errorMsg);
+      throw new MisionServiceError(status, humanizarTextoConEnums(errorMsg));
     }
 
     await persistirRechazoLocal(false, data?.data?.mision?.actualizadoEn);

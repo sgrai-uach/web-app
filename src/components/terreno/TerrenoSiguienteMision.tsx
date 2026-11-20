@@ -12,6 +12,7 @@ import {
   formatearFechaHora24h,
   ordenarMisionesPorPrioridadYFecha,
   esMisionDePrevencion,
+  formatearTipologia,
 } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './TerrenoSiguienteMision.module.css';
@@ -154,7 +155,7 @@ export function TerrenoSiguienteMision() {
                   )}
                   <EstadoBadge estado={mision.estado} />
                 </div>
-                <div className={styles.typology}>{mision.tipologia}</div>
+                <div className={styles.typology}>{formatearTipologia(mision.tipologia)}</div>
                 <div className={styles.timestampRow}>
                   <Clock size={12} aria-hidden="true" />
                   <span>

@@ -8,6 +8,7 @@ import {
   formatearPrioridad,
   formatearFechaHora24h,
   esMisionDePrevencion,
+  formatearTipologia,
 } from '@/lib/utils/formatters';
 import { obtenerContextoPrevencionMision } from '@/services/prevencionService';
 import type { MisionLocal } from '@/types/offline';
@@ -52,7 +53,7 @@ export function MisionCard({ mision, href, esInactiva = false }: MisionCardProps
         </div>
       )}
 
-      <div className={styles.typology}>{mision.tipologia}</div>
+      <div className={styles.typology}>{formatearTipologia(mision.tipologia)}</div>
 
       <div className={styles.locationRow}>
         <MapPin size={16} className={styles.locationIcon} aria-hidden="true" />

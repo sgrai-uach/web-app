@@ -131,6 +131,25 @@ export function ordenarMisionesPorPrioridadYFecha<T extends { prioridad?: string
   });
 }
 
+const DICCIONARIO_HUMANIZACION_ENUMS: Record<string, string> = {
+  ...ETIQUETAS_ESTADO,
+  ...ETIQUETAS_TIPO_MISION,
+  ...ETIQUETAS_PRIORIDAD,
+};
+
+/**
+ * Reemplaza códigos enum internos (ej. 'EN_VERIFICACION', 'EN_PREVENCION', 'DESPACHADA')
+ * dentro de mensajes del backend por etiquetas legibles en español.
+ */
+export function humanizarTextoConEnums(texto: string): string {
+  if (!texto) return texto;
+  return texto.replace(/['"]?([A-Z]{2,}(?:_[A-Z0-9]+)*)['"]?/g, (match, token: string) => {
+    const etiqueta = DICCIONARIO_HUMANIZACION_ENUMS[token];
+    if (etiqueta) return etiqueta;
+    return match;
+  });
+}
+
 /**
  * Ordena un listado de misiones de forma descendente según la fecha de última actualización (H37).
  * Si actualizadoEn está ausente, recurre a fechaDespacho o creadoEn.

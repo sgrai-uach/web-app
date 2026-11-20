@@ -340,10 +340,10 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           />
           {unidadActiva && esEnCurso && (
             <NotaInformativaReporte testId="nota-operacion-preventiva">
-              Misión originada directamente sobre evento de prevención comunal
-              (§3.4), sin incidente previo asociado. Los formularios de
-              categorización, prioridad y dictamen de incidente no aplican para
-              despliegues preventivos.
+              Misión preventiva programada en punto crítico territorial, sin
+              incidente previo asociado. Los formularios de categorización,
+              prioridad y dictamen de incidente no aplican para despliegues
+              preventivos.
             </NotaInformativaReporte>
           )}
         </>

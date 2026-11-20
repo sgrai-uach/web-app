@@ -1,16 +1,8 @@
 'use client';
 
 import React from 'react';
-import {
-  AlertTriangle,
-  MapPin,
-  Clock,
-  ArrowRight,
-  X,
-  BellRing,
-  ShieldCheck,
-  Package,
-} from 'lucide-react';
+import { AlertTriangle, MapPin, Clock, ArrowRight, X, BellRing, ShieldCheck, Package } from 'lucide-react';
+import { formatearPrioridad, formatearTipologia } from '@/lib/utils/formatters';
 import type { MisionAsignadaAlerta } from '@/types/notificaciones';
 import { formatearFechaHora24h } from '@/lib/utils/formatters';
 import styles from './MisionAsignadaBanner.module.css';
@@ -65,7 +57,7 @@ export const MisionAsignadaBanner: React.FC<MisionAsignadaBannerProps> = ({
           data-testid="badge-prioridad-banner"
         >
           <AlertTriangle size={12} aria-hidden="true" style={{ marginRight: '4px', verticalAlign: 'middle' }} />
-          <span>{alerta.prioridad || 'ALTA'}</span>
+          <span>{formatearPrioridad(alerta.prioridad || 'ALTA')}</span>
         </span>
       </div>
 
@@ -89,9 +81,10 @@ export const MisionAsignadaBanner: React.FC<MisionAsignadaBannerProps> = ({
         <div className={styles.afectacionTitulo} data-testid="afectacion-banner">
           {esPrevencion
             ? alerta.eventoPrevencionNombre ||
-              alerta.tipoAfectacion ||
+              (alerta.tipoAfectacion ? formatearTipologia(alerta.tipoAfectacion) : '') ||
               'Despliegue preventivo en punto crítico'
-            : alerta.tipoAfectacion || 'Verificación operativa de incidente'}
+            : (alerta.tipoAfectacion ? formatearTipologia(alerta.tipoAfectacion) : '') ||
+              'Verificación operativa de incidente'}
         </div>
 
         {esPrevencion && totalRecursos > 0 && (

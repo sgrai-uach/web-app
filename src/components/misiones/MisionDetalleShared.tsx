@@ -123,7 +123,7 @@ export function MisionDetalleHeaderCard({
             {esPrevencion ? 'Operación preventiva' : 'Tipo'}
           </span>
           <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
-            {esPrevencion ? mision.tipologia : formatearTipologia(mision.tipologia)}
+            {formatearTipologia(mision.tipologia)}
           </span>
         </div>
 
