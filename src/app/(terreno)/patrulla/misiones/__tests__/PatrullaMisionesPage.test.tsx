@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import PatrullaMisionesPage from '../page';
 import * as AuthContextModule from '@/context/AuthContext';
 import * as misionesService from '@/services/misionesService';
@@ -53,7 +53,6 @@ describe('PatrullaMisionesPage — Modo Histórico y Filtro por Patrulla (H85 / 
 
     await waitFor(() => {
       expect(misionesService.sincronizarMisiones).toHaveBeenCalledWith({
-        tipoMision: 'VERIFICACION',
         patrullaId: 'pat-02',
       });
       expect(
@@ -98,12 +97,91 @@ describe('PatrullaMisionesPage — Modo Histórico y Filtro por Patrulla (H85 / 
 
     await waitFor(() => {
       expect(misionesService.sincronizarMisiones).toHaveBeenCalledWith({
-        tipoMision: 'VERIFICACION',
         patrullaId: 'pat-01',
       });
       expect(
         screen.getByText(/La patrulla se encuentra disponible para despacho\./i)
       ).toBeInTheDocument();
+    });
+  });
+
+  it('muestra misiones de recuperación y refresca al recibir sgrai:mision-sincronizada (H75)', async () => {
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: {
+        id: 'u-pat-3',
+        rut: '12.345.678-5',
+        nombre: 'Mario Patrullero',
+        email: 'mpatrullero@valdivia.cl',
+        rolId: 'r-pat-1',
+        rolNombre: 'Patrulla Verificadora',
+        rolCodigo: 'PATRULLA_VERIFICADORA',
+        delegacionId: 'del-1',
+        delegacionNombre: 'Valdivia Sur',
+        permisos: ['misiones:terreno:verificar'],
+        unidadId: 'pat-01',
+        unidadNombre: 'Patrulla Costa-1',
+        unidadActiva: true,
+      },
+      token: 'mock-token',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: true,
+      esCuadrilla: false,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
+    });
+
+    vi.mocked(misionesService.sincronizarMisiones)
+      .mockResolvedValueOnce([
+        {
+          id: 'mis-rec-1',
+          incidenteId: '',
+          codigoIncidente: 'MIS-REC-001',
+          tipoMision: 'RECUPERACION',
+          tipologia: 'Entrega de ayudas sector Las Ánimas',
+          direccion: 'Av. España 450',
+          prioridad: 'ALTA',
+          estado: 'EN_CURSO',
+          fechaDespacho: '2026-11-20T12:00:00Z',
+          actualizadoEn: '2026-11-20T12:00:00Z',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'mis-rec-1',
+          incidenteId: '',
+          codigoIncidente: 'MIS-REC-001',
+          tipoMision: 'RECUPERACION',
+          tipologia: 'Entrega de ayudas sector Las Ánimas',
+          direccion: 'Av. España 450',
+          prioridad: 'ALTA',
+          estado: 'COMPLETADA',
+          fechaDespacho: '2026-11-20T12:00:00Z',
+          fechaCierre: '2026-11-20T15:00:00Z',
+          actualizadoEn: '2026-11-20T15:00:00Z',
+        },
+      ]);
+
+    render(<PatrullaMisionesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('MIS-REC-001')).toBeInTheDocument();
+      expect(screen.getByText('Recuperación operativa')).toBeInTheDocument();
+      expect(screen.getAllByText('En curso').length).toBeGreaterThanOrEqual(2);
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('sgrai:mision-sincronizada'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Finalizada')).toBeInTheDocument();
     });
   });
 
