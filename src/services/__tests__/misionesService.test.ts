@@ -424,6 +424,58 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
       const coordsSinGps = await obtenerCoordenadasOpcionales(10);
       expect(coordsSinGps).toEqual({});
     });
+
+    it('mantiene estadoPatrulla EN_RECUPERACION y no fuerza estadoIncidente al aceptar misión RECUPERACION', async () => {
+      const misionRecup = {
+        ...misionDespachada,
+        id: 'mis-rec-01',
+        incidenteId: '',
+        tipoMision: 'RECUPERACION',
+        codigoIncidente: 'REC-2026-0001',
+      };
+
+      vi.mocked(apiClient.POST).mockResolvedValueOnce({
+        data: {
+          message: 'Misión de recuperación aceptada.',
+          data: {
+            mision: {
+              id: 'mis-rec-01',
+              codigo: 'MIS-2026-0099',
+              estado: 'EN_CURSO',
+              tipoMision: 'RECUPERACION',
+              prioridad: 'ALTA',
+              incidenteId: null,
+              patrullaId: 'pat-1',
+              fechaInicio: '2026-11-21T00:10:00.000Z',
+              actualizadoEn: '2026-11-21T00:10:00.000Z',
+            },
+            patrulla: {
+              id: 'pat-1',
+              nombre: 'Patrulla Recuperación Sur',
+              estado: 'EN_RECUPERACION',
+            },
+            incidente: null,
+            hito: {
+              id: 'hito-rec-1',
+              hito: 'MISION_ACEPTADA',
+              descripcion: 'Misión Aceptada por Patrulla',
+              creadoEn: '2026-11-21T00:10:00.000Z',
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
+
+      const resultado = await aceptarMisionPatrulla('mis-rec-01', {
+        misionActual: misionRecup,
+        coordenadas: {},
+      });
+
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.datosAdicionales?.estadoPatrulla).toBe('EN_RECUPERACION');
+      expect(resultado.mision.datosAdicionales?.estadoIncidente).toBeUndefined();
+    });
   });
 
   describe('Sincronización de tipología y estado de evaluaciones desde backend', () => {

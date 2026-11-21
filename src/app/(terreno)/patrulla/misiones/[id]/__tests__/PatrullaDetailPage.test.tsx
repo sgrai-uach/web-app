@@ -343,5 +343,54 @@ describe('PatrullaMisionDetailPage — Confirmar y aceptar misión asignada (HU-
       screen.queryByRole('button', { name: /aceptar misi[oó]n/i })
     ).not.toBeInTheDocument();
   });
+
+  it('acepta una misión de RECUPERACION mostrando texto de recuperación y vista En Trayecto / Recuperación', async () => {
+    configurarAuthMock();
+    const misionRecupDespachada = {
+      ...misionDespachadaMock,
+      id: 'mis-rec-detail-1',
+      incidenteId: '',
+      tipoMision: 'RECUPERACION',
+      codigoIncidente: 'MIS-REC-001',
+      tipologia: 'Recuperación / Entrega de ayudas',
+    };
+
+    const misionRecupEnCurso = {
+      ...misionRecupDespachada,
+      estado: 'EN_CURSO',
+      fechaInicio: '2026-11-21T00:10:00.000Z',
+      datosAdicionales: {
+        estadoPatrulla: 'EN_RECUPERACION',
+      },
+    };
+
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(misionRecupDespachada);
+    vi.mocked(misionesService.aceptarMisionPatrulla).mockResolvedValueOnce({
+      mision: misionRecupEnCurso,
+      enColaOffline: false,
+      mensaje: 'Misión de recuperación aceptada exitosamente.',
+    });
+
+    await act(async () => {
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <PatrullaMisionDetailPage
+            params={Promise.resolve({ id: misionRecupDespachada.id })}
+          />
+        </Suspense>
+      );
+    });
+
+    expect(
+      await screen.findByText(/ha tomado conocimiento del operativo de recuperación/i)
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /aceptar misi[oó]n/i }));
+
+    expect(
+      await screen.findByText('En Trayecto / Recuperación')
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('En recuperación').length).toBeGreaterThanOrEqual(1);
+  });
 });
 
