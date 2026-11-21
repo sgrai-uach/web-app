@@ -252,6 +252,7 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
           id: item.id,
           incidenteId: item.incidenteId || '',
           codigoIncidente: item.incidenteCodigo || item.codigo,
+          tipoMision: item.tipoMision,
           tipologia: tipologiaFinal,
           direccion:
             item.descripcion ||
@@ -261,11 +262,15 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
           fechaDespacho: item.fechaInicio || item.creadoEn,
           fechaInicio:
             mantenerOptimista && previa ? previa.fechaInicio : item.fechaInicio || null,
+          fechaCierre:
+            ((item as Record<string, unknown>).fechaCierre as string | null | undefined) ??
+            null,
           sincronizacionPendiente: mantenerOptimista
             ? true
             : Boolean(previa?.sincronizacionPendiente),
           datosAdicionales: {
             ...datosPrevios,
+            tipoMision: item.tipoMision,
             trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
             titulo: item.titulo,
             patrullaId: (item as Record<string, unknown>).patrullaId as string | null | undefined,
@@ -413,6 +418,7 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
 
       const datosBaseMision = {
         ...datosPrevios,
+        tipoMision: d.tipoMision,
         trabajo:
           d.descripcion ||
           d.incidente?.descripcion ||
@@ -457,6 +463,7 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         id: d.id,
         incidenteId: d.incidente?.id || '',
         codigoIncidente: d.incidente?.codigo || d.codigo,
+        tipoMision: d.tipoMision,
         tipologia: d.incidente?.tipoAfectacion
           ? formatearTipologia(d.incidente.tipoAfectacion)
           : limpiarTituloMision(d.titulo),
@@ -470,6 +477,7 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         fechaDespacho: d.fechaInicio || d.creadoEn,
         fechaInicio:
           mantenerOptimista && previaLocal ? previaLocal.fechaInicio : d.fechaInicio || null,
+        fechaCierre: d.fechaCierre || null,
         sincronizacionPendiente: mantenerOptimista,
         datosAdicionales:
           mantenerOptimista && previaLocal?.datosAdicionales

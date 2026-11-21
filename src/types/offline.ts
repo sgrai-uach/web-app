@@ -34,10 +34,15 @@ export interface AccionOutbox {
   errorUltimoIntento?: string;
 }
 
+export type TipoMisionOperativa = NonNullable<
+  paths['/api/misiones']['get']['responses'][200]['content']['application/json']['data'][number]['tipoMision']
+>;
+
 export interface MisionLocal {
   id: string;
   incidenteId: string;
   codigoIncidente: string;
+  tipoMision?: TipoMisionOperativa | string;
   tipologia: string;
   direccion: string;
   coordenadas?: {
@@ -48,6 +53,7 @@ export interface MisionLocal {
   estado: string;
   fechaDespacho: string;
   fechaInicio?: string | null;
+  fechaCierre?: string | null;
   sincronizacionPendiente?: boolean;
   datosAdicionales?: Record<string, unknown>;
   actualizadoEn: string;
