@@ -36,14 +36,14 @@ import type { AdjuntoLocal, MisionLocal } from '@/types/offline';
 import styles from './CuadrillaDetailPage.module.css';
 
 interface PageProps {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const resolvedParams =
-    params && typeof (params as { then?: unknown }).then === 'function'
-      ? use(params as Promise<{ id: string }>)
-      : (params as { id: string });
+    params && typeof (params as unknown as { then?: unknown }).then === 'function'
+      ? use(params)
+      : (params as unknown as { id: string });
   const misionId = resolvedParams?.id;
   const router = useRouter();
 
