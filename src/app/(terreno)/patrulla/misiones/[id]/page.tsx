@@ -360,9 +360,9 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         >
           <h2 className={styles.acceptTitle}>Confirmación de salida a terreno</h2>
           <p className={styles.acceptDescription}>
-            Presione el botón para informar al Centro de Mando que la patrulla ha
-            tomado conocimiento de la emergencia y se dirige al lugar para iniciar
-            la evaluación.
+            {esRecuperacion
+              ? 'Presione el botón para informar al Centro de Mando que la patrulla ha tomado conocimiento del operativo de recuperación y se dirige al sector para iniciar las labores de entrega o rehabilitación.'
+              : 'Presione el botón para informar al Centro de Mando que la patrulla ha tomado conocimiento de la emergencia y se dirige al lugar para iniciar la evaluación.'}
           </p>
 
           {errorAceptacion && (
@@ -399,7 +399,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                 aria-hidden="true"
               />
               <h2 className={styles.enTrayectoTitle}>
-                En Trayecto / Evaluación
+                {esRecuperacion ? 'En Trayecto / Recuperación' : 'En Trayecto / Evaluación'}
               </h2>
             </div>
             <Chip variant="success" size="sm">

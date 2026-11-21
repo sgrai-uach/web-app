@@ -549,6 +549,16 @@ export async function aceptarMisionPatrulla(
 
       if (!error && data && data.data) {
         const resData: AceptarMisionApiData['data'] = data.data;
+        const estadoPatrullaFallback =
+          misionBase.tipoMision === 'RECUPERACION'
+            ? 'EN_RECUPERACION'
+            : misionBase.tipoMision === 'PREVENCION'
+              ? 'EN_PREVENCION'
+              : 'EN_VERIFICACION';
+        const estadoIncidenteResuelto =
+          resData.incidente?.estado ??
+          (misionBase.incidenteId ? 'VERIFICANDO' : undefined);
+
         const misionActualizada: MisionLocal = {
           ...misionBase,
           id: resData.mision.id || misionId,
@@ -561,8 +571,10 @@ export async function aceptarMisionPatrulla(
           sincronizacionPendiente: false,
           datosAdicionales: {
             ...(misionBase.datosAdicionales || {}),
-            estadoPatrulla: resData.patrulla?.estado || 'EN_VERIFICACION',
-            estadoIncidente: resData.incidente?.estado || 'VERIFICANDO',
+            estadoPatrulla: resData.patrulla?.estado || estadoPatrullaFallback,
+            ...(estadoIncidenteResuelto
+              ? { estadoIncidente: estadoIncidenteResuelto }
+              : {}),
             hitoAceptacion: resData.hito?.descripcion || 'Misión Aceptada por Patrulla',
           },
           actualizadoEn: resData.mision.actualizadoEn || new Date().toISOString(),
@@ -575,7 +587,9 @@ export async function aceptarMisionPatrulla(
           enColaOffline: false,
           mensaje:
             data.message ||
-            'Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación.',
+            (misionBase.tipoMision === 'RECUPERACION'
+              ? 'Misión de recuperación aceptada exitosamente. La patrulla se encuentra en trayecto al sector.'
+              : 'Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación.'),
         };
       }
 
@@ -599,6 +613,12 @@ export async function aceptarMisionPatrulla(
         }
 
         const ahoraIso = new Date().toISOString();
+        const estadoPatrullaIdempotente =
+          misionBase.tipoMision === 'RECUPERACION'
+            ? 'EN_RECUPERACION'
+            : misionBase.tipoMision === 'PREVENCION'
+              ? 'EN_PREVENCION'
+              : 'EN_VERIFICACION';
         const misionIdempotente: MisionLocal = {
           ...misionBase,
           estado: 'EN_CURSO',
@@ -606,8 +626,8 @@ export async function aceptarMisionPatrulla(
           sincronizacionPendiente: false,
           datosAdicionales: {
             ...(misionBase.datosAdicionales || {}),
-            estadoPatrulla: 'EN_VERIFICACION',
-            estadoIncidente: 'VERIFICANDO',
+            estadoPatrulla: estadoPatrullaIdempotente,
+            ...(misionBase.incidenteId ? { estadoIncidente: 'VERIFICANDO' } : {}),
             hitoAceptacion: 'Misión Aceptada por Patrulla',
           },
           actualizadoEn: ahoraIso,
@@ -619,7 +639,10 @@ export async function aceptarMisionPatrulla(
           mision: misionIdempotente,
           enColaOffline: false,
           yaAceptadaPreviamente: true,
-          mensaje: 'La misión ya se encuentra en curso (En Trayecto / Evaluación).',
+          mensaje:
+            misionBase.tipoMision === 'RECUPERACION'
+              ? 'La misión ya se encuentra en curso (En Trayecto / Recuperación).'
+              : 'La misión ya se encuentra en curso (En Trayecto / Evaluación).',
         };
       }
 
