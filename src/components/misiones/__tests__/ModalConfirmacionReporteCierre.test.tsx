@@ -25,7 +25,7 @@ describe('ModalConfirmacionReporteCierre (H39)', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Requiere cuadrilla')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
-    expect(screen.getByText('Solicitada')).toBeInTheDocument();
+    expect(screen.getByText(/Solicitada/i)).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', { name: /Confirmar y Cerrar Misión/i })

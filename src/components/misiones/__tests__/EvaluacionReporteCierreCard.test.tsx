@@ -143,6 +143,13 @@ describe('EvaluacionReporteCierreCard (H39)', () => {
       })
     );
 
+    fireEvent.change(screen.getByLabelText(/Nombre de contacto/i), {
+      target: { value: 'María Pérez' },
+    });
+    fireEvent.change(screen.getByLabelText(/Teléfono de contacto/i), {
+      target: { value: '+56912345678' },
+    });
+
     fireEvent.click(
       screen.getByRole('button', { name: /Enviar Reporte y Cerrar Tarea/i })
     );

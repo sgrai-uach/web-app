@@ -91,6 +91,21 @@ describe('reporteVerificacionService (H39)', () => {
           estado_terreno: 'CRITICO',
           personas_afectadas: 5,
           requiere_asistencia_social: true,
+          familias: [
+            {
+              id: 'fam-1',
+              referencia: 'Casa 1',
+              nucleoFamiliarTotal: 5,
+              cantidadNinos: 2,
+              cantidadAdultosMayores: 0,
+              personasDiscapacitadas: 1,
+              personasElectrodependientes: 0,
+              mascotasAfectadas: 0,
+              nivelCompromisoVivienda: 'MODERADO',
+              contactoNombre: 'Ana Veas',
+              contactoTelefono: '+56912345678',
+            },
+          ],
         },
         misionMock
       );

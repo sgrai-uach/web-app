@@ -16,11 +16,59 @@ describe('Validaciones de informe técnico de verificación y cierre (H39)', () 
       danos_estimados: 'Daño en cerco perimetral de dos viviendas.',
       observaciones: 'Acceso libre por calle paralela.',
       requiere_asistencia_social: true,
+      familias: [
+        {
+          id: 'fam-1',
+          referencia: 'Familia Veas',
+          nucleoFamiliarTotal: 4,
+          cantidadNinos: 1,
+          cantidadAdultosMayores: 0,
+          personasDiscapacitadas: 0,
+          personasElectrodependientes: 0,
+          mascotasAfectadas: 0,
+          nivelCompromisoVivienda: 'LEVE',
+          contactoNombre: 'Ana Veas',
+          contactoTelefono: '+56912345678',
+        },
+      ],
       adjuntoIds: [],
       adjuntos: [],
     });
 
     expect(parsed.success).toBe(true);
+  });
+
+  it('rechaza si requiere_asistencia_social es true sin familias o sin contacto preliminar por familia', () => {
+    const sinFamilias = crearReporteVerificacionSchema.safeParse({
+      ...VALORES_INICIALES_REPORTE_VERIFICACION,
+      dictamen: 'REQUIERE_CUADRILLA',
+      resumen_tecnico: 'Se constata anegamiento con afectación social en vivienda.',
+      personas_afectadas: 3,
+      requiere_asistencia_social: true,
+      familias: [],
+    });
+    expect(sinFamilias.success).toBe(false);
+
+    const sinContacto = crearReporteVerificacionSchema.safeParse({
+      ...VALORES_INICIALES_REPORTE_VERIFICACION,
+      dictamen: 'REQUIERE_CUADRILLA',
+      resumen_tecnico: 'Se constata anegamiento con afectación social en vivienda.',
+      personas_afectadas: 3,
+      requiere_asistencia_social: true,
+      familias: [
+        {
+          id: 'fam-1',
+          nucleoFamiliarTotal: 3,
+          cantidadNinos: 1,
+          cantidadAdultosMayores: 0,
+          personasDiscapacitadas: 0,
+          personasElectrodependientes: 0,
+          mascotasAfectadas: 0,
+          nivelCompromisoVivienda: 'LEVE',
+        },
+      ],
+    });
+    expect(sinContacto.success).toBe(false);
   });
 
   it('rechaza cuando resumen_tecnico tiene menos de 10 caracteres', () => {
