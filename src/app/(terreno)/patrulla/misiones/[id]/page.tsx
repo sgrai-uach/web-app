@@ -168,6 +168,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       });
       setMision(resultado.mision);
       setMensajeConfirmacion(resultado.mensaje);
+      if (resultado.enColaOffline) {
+        toast?.showWarning(resultado.mensaje, 'Guardado sin conexión');
+      } else {
+        toast?.showSuccess(resultado.mensaje, 'Misión aceptada');
+      }
       await actualizarPendientes();
     } catch (err) {
       const msg =
@@ -455,7 +460,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           aria-label="Estado de misión de recuperación"
         >
           <div className={styles.evaluationContent}>
-            <RecuperacionMisionEstadoCard mision={mision} />
+            <RecuperacionMisionEstadoCard
+              mision={mision}
+              deshabilitado={esSoloLectura}
+              onReporteEnviado={(misionActualizada) => setMision(misionActualizada)}
+            />
           </div>
         </section>
       )}

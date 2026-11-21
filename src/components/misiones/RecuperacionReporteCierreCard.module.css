@@ -1,0 +1,91 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background-color: var(--color-white, #ffffff);
+  border: 1px solid var(--color-border, #dfe3e8);
+  padding: var(--space-4);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--color-border, #dfe3e8);
+  padding-bottom: var(--space-3);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-charcoal, #3b3f45);
+}
+
+.charCount {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #5f676e);
+  text-align: right;
+  margin-top: 4px;
+}
+
+.recursosLista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.recursoItem {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-bg-light, #eceff3);
+  border: 1px solid var(--color-border, #dfe3e8);
+}
+
+.recursoInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recursoNombre {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-dark, #2b2b2b);
+}
+
+.recursoMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #5f676e);
+}
+
+.recursoInputBox {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  width: 110px;
+}
+
+.pendingNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background-color: var(--color-info-bg, #e0f2f1);
+  border-left: 3px solid var(--color-primary-teal, #1b6f7d);
+  font-size: 0.8125rem;
+  color: var(--color-primary-teal-dark, #14505a);
+  line-height: 1.45;
+}

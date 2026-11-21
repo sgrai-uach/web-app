@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { CheckCircle2, Info } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { Chip } from '@/components/ui/Chip';
 import {
   ResumenReporteTerreno,
@@ -9,20 +9,25 @@ import {
 } from '@/components/misiones/ReporteTerrenoBase';
 import { formatearFechaHora24h } from '@/lib/utils/formatters';
 import { ETIQUETAS_TIPO_MISION, formatearEtiquetaSegura } from '@/lib/utils/labels';
+import { RecuperacionReporteCierreCard } from '@/components/misiones/RecuperacionReporteCierreCard';
 import type { MisionLocal } from '@/types/offline';
 import styles from './RecuperacionMisionEstadoCard.module.css';
 
 export interface RecuperacionMisionEstadoCardProps {
   mision: MisionLocal;
+  onReporteEnviado?: (misionActualizada: MisionLocal) => void;
+  deshabilitado?: boolean;
 }
 
 /**
  * Tarjeta de estado operativo para misiones de tipo RECUPERACION en Patrulla Verificadora.
- * Reutiliza primitivas de ReporteTerrenoBase (patrón H39/H68) sin habilitar acciones
- * de cierre reservadas al Encargado en sgrai-web (H75).
+ * Reutiliza primitivas de ReporteTerrenoBase (patrón H39/H68) y permite a la patrulla
+ * reportar el cierre en terreno para su confirmación final en Centro de Mando.
  */
 export function RecuperacionMisionEstadoCard({
   mision,
+  onReporteEnviado,
+  deshabilitado = false,
 }: RecuperacionMisionEstadoCardProps) {
   const estadoNorm = (mision.estado || '').trim().toUpperCase();
   const estaConcluida =
@@ -87,30 +92,11 @@ export function RecuperacionMisionEstadoCard({
 
   return (
     <div className={styles.cardWrapper} data-testid="recuperacion-estado-card">
-      <ResumenReporteTerreno
-        testId="recuperacion-en-curso-resumen"
-        titulo="Operativo de recuperación en ejecución"
-        chip={
-          <Chip variant="warning" size="sm">
-            En ejecución
-          </Chip>
-        }
-      >
-        <CampoResumenReporte label="Tipo de misión" valor={tipoEtiqueta} />
-        <CampoResumenReporte
-          label="Estado de la patrulla"
-          valor="En recuperación"
-        />
-      </ResumenReporteTerreno>
-
-      <div className={styles.infoBox} role="note">
-        <Info size={18} aria-hidden="true" className={styles.infoIcon} />
-        <span>
-          El cierre formal del operativo y la devolución de insumos se decretan
-          desde el Centro de Mando. Al concluir, esta misión pasará a estado
-          Finalizada y la patrulla quedará disponible automáticamente.
-        </span>
-      </div>
+      <RecuperacionReporteCierreCard
+        misionActual={mision}
+        onReporteEnviado={onReporteEnviado}
+        deshabilitado={deshabilitado}
+      />
     </div>
   );
 }
