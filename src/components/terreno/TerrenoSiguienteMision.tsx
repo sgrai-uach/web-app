@@ -32,7 +32,7 @@ export function TerrenoSiguienteMision() {
         }
 
         const misiones = await sincronizarMisiones({
-          tipoMision: esCuadrilla ? 'ATENCION_CUADRILLA' : 'VERIFICACION',
+          tipoMision: esCuadrilla ? 'ATENCION_CUADRILLA' : undefined,
           patrullaId: !esCuadrilla ? usuario?.unidadId || undefined : undefined,
           cuadrillaId: esCuadrilla ? usuario?.unidadId || undefined : undefined,
         });
@@ -66,8 +66,16 @@ export function TerrenoSiguienteMision() {
 
     void buscarMisiones();
 
+    const handleSync = () => {
+      void buscarMisiones();
+    };
+    window.addEventListener('sgrai:outbox-synced', handleSync);
+    window.addEventListener('sgrai:mision-sincronizada', handleSync);
+
     return () => {
       cancelado = true;
+      window.removeEventListener('sgrai:outbox-synced', handleSync);
+      window.removeEventListener('sgrai:mision-sincronizada', handleSync);
     };
   }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId]);
 

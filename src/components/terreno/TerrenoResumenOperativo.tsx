@@ -94,8 +94,16 @@ export function TerrenoResumenOperativo() {
 
     void cargarResumenMisiones();
 
+    const handleSync = () => {
+      void cargarResumenMisiones();
+    };
+    window.addEventListener('sgrai:outbox-synced', handleSync);
+    window.addEventListener('sgrai:mision-sincronizada', handleSync);
+
     return () => {
       cancelado = true;
+      window.removeEventListener('sgrai:outbox-synced', handleSync);
+      window.removeEventListener('sgrai:mision-sincronizada', handleSync);
     };
   }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId, actualizarUnidadAsignada]);
 

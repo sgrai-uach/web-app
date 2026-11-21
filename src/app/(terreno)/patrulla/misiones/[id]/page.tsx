@@ -34,6 +34,7 @@ import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
 import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
 import { EvaluacionPrioridadCard } from '@/components/misiones/EvaluacionPrioridadCard';
 import { EvaluacionReporteCierreCard } from '@/components/misiones/EvaluacionReporteCierreCard';
+import { RecuperacionMisionEstadoCard } from '@/components/misiones/RecuperacionMisionEstadoCard';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
@@ -108,6 +109,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         } else {
           setMision(null);
         }
+        return encontrada;
       } finally {
         if (!silencioso) {
           setCargando(false);
@@ -126,8 +128,25 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     const handleOutboxSynced = () => {
       void cargarDetalle(true);
     };
-    const handleMisionSincronizada = () => {
-      void cargarDetalle(true);
+    const handleMisionSincronizada = async () => {
+      const estadoAnterior = mision?.estado?.toUpperCase() || '';
+      const esRecup = mision?.tipoMision === 'RECUPERACION';
+      const actualizada = await cargarDetalle(true);
+      const estadoNuevo = actualizada?.estado?.toUpperCase() || '';
+      const pasoAFinalizada =
+        estadoAnterior !== 'COMPLETADA' &&
+        estadoAnterior !== 'FINALIZADA' &&
+        estadoAnterior !== 'CERRADA' &&
+        (estadoNuevo === 'COMPLETADA' ||
+          estadoNuevo === 'FINALIZADA' ||
+          estadoNuevo === 'CERRADA');
+
+      if ((esRecup || actualizada?.tipoMision === 'RECUPERACION') && pasoAFinalizada) {
+        toast?.showSuccess(
+          'El operativo de recuperación fue declarado concluido. La patrulla quedó disponible.',
+          'Misión completada'
+        );
+      }
     };
     window.addEventListener('sgrai:outbox-synced', handleOutboxSynced);
     window.addEventListener('sgrai:mision-sincronizada', handleMisionSincronizada);
@@ -135,7 +154,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       window.removeEventListener('sgrai:outbox-synced', handleOutboxSynced);
       window.removeEventListener('sgrai:mision-sincronizada', handleMisionSincronizada);
     };
-  }, [cargarDetalle]);
+  }, [cargarDetalle, mision?.estado, mision?.tipoMision, toast]);
 
   const handleAceptarMision = async () => {
     if (!mision || aceptando) return;
@@ -222,6 +241,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const mostrarBotonAceptar =
     unidadActiva && esDespachada && tienePermisoVerificar;
 
+  const esRecuperacion = mision.tipoMision === 'RECUPERACION';
   const trabajoTexto =
     (mision.datosAdicionales?.trabajo as string) || mision.direccion;
   const esFinalizada =
@@ -230,7 +250,8 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     estadoNormalizado === 'CERRADA';
   const esSoloLectura = !unidadActiva || esFinalizada;
   const mostrarFormulariosTecnicos =
-    (unidadActiva && esEnCurso) || (tieneUnidadAsignada && esFinalizada);
+    !esRecuperacion &&
+    ((unidadActiva && esEnCurso) || (tieneUnidadAsignada && esFinalizada));
 
   return (
     <div className={styles.container}>
@@ -411,13 +432,30 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               </div>
               <div className={styles.canonicalStateItem}>
                 <span className={styles.canonicalStateLabel}>Patrulla</span>
-                <span className={styles.canonicalStateValue}>En verificación</span>
+                <span className={styles.canonicalStateValue}>
+                  {esRecuperacion ? 'En recuperación' : 'En verificación'}
+                </span>
               </div>
               <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Incidente</span>
-                <span className={styles.canonicalStateValue}>Verificando</span>
+                <span className={styles.canonicalStateLabel}>
+                  {esRecuperacion ? 'Operativo' : 'Incidente'}
+                </span>
+                <span className={styles.canonicalStateValue}>
+                  {esRecuperacion ? 'En ejecución' : 'Verificando'}
+                </span>
               </div>
             </div>
+          </div>
+        </section>
+      )}
+
+      {esRecuperacion && (esEnCurso || esFinalizada) && (
+        <section
+          className={styles.evaluationFormsSection}
+          aria-label="Estado de misión de recuperación"
+        >
+          <div className={styles.evaluationContent}>
+            <RecuperacionMisionEstadoCard mision={mision} />
           </div>
         </section>
       )}

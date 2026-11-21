@@ -5,6 +5,7 @@ import { EstadoBadge } from './EstadoBadge';
 import { Chip } from '@/components/ui/Chip';
 import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
+import { ETIQUETAS_TIPO_MISION, formatearEtiquetaSegura } from '@/lib/utils/labels';
 import type { MisionLocal } from '@/types/offline';
 import styles from './MisionCard.module.css';
 
@@ -15,6 +16,8 @@ interface MisionCardProps {
 }
 
 export function MisionCard({ mision, href, esInactiva = false }: MisionCardProps) {
+  const esRecuperacion = mision.tipoMision === 'RECUPERACION';
+
   return (
     <Link href={href} className={styles.card} tabIndex={0}>
       <div className={styles.headerRow}>
@@ -23,6 +26,11 @@ export function MisionCard({ mision, href, esInactiva = false }: MisionCardProps
           <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
             {formatearPrioridad(mision.prioridad)}
           </Chip>
+          {esRecuperacion && (
+            <Chip variant="teal" size="sm">
+              {formatearEtiquetaSegura(mision.tipoMision, ETIQUETAS_TIPO_MISION)}
+            </Chip>
+          )}
         </div>
         <div className={styles.statusAndChevron}>
           <EstadoBadge estado={mision.estado} size="md" />

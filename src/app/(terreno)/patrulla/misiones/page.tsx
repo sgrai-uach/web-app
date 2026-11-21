@@ -46,7 +46,6 @@ function PatrullaMisionesContenido() {
       }
 
       const locales = await sincronizarMisiones({
-        tipoMision: 'VERIFICACION',
         patrullaId: usuario?.unidadId || undefined,
       });
 
@@ -58,6 +57,18 @@ function PatrullaMisionesContenido() {
 
   useEffect(() => {
     cargarMisiones();
+  }, [cargarMisiones]);
+
+  useEffect(() => {
+    const handleSync = () => {
+      void cargarMisiones();
+    };
+    window.addEventListener('sgrai:outbox-synced', handleSync);
+    window.addEventListener('sgrai:mision-sincronizada', handleSync);
+    return () => {
+      window.removeEventListener('sgrai:outbox-synced', handleSync);
+      window.removeEventListener('sgrai:mision-sincronizada', handleSync);
+    };
   }, [cargarMisiones]);
 
   const cambiarFiltro = (nuevoFiltro: FiltroEstado) => {
