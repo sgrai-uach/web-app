@@ -14,7 +14,36 @@ export type AccionOutboxTipo =
   | 'SUBIR_EVIDENCIA'
   | 'SOLICITAR_APOYO'
   | 'CERRAR_FAENA'
+  | 'REPORTAR_CIERRE_RECUPERACION'
   | 'ACK_NOTIFICACION';
+
+export interface RecursoRecuperacionMisionItem {
+  recursoId: string;
+  nombre: string;
+  cantidadAsignada: number;
+}
+
+export interface ReportePatrullaRecuperacionLocal {
+  resumen: string;
+  consumos: Array<{
+    recursoId: string;
+    cantidadConsumida: number;
+  }>;
+  reportadoEn: string;
+  reportadoPor?: {
+    id: string;
+    nombre: string;
+  } | null;
+}
+
+export interface RecuperacionMisionDetalleLocal {
+  id: string;
+  codigo: string;
+  estado: string;
+  sector: string;
+  recursos: RecursoRecuperacionMisionItem[];
+  reportePatrulla?: ReportePatrullaRecuperacionLocal | null;
+}
 
 /**
  * Payload validado contra el contrato OpenAPI generado antes de encolarse en IndexedDB (GEMINI.md §5.3).

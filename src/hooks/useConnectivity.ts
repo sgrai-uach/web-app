@@ -200,6 +200,26 @@ export function useConnectivity() {
             }
           }
         }
+        if (procesada && accion.tipo === 'REPORTAR_CIERRE_RECUPERACION') {
+          const match = accion.url.match(
+            /\/api\/misiones\/([^/]+)\/reportar-cierre-recuperacion/
+          );
+          const misionId = match?.[1];
+          if (misionId) {
+            try {
+              const local = await obtenerMisionLocalPorId(misionId);
+              if (local) {
+                await guardarMisionLocal({
+                  ...local,
+                  sincronizacionPendiente: false,
+                  actualizadoEn: new Date().toISOString(),
+                });
+              }
+            } catch {
+              // Ignorar fallos de persistencia secundaria
+            }
+          }
+        }
 
         return procesada;
       });

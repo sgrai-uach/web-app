@@ -4073,6 +4073,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/misiones/{id}/reportar-cierre-recuperacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                    "x-user-id"?: string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        resumenCierre: string;
+                        consumos?: {
+                            recursoId: string;
+                            cantidadConsumida: number;
+                        }[];
+                        latitud?: number;
+                        longitud?: number;
+                    };
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                            data: {
+                                misionId: string;
+                                recuperacionId: string;
+                                reportePatrulla: {
+                                    resumen: string;
+                                    consumos: {
+                                        recursoId: string;
+                                        cantidadConsumida: number;
+                                    }[];
+                                    reportadoEn: string;
+                                    reportadoPor: {
+                                        id: string;
+                                        nombre: string;
+                                    } | null;
+                                };
+                            };
+                        };
+                    };
+                };
+                400: { headers: { [name: string]: unknown }; content?: never };
+                401: { headers: { [name: string]: unknown }; content?: never };
+                403: { headers: { [name: string]: unknown }; content?: never };
+                404: { headers: { [name: string]: unknown }; content?: never };
+                409: { headers: { [name: string]: unknown }; content?: never };
+                500: { headers: { [name: string]: unknown }; content?: never };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/incidentes/kpis": {
         parameters: {
             query?: never;

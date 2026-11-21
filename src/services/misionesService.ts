@@ -427,6 +427,11 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION',
         estadoIncidente: d.incidente?.estado || 'VERIFICANDO',
         reportesTerreno: reportesRemotos,
+        ...((d as { recuperacion?: unknown }).recuperacion !== undefined
+          ? { recuperacion: (d as { recuperacion?: unknown }).recuperacion }
+          : datosPrevios.recuperacion !== undefined
+            ? { recuperacion: datosPrevios.recuperacion }
+            : {}),
         ...(reportesPrioridadRemotos.length > 0
           ? { reportesPrioridad: reportesPrioridadLocalesPendientes }
           : reportesPrioridadLocales.length > 0
