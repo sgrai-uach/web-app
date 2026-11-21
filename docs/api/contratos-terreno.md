@@ -259,3 +259,9 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
        "timestamp": "2026-10-27T16:05:00Z"
      }
      ```
+
+3. **Conclusión de Operativo de Recuperación (H75):**
+   - Cuando el Encargado decreta el cierre (`POST /api/eventos-atp/recuperacion/{id}/cerrar` desde `sgrai-web`), `sgrai-api` emite hacia la sala `patrulla:{patrullaId}`:
+     - `mision:actualizada` con estado `COMPLETADA`.
+     - `patrulla:actualizada` con estado `DISPONIBLE`.
+   - `useTerrenoSocket` propaga ambos eventos mediante `CustomEvent('sgrai:mision-sincronizada')`, refrescando automáticamente la bandeja `/patrulla/misiones`, los componentes de inicio (`TerrenoResumenOperativo`, `TerrenoSiguienteMision`) y el detalle `/patrulla/misiones/[id]`.
