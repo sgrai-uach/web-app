@@ -19,15 +19,14 @@ const baseMision: MisionLocal = {
 };
 
 describe('RecuperacionMisionEstadoCard (H75)', () => {
-  it('renderiza estado EN_CURSO informando que el cierre formal corresponde al Centro de Mando', () => {
+  it('renderiza estado EN_CURSO mostrando el formulario de reporte de cierre en terreno para la patrulla', () => {
     render(<RecuperacionMisionEstadoCard mision={baseMision} />);
 
-    expect(screen.getByTestId('recuperacion-en-curso-resumen')).toBeInTheDocument();
-    expect(screen.getByText('Operativo de recuperación en ejecución')).toBeInTheDocument();
+    expect(screen.getByTestId('recuperacion-reporte-cierre-card')).toBeInTheDocument();
+    expect(screen.getByText('Cierre de Operativo en Terreno')).toBeInTheDocument();
     expect(screen.getByText('En ejecución')).toBeInTheDocument();
-    expect(screen.getByText('Recuperación operativa')).toBeInTheDocument();
     expect(
-      screen.getByText(/El cierre formal del operativo y la devolución de insumos se decretan desde el Centro de Mando/i)
+      screen.getByRole('button', { name: /Enviar Reporte de Cierre/i })
     ).toBeInTheDocument();
   });
 
