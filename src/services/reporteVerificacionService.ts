@@ -239,6 +239,9 @@ export async function enviarReporteVerificacionTerreno(
     requiereAsistenciaSocial: validado.requiere_asistencia_social,
     adjuntoIds: validado.adjuntoIds || [],
     adjuntos: validado.adjuntos || [],
+    ...(validado.familias && validado.familias.length > 0
+      ? { familias: validado.familias }
+      : {}),
     ...(typeof latitud === 'number' ? { latitud } : {}),
     ...(typeof longitud === 'number' ? { longitud } : {}),
   };
@@ -264,6 +267,7 @@ export async function enviarReporteVerificacionTerreno(
       danos_estimados: danosLimpio || '',
       observaciones: observacionesLimpio || '',
       requiere_asistencia_social: validado.requiere_asistencia_social,
+      familias: validado.familias || [],
       adjuntoIds: validado.adjuntoIds || [],
       adjuntos: validado.adjuntos || [],
       ...(evaluadorFinal ? { evaluador: evaluadorFinal } : {}),

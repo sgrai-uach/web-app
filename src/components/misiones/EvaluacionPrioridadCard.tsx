@@ -5,23 +5,15 @@ import {
   CheckCircle,
   AlertTriangle,
   CheckCircle2,
-  Plus,
-  Minus,
-  Users,
-  Baby,
-  UserCheck,
-  Accessibility,
-  Zap,
-  HeartHandshake,
   ShieldAlert,
   History,
-  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { Textarea } from '@/components/ui/Textarea';
 import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { ModalConfirmacionPrioridad } from './ModalConfirmacionPrioridad';
+import { FamiliasTerrenoSection } from './FamiliasTerrenoSection';
 import {
   AlertaFeedbackReporte,
   CampoResumenReporte,
@@ -32,10 +24,8 @@ import {
 import {
   VALORES_INICIALES_EVALUACION_PRIORIDAD,
   PRIORIDADES_CANONICAS,
-  NIVELES_COMPROMISO_VIVIENDA,
   calcularPrioridadSugerida,
   consolidarEvaluacionFamilias,
-  calcularLimitesFamilia,
 } from '@/lib/validations/prioridad';
 import {
   asignarPrioridadEnTerreno,
@@ -47,9 +37,7 @@ import { formatearPrioridad } from '@/lib/utils/formatters';
 import { ETIQUETAS_COMPROMISO_VIVIENDA } from '@/lib/utils/labels';
 import type {
   EvaluacionTerrenoPrioridadForm,
-  FamiliaAfectadaItem,
   MisionLocal,
-  NivelCompromisoVivienda,
   PrioridadIncidente,
 } from '@/types/offline';
 import styles from './EvaluacionPrioridadCard.module.css';
@@ -275,138 +263,6 @@ export function EvaluacionPrioridadCard({
     !esDiscrepancia ||
     (longitudJustificacion >= JUSTIFICACION_MIN &&
       longitudJustificacion <= JUSTIFICACION_MAX);
-
-  type CampoContadorFamilia = keyof Pick<
-    FamiliaAfectadaItem,
-    | 'nucleoFamiliarTotal'
-    | 'cantidadNinos'
-    | 'cantidadAdultosMayores'
-    | 'personasDiscapacitadas'
-    | 'personasElectrodependientes'
-    | 'mascotasAfectadas'
-  >;
-
-  const obtenerRangoContadorFamilia = (
-    fam: FamiliaAfectadaItem,
-    campo: CampoContadorFamilia
-  ): { min: number; max: number } => {
-    const { minimoNucleo } = calcularLimitesFamilia(fam);
-    switch (campo) {
-      case 'nucleoFamiliarTotal':
-        return { min: minimoNucleo, max: 999 };
-      case 'cantidadNinos':
-        return { min: 0, max: Math.max(0, fam.nucleoFamiliarTotal - fam.cantidadAdultosMayores) };
-      case 'cantidadAdultosMayores':
-        return { min: 0, max: Math.max(0, fam.nucleoFamiliarTotal - fam.cantidadNinos) };
-      case 'personasDiscapacitadas':
-      case 'personasElectrodependientes':
-        return { min: 0, max: Math.max(0, fam.nucleoFamiliarTotal) };
-      case 'mascotasAfectadas':
-      default:
-        return { min: 0, max: 999 };
-    }
-  };
-
-  const ajustarContadorFamilia = (
-    familiaId: string,
-    campo: CampoContadorFamilia,
-    delta: number
-  ) => {
-    setEvaluacion((prev) => {
-      const familiasActualizadas = (prev.familias || []).map((fam) => {
-        if (fam.id !== familiaId) return fam;
-        const actual = fam[campo] || 0;
-        const { min, max } = obtenerRangoContadorFamilia(fam, campo);
-        const nuevo = Math.max(min, Math.min(max, actual + delta));
-        return {
-          ...fam,
-          [campo]: nuevo,
-        };
-      });
-
-      // Recalcular agregados
-      const consolidado = consolidarEvaluacionFamilias({
-        ...prev,
-        familias: familiasActualizadas,
-      });
-
-      return {
-        ...prev,
-        ...consolidado,
-        familias: familiasActualizadas,
-      };
-    });
-    setErrorValidacion(null);
-  };
-
-  const cambiarCompromisoFamilia = (
-    familiaId: string,
-    nivel: NivelCompromisoVivienda
-  ) => {
-    setEvaluacion((prev) => {
-      const familiasActualizadas = (prev.familias || []).map((fam) =>
-        fam.id === familiaId ? { ...fam, nivelCompromisoVivienda: nivel } : fam
-      );
-      return {
-        ...prev,
-        familias: familiasActualizadas,
-        ...(familiasActualizadas.length === 1
-          ? { nivelCompromisoVivienda: nivel }
-          : {}),
-      };
-    });
-    setErrorValidacion(null);
-  };
-
-  const cambiarReferenciaFamilia = (familiaId: string, ref: string) => {
-    setEvaluacion((prev) => ({
-      ...prev,
-      familias: (prev.familias || []).map((fam) =>
-        fam.id === familiaId ? { ...fam, referencia: ref } : fam
-      ),
-    }));
-  };
-
-  const agregarFamilia = () => {
-    setEvaluacion((prev) => {
-      const actuales = prev.familias || [];
-      const nuevaFamilia: FamiliaAfectadaItem = {
-        id: `fam-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        referencia: '',
-        nucleoFamiliarTotal: 0,
-        cantidadNinos: 0,
-        cantidadAdultosMayores: 0,
-        personasDiscapacitadas: 0,
-        personasElectrodependientes: 0,
-        mascotasAfectadas: 0,
-        nivelCompromisoVivienda: 'SIN_DANO',
-      };
-      return {
-        ...prev,
-        familias: [...actuales, nuevaFamilia],
-        viviendasAfectadas: actuales.length + 1,
-      };
-    });
-    setErrorValidacion(null);
-  };
-
-  const eliminarFamilia = (familiaId: string) => {
-    setEvaluacion((prev) => {
-      const filtradas = (prev.familias || []).filter((f) => f.id !== familiaId);
-      if (filtradas.length === 0) return prev; // Mantener al menos 1 familia
-      const consolidado = consolidarEvaluacionFamilias({
-        ...prev,
-        familias: filtradas,
-      });
-      return {
-        ...prev,
-        ...consolidado,
-        familias: filtradas,
-        viviendasAfectadas: filtradas.length,
-      };
-    });
-    setErrorValidacion(null);
-  };
 
   const alternarSwitch = (campo: SwitchPeligroConfig['campo']) => {
     setEvaluacion((prev) => ({
@@ -638,175 +494,27 @@ export function EvaluacionPrioridadCard({
 
           {/* Bloque 1: Familias y Viviendas Afectadas */}
           <div className={styles.blockSection}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-              <h4 className={styles.blockTitle}>
-                <Users size={16} aria-hidden="true" />
-                <span>1. Familias y Viviendas Afectadas</span>
-              </h4>
-              <Chip variant="neutral" size="sm">
-                {(evaluacion.familias || []).length} {((evaluacion.familias || []).length === 1 ? 'Hogar / Vivienda' : 'Hogares / Viviendas')}
-              </Chip>
-            </div>
-
-            {/* Listado dinámico de familias con su vivienda asociada */}
-            {(evaluacion.familias && evaluacion.familias.length > 0) ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {evaluacion.familias.map((fam, fIndex) => (
-                  <div key={fam.id} className={styles.familiaCard}>
-                    <div className={styles.familiaHeader}>
-                      <div className={styles.familiaTitleGroup}>
-                        <span className={styles.familiaBadge}>
-                          Familia #{fIndex + 1}
-                        </span>
-                        <input
-                          type="text"
-                          className={styles.familiaRefInput}
-                          placeholder="Referencia (ej: Familia Pérez, Casa 2)"
-                          value={fam.referencia || ''}
-                          disabled={deshabilitado || guardando}
-                          onChange={(e) => cambiarReferenciaFamilia(fam.id, e.target.value)}
-                          aria-label={`Referencia para Familia #${fIndex + 1}`}
-                        />
-                      </div>
-
-                      {evaluacion.familias.length > 1 && (
-                        <button
-                          type="button"
-                          className={styles.btnEliminarFamilia}
-                          disabled={deshabilitado || guardando}
-                          onClick={() => eliminarFamilia(fam.id)}
-                          aria-label={`Eliminar Familia #${fIndex + 1}`}
-                        >
-                          <Minus size={14} aria-hidden="true" />
-                          <span>Quitar</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Contadores por Familia */}
-                    <div className={styles.countersGrid}>
-                      {[
-                        { campo: 'nucleoFamiliarTotal' as const, etiqueta: 'Tamaño núcleo familiar', icono: <Users size={16} /> },
-                        { campo: 'cantidadNinos' as const, etiqueta: 'Cantidad de niños', icono: <Baby size={16} /> },
-                        { campo: 'cantidadAdultosMayores' as const, etiqueta: 'Adultos mayores', icono: <UserCheck size={16} /> },
-                        { campo: 'personasDiscapacitadas' as const, etiqueta: 'Personas con discapacidad', icono: <Accessibility size={16} /> },
-                        { campo: 'personasElectrodependientes' as const, etiqueta: 'Personas electrodependientes', icono: <Zap size={16} /> },
-                        { campo: 'mascotasAfectadas' as const, etiqueta: 'Mascotas afectadas', icono: <HeartHandshake size={16} /> },
-                      ].map((item) => {
-                        const valorActual = fam[item.campo];
-                        const { min, max } = obtenerRangoContadorFamilia(fam, item.campo);
-                        return (
-                          <div key={item.campo} className={styles.counterCard}>
-                            <div className={styles.counterLabelGroup}>
-                              <span className={styles.counterIcon}>{item.icono}</span>
-                              <span className={styles.counterLabel}>{item.etiqueta}</span>
-                            </div>
-                            <div className={styles.counterControls}>
-                              <button
-                                type="button"
-                                className={styles.counterBtn}
-                                onClick={() => ajustarContadorFamilia(fam.id, item.campo, -1)}
-                                disabled={deshabilitado || guardando || valorActual <= min}
-                                aria-label={`Disminuir ${item.etiqueta}`}
-                              >
-                                <Minus size={18} aria-hidden="true" />
-                              </button>
-                              <span
-                                className={styles.counterValue}
-                                data-testid={fIndex === 0 ? `valor-${item.campo}` : undefined}
-                              >
-                                {valorActual}
-                              </span>
-                              <button
-                                type="button"
-                                className={styles.counterBtn}
-                                onClick={() => ajustarContadorFamilia(fam.id, item.campo, 1)}
-                                disabled={deshabilitado || guardando || valorActual >= max}
-                                aria-label={`Aumentar ${item.etiqueta}`}
-                              >
-                                <Plus size={18} aria-hidden="true" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {(() => {
-                      const { totalEtarios } = calcularLimitesFamilia(fam);
-                      if (fam.nucleoFamiliarTotal === 0) {
-                        return (
-                          <div className={styles.cupoInfoHint} role="status">
-                            <Info size={14} aria-hidden="true" />
-                            <span>
-                              Defina el tamaño del núcleo familiar para registrar integrantes.
-                            </span>
-                          </div>
-                        );
-                      }
-                      if (totalEtarios >= fam.nucleoFamiliarTotal) {
-                        return (
-                          <div className={styles.cupoInfoHint} role="status">
-                            <Info size={14} aria-hidden="true" />
-                            <span>
-                              Cupo de integrantes etarios completo ({totalEtarios}/{fam.nucleoFamiliarTotal}).
-                            </span>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-
-                    {/* Compromiso de Vivienda para esta Familia */}
-                    <div className={styles.fieldGroup}>
-                      <span className={styles.infoLabel}>
-                        Compromiso de vivienda de esta familia
-                      </span>
-                      <div
-                        className={styles.prioritySelectorGrid}
-                        role="radiogroup"
-                        aria-label={`Nivel de compromiso de vivienda Familia #${fIndex + 1}`}
-                      >
-                        {NIVELES_COMPROMISO_VIVIENDA.map((nivel) => {
-                          const activo = fam.nivelCompromisoVivienda === nivel;
-                          return (
-                            <button
-                              key={nivel}
-                              type="button"
-                              role="radio"
-                              aria-checked={activo}
-                              disabled={deshabilitado || guardando}
-                              onClick={() => cambiarCompromisoFamilia(fam.id, nivel as NivelCompromisoVivienda)}
-                              className={`${styles.priorityOptionBtn} ${
-                                activo
-                                  ? nivel === 'GRAVE_INHABITABLE'
-                                    ? styles.priorityOptionSelectedCritica
-                                    : nivel === 'MODERADO'
-                                      ? styles.priorityOptionSelectedAlta
-                                      : styles.priorityOptionSelectedMedia
-                                  : ''
-                              }`}
-                            >
-                              <span>{ETIQUETAS_COMPROMISO_VIVIENDA[nivel]}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <button
-                  type="button"
-                  className={styles.btnAgregarFamilia}
-                  disabled={deshabilitado || guardando}
-                  onClick={agregarFamilia}
-                >
-                  <Plus size={16} aria-hidden="true" />
-                  <span>Añadir otra familia afectada</span>
-                </button>
-              </div>
-            ) : null}
+            <FamiliasTerrenoSection
+              titulo="1. Familias y Viviendas Afectadas"
+              familias={evaluacion.familias || []}
+              contactoObligatorio={false}
+              disabled={deshabilitado || guardando}
+              onChange={(familiasActualizadas) => {
+                setEvaluacion((prev) => {
+                  const consolidado = consolidarEvaluacionFamilias({
+                    ...prev,
+                    familias: familiasActualizadas,
+                  });
+                  return {
+                    ...prev,
+                    ...consolidado,
+                    familias: familiasActualizadas,
+                    viviendasAfectadas: familiasActualizadas.length,
+                  };
+                });
+                setErrorValidacion(null);
+              }}
+            />
 
             {/* Resumen Consolidado */}
             <div className={styles.resumenConsolidadoFamilias}>

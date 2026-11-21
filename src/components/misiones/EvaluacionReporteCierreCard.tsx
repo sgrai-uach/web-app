@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { Textarea } from '@/components/ui/Textarea';
 import { CargaEvidenciaCard } from './CargaEvidenciaCard';
+import { FamiliasTerrenoSection } from './FamiliasTerrenoSection';
 import { ModalConfirmacionReporteCierre } from './ModalConfirmacionReporteCierre';
 import {
   AlertaFeedbackReporte,
@@ -31,7 +32,11 @@ import {
   RESUMEN_TECNICO_MIN,
   VALORES_INICIALES_REPORTE_VERIFICACION,
 } from '@/lib/validations/reporteVerificacion';
-import { obtenerPersonasAfectadasPrevias } from '@/services/prioridadService';
+import {
+  obtenerPersonasAfectadasPrevias,
+  obtenerUltimoReportePrioridad,
+} from '@/services/prioridadService';
+import { validarCoherenciaFamiliaTerreno } from '@/lib/validations/prioridad';
 import {
   enviarReporteVerificacionTerreno,
   obtenerReporteVerificacionMision,
@@ -42,6 +47,7 @@ import { extraerAdjuntosDeMision } from '@/services/offlineQueue';
 import type {
   AdjuntoLocal,
   DictamenAtencion,
+  FamiliaAfectadaItem,
   MisionLocal,
   ReporteVerificacionTerrenoForm,
 } from '@/types/offline';
@@ -77,6 +83,11 @@ export function EvaluacionReporteCierreCard({
     [misionActual]
   );
 
+  const familiasPrevias = useMemo<FamiliaAfectadaItem[]>(() => {
+    const ultimo = obtenerUltimoReportePrioridad(misionActual);
+    return ultimo?.evaluacion?.familias ?? [];
+  }, [misionActual]);
+
   const yaEnviado =
     Boolean(reporteExistente) ||
     Boolean(misionActual?.datosAdicionales?.reporteVerificacionEnviado);
@@ -87,6 +98,7 @@ export function EvaluacionReporteCierreCard({
   const [form, setForm] = useState<ReporteVerificacionTerrenoForm>(() => ({
     ...VALORES_INICIALES_REPORTE_VERIFICACION,
     personas_afectadas: infoPersonasPrevias.cantidad,
+    familias: familiasPrevias,
   }));
 
   const [guardando, setGuardando] = useState<boolean>(false);
@@ -188,6 +200,33 @@ export function EvaluacionReporteCierreCard({
         }
       }
       return;
+    }
+
+    const familiasActuales = form.familias || [];
+    if (form.requiere_asistencia_social) {
+      if (familiasActuales.length === 0) {
+        setErrorValidacion(
+          'Cuando se requiere asistencia social (posterior FIBE), debe declarar al menos una familia afectada con sus datos de contacto preliminares.'
+        );
+        return;
+      }
+      for (let i = 0; i < familiasActuales.length; i++) {
+        const erroresFam = validarCoherenciaFamiliaTerreno(familiasActuales[i], true);
+        const primerError = Object.values(erroresFam)[0];
+        if (primerError) {
+          setErrorValidacion(`Familia #${i + 1}: ${primerError}`);
+          return;
+        }
+      }
+    } else if (familiasActuales.length > 0) {
+      for (let i = 0; i < familiasActuales.length; i++) {
+        const erroresFam = validarCoherenciaFamiliaTerreno(familiasActuales[i], false);
+        const primerError = Object.values(erroresFam)[0];
+        if (primerError) {
+          setErrorValidacion(`Familia #${i + 1}: ${primerError}`);
+          return;
+        }
+      }
     }
 
     setModalConfirmacionAbierto(true);
@@ -578,10 +617,45 @@ export function EvaluacionReporteCierreCard({
               aria-checked={form.requiere_asistencia_social}
               disabled={deshabilitado || guardando}
               onClick={() =>
-                setForm((prev) => ({
-                  ...prev,
-                  requiere_asistencia_social: !prev.requiere_asistencia_social,
-                }))
+                setForm((prev) => {
+                  const siguienteEstado = !prev.requiere_asistencia_social;
+                  const familiasActuales = prev.familias || [];
+                  let familiasActualizadas = familiasActuales;
+                  if (siguienteEstado && familiasActuales.length === 0) {
+                    familiasActualizadas = [
+                      {
+                        id: `fam-${Date.now()}`,
+                        referencia: '',
+                        nucleoFamiliarTotal: Math.max(1, prev.personas_afectadas),
+                        cantidadNinos: 0,
+                        cantidadAdultosMayores: 0,
+                        personasDiscapacitadas: 0,
+                        personasElectrodependientes: 0,
+                        mascotasAfectadas: 0,
+                        nivelCompromisoVivienda: 'SIN_DANO' as const,
+                        contactoNombre: '',
+                        contactoTelefono: '',
+                        contactoRut: '',
+                      },
+                    ];
+                  } else if (
+                    siguienteEstado &&
+                    familiasActuales.length === 1 &&
+                    familiasActuales[0].nucleoFamiliarTotal === 0
+                  ) {
+                    familiasActualizadas = [
+                      {
+                        ...familiasActuales[0],
+                        nucleoFamiliarTotal: Math.max(1, prev.personas_afectadas),
+                      },
+                    ];
+                  }
+                  return {
+                    ...prev,
+                    requiere_asistencia_social: siguienteEstado,
+                    familias: familiasActualizadas,
+                  };
+                })
               }
               className={`${styles.fibeSwitchBtn} ${
                 form.requiere_asistencia_social ? styles.fibeSwitchActive : ''
@@ -595,6 +669,32 @@ export function EvaluacionReporteCierreCard({
                 {form.requiere_asistencia_social ? 'Sí' : 'No'}
               </span>
             </button>
+
+            <FamiliasTerrenoSection
+              titulo={
+                form.requiere_asistencia_social
+                  ? 'Catastro Preliminar por Familia (Contacto Obligatorio)'
+                  : 'Catastro Preliminar por Familia (Opcional)'
+              }
+              familias={form.familias || []}
+              contactoObligatorio={form.requiere_asistencia_social}
+              permitirListaVacia={!form.requiere_asistencia_social}
+              disabled={deshabilitado || guardando}
+              onChange={(familiasActualizadas) => {
+                const totalFamilias = familiasActualizadas.reduce(
+                  (acc, f) => acc + f.nucleoFamiliarTotal,
+                  0
+                );
+                setForm((prev) => ({
+                  ...prev,
+                  familias: familiasActualizadas,
+                  ...(familiasActualizadas.length > 0
+                    ? { personas_afectadas: totalFamilias }
+                    : {}),
+                }));
+                setErrorValidacion(null);
+              }}
+            />
 
             <CargaEvidenciaCard
               misionId={misionActual.id}
@@ -683,6 +783,7 @@ export function EvaluacionReporteCierreCard({
         resumenTecnico={resumenLimpio}
         personasAfectadas={form.personas_afectadas}
         requiereAsistenciaSocial={form.requiere_asistencia_social}
+        familias={form.familias || []}
         cargando={guardando}
         alConfirmar={handleEjecutarEnvio}
         alCancelar={() => setModalConfirmacionAbierto(false)}

@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  familiaAfectadaSchema,
+  validarFamiliasRequerimientoSocial,
+} from './prioridad';
 import type { ReporteVerificacionTerrenoForm } from '@/types/offline';
 
 export const DICTAMENES_ATENCION = ['REQUIERE_CUADRILLA', 'NO_ABORDABLE'] as const;
@@ -22,6 +26,7 @@ export const VALORES_INICIALES_REPORTE_VERIFICACION: ReporteVerificacionTerrenoF
   danos_estimados: '',
   observaciones: '',
   requiere_asistencia_social: false,
+  familias: [],
   adjuntoIds: [],
   adjuntos: [],
 };
@@ -78,6 +83,7 @@ export const crearReporteVerificacionSchema = z
       .optional()
       .default(''),
     requiere_asistencia_social: z.boolean().default(false),
+    familias: z.array(familiaAfectadaSchema).optional().default([]),
     adjuntoIds: z
       .array(z.string().uuid('Cada identificador de adjunto debe ser un UUID válido.'))
       .max(20, 'No se pueden vincular más de 20 adjuntos por reporte.')
@@ -101,6 +107,10 @@ export const crearReporteVerificacionSchema = z
         path: ['motivo_no_abordable'],
         message: `El motivo de no abordabilidad es obligatorio y debe contener al menos ${MOTIVO_NO_ABORDABLE_MIN} caracteres.`,
       });
+    }
+
+    if (data.requiere_asistencia_social) {
+      validarFamiliasRequerimientoSocial(data.familias, ctx);
     }
   });
 

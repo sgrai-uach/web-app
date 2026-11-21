@@ -116,6 +116,9 @@ export interface FamiliaAfectadaItem {
   personasElectrodependientes: number;
   mascotasAfectadas: number;
   nivelCompromisoVivienda: NivelCompromisoVivienda;
+  contactoNombre?: string;
+  contactoTelefono?: string;
+  contactoRut?: string;
 }
 
 export interface EvaluacionTerrenoPrioridadForm {
@@ -192,6 +195,7 @@ export interface ReporteVerificacionTerrenoForm {
   danos_estimados: string;
   observaciones: string;
   requiere_asistencia_social: boolean;
+  familias?: FamiliaAfectadaItem[];
   adjuntoIds: string[];
   adjuntos: AdjuntoReportePreliminar[];
 }

@@ -10,7 +10,7 @@ import {
 } from '@/components/common/ConfirmacionResumen';
 import { Chip } from '@/components/ui/Chip';
 import { formatearDictamenAtencion } from '@/lib/utils/formatters';
-import type { DictamenAtencion } from '@/types/offline';
+import type { DictamenAtencion, FamiliaAfectadaItem } from '@/types/offline';
 import styles from './ModalConfirmacionReporteCierre.module.css';
 
 export interface ModalConfirmacionReporteCierreProps {
@@ -20,6 +20,7 @@ export interface ModalConfirmacionReporteCierreProps {
   resumenTecnico: string;
   personasAfectadas: number;
   requiereAsistenciaSocial: boolean;
+  familias?: FamiliaAfectadaItem[];
   cargando?: boolean;
   alConfirmar: () => void;
   alCancelar: () => void;
@@ -32,6 +33,7 @@ export function ModalConfirmacionReporteCierre({
   resumenTecnico,
   personasAfectadas,
   requiereAsistenciaSocial,
+  familias = [],
   cargando = false,
   alConfirmar,
   alCancelar,
@@ -74,9 +76,28 @@ export function ModalConfirmacionReporteCierre({
           {personasAfectadas}
         </ConfirmacionResumenFila>
 
-        <ConfirmacionResumenFila etiqueta="Asistencia Social (FIBE)">
-          {requiereAsistenciaSocial ? 'Solicitada' : 'No requerida'}
+        <ConfirmacionResumenFila etiqueta="Asistencia Social (Posterior FIBE)">
+          {requiereAsistenciaSocial ? 'Solicitada (antecedentes preliminares)' : 'No requerida'}
         </ConfirmacionResumenFila>
+
+        {familias.length > 0 && (
+          <ConfirmacionResumenFila etiqueta="Catastro Preliminar por Familia">
+            <span>
+              {familias.length}{' '}
+              {familias.length === 1 ? 'familia declarada' : 'familias declaradas'}
+              {familias.some((f) => f.contactoNombre?.trim())
+                ? ` (${familias
+                    .map((f, idx) =>
+                      f.contactoNombre?.trim()
+                        ? `#${idx + 1}: ${f.contactoNombre.trim()}`
+                        : null
+                    )
+                    .filter(Boolean)
+                    .join(' · ')})`
+                : ''}
+            </span>
+          </ConfirmacionResumenFila>
+        )}
 
         <ConfirmacionResumenJustificacion
           etiqueta="Resumen Técnico"

@@ -197,6 +197,18 @@ export function obtenerReportesPrioridadMision(
             nivelCompromisoVivienda: esNivelCompromisoValido(f.nivelCompromisoVivienda)
               ? (String(f.nivelCompromisoVivienda).toUpperCase() as NivelCompromisoVivienda)
               : 'SIN_DANO',
+            contactoNombre:
+              typeof (f.contactoNombre ?? f.contacto_nombre) === 'string'
+                ? String(f.contactoNombre ?? f.contacto_nombre)
+                : '',
+            contactoTelefono:
+              typeof (f.contactoTelefono ?? f.contacto_telefono) === 'string'
+                ? String(f.contactoTelefono ?? f.contacto_telefono)
+                : '',
+            contactoRut:
+              typeof (f.contactoRut ?? f.contacto_rut) === 'string'
+                ? String(f.contactoRut ?? f.contacto_rut)
+                : '',
           }))
         : [
             {

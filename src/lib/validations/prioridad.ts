@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { validarRutChileno } from './rut';
 import type {
   EvaluacionTerrenoPrioridadForm,
+  FamiliaAfectadaItem,
   NivelCompromisoVivienda,
   PrioridadIncidente,
 } from '@/types/offline';
@@ -85,14 +87,15 @@ export function calcularLimitesFamilia(fam: ContadoresFamiliaLimites) {
 
 function validarLimitesNucleoFamiliar(
   data: ContadoresFamiliaLimites,
-  ctx: z.RefinementCtx
+  ctx: z.RefinementCtx,
+  pathPrefix: Array<string | number> = []
 ) {
   if (data.cantidadNinos + data.cantidadAdultosMayores > data.nucleoFamiliarTotal) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message:
         'La suma de niños y adultos mayores no puede superar el tamaño del núcleo familiar.',
-      path: ['cantidadNinos'],
+      path: [...pathPrefix, 'cantidadNinos'],
     });
   }
   if (data.personasDiscapacitadas > data.nucleoFamiliarTotal) {
@@ -100,7 +103,7 @@ function validarLimitesNucleoFamiliar(
       code: z.ZodIssueCode.custom,
       message:
         'Las personas con discapacidad no pueden superar el tamaño del núcleo familiar.',
-      path: ['personasDiscapacitadas'],
+      path: [...pathPrefix, 'personasDiscapacitadas'],
     });
   }
   if (data.personasElectrodependientes > data.nucleoFamiliarTotal) {
@@ -108,7 +111,7 @@ function validarLimitesNucleoFamiliar(
       code: z.ZodIssueCode.custom,
       message:
         'Las personas electrodependientes no pueden superar el tamaño del núcleo familiar.',
-      path: ['personasElectrodependientes'],
+      path: [...pathPrefix, 'personasElectrodependientes'],
     });
   }
 }
@@ -116,7 +119,7 @@ function validarLimitesNucleoFamiliar(
 export const familiaAfectadaSchema = z
   .object({
     id: z.string().default(() => Math.random().toString(36).substring(2, 9)),
-    referencia: z.string().trim().max(100).optional().default(''),
+    referencia: z.string().trim().max(120).optional().default(''),
     nucleoFamiliarTotal: contadorEnteroSchema,
     cantidadNinos: contadorEnteroSchema,
     cantidadAdultosMayores: contadorEnteroSchema,
@@ -124,8 +127,118 @@ export const familiaAfectadaSchema = z
     personasElectrodependientes: contadorEnteroSchema,
     mascotasAfectadas: contadorEnteroSchema,
     nivelCompromisoVivienda: z.enum(NIVELES_COMPROMISO_VIVIENDA),
+    contactoNombre: z
+      .string()
+      .trim()
+      .max(150, 'El nombre de contacto no puede superar 150 caracteres.')
+      .optional()
+      .default(''),
+    contactoTelefono: z
+      .string()
+      .trim()
+      .max(50, 'El teléfono de contacto no puede superar 50 caracteres.')
+      .optional()
+      .default(''),
+    contactoRut: z
+      .string()
+      .trim()
+      .max(20, 'El RUT de contacto no puede superar 20 caracteres.')
+      .optional()
+      .default(''),
   })
-  .superRefine(validarLimitesNucleoFamiliar);
+  .superRefine((data, ctx) => {
+    validarLimitesNucleoFamiliar(data, ctx);
+    if (data.contactoRut && data.contactoRut.trim().length > 0 && !validarRutChileno(data.contactoRut)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El RUT preliminar ingresado no es válido.',
+        path: ['contactoRut'],
+      });
+    }
+  });
+
+export function validarCoherenciaFamiliaTerreno(
+  fam: FamiliaAfectadaItem,
+  contactoObligatorio = false
+): Record<string, string> {
+  const errores: Record<string, string> = {};
+  if (contactoObligatorio && fam.nucleoFamiliarTotal < 1) {
+    errores.nucleoFamiliarTotal = 'Cada familia debe registrar al menos 1 integrante.';
+  }
+  if (fam.cantidadNinos + fam.cantidadAdultosMayores > fam.nucleoFamiliarTotal) {
+    errores.cantidadNinos =
+      'La suma de niños y adultos mayores no puede superar el total de integrantes.';
+  }
+  if (fam.personasDiscapacitadas > fam.nucleoFamiliarTotal) {
+    errores.personasDiscapacitadas =
+      'Las personas con discapacidad no pueden superar el total de integrantes.';
+  }
+  if (fam.personasElectrodependientes > fam.nucleoFamiliarTotal) {
+    errores.personasElectrodependientes =
+      'Las personas electrodependientes no pueden superar el total de integrantes.';
+  }
+  if (contactoObligatorio) {
+    if ((fam.contactoNombre?.trim().length ?? 0) < 2) {
+      errores.contactoNombre =
+        'El nombre de contacto preliminar es obligatorio (mínimo 2 caracteres).';
+    }
+    if ((fam.contactoTelefono?.trim().length ?? 0) < 7) {
+      errores.contactoTelefono =
+        'El teléfono de contacto preliminar es obligatorio (mínimo 7 caracteres).';
+    }
+  }
+  if (fam.contactoRut && fam.contactoRut.trim().length > 0 && !validarRutChileno(fam.contactoRut)) {
+    errores.contactoRut = 'El RUT preliminar ingresado no es válido.';
+  }
+  return errores;
+}
+
+export function validarFamiliasRequerimientoSocial(
+  familias: FamiliaAfectadaItem[] | undefined,
+  ctx: z.RefinementCtx
+): void {
+  if (!Array.isArray(familias) || familias.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['familias'],
+      message:
+        'Cuando se requiere asistencia social (posterior FIBE), debe declarar al menos una familia afectada con sus datos de contacto preliminares.',
+    });
+    return;
+  }
+
+  familias.forEach((fam, idx) => {
+    if (fam.nucleoFamiliarTotal < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['familias', idx, 'nucleoFamiliarTotal'],
+        message: `Familia #${idx + 1}: debe registrar al menos 1 integrante.`,
+      });
+    }
+    validarLimitesNucleoFamiliar(fam, ctx, ['familias', idx]);
+    if ((fam.contactoNombre?.trim().length ?? 0) < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['familias', idx, 'contactoNombre'],
+        message: `Familia #${idx + 1}: el nombre de contacto preliminar es obligatorio (mínimo 2 caracteres).`,
+      });
+    }
+    if ((fam.contactoTelefono?.trim().length ?? 0) < 7) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['familias', idx, 'contactoTelefono'],
+        message: `Familia #${idx + 1}: el teléfono de contacto preliminar es obligatorio (mínimo 7 caracteres).`,
+      });
+    }
+    if (fam.contactoRut && fam.contactoRut.trim().length > 0 && !validarRutChileno(fam.contactoRut)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['familias', idx, 'contactoRut'],
+        message: `Familia #${idx + 1}: el RUT preliminar ingresado no es válido.`,
+      });
+    }
+  });
+}
 
 const evaluacionTerrenoBaseSchema = z.object({
   familias: z.array(familiaAfectadaSchema).optional().default([]),
