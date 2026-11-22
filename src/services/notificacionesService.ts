@@ -48,11 +48,14 @@ export async function esNotificacionDuplicada(notificacionId: string): Promise<b
  * Convierte una orden de misión a la estructura MisionLocal para su persistencia en terreno.
  */
 export function mapearAlertaAMisionLocal(alerta: MisionAsignadaAlerta): MisionLocal {
+  const esCuadrilla = alerta.tipoMision === 'ATENCION_CUADRILLA';
   return {
     id: alerta.misionId,
     incidenteId: alerta.incidenteId || '',
     codigoIncidente: alerta.incidenteCodigo || alerta.codigo,
-    tipologia: alerta.tipoAfectacion || 'Verificación de Incidente',
+    tipologia:
+      alerta.tipoAfectacion ||
+      (esCuadrilla ? 'Atención de Cuadrilla' : 'Verificación de Incidente'),
     direccion: alerta.direccion || 'Comuna de Valdivia',
     prioridad: alerta.prioridad,
     estado: 'DESPACHADA',
@@ -64,7 +67,8 @@ export function mapearAlertaAMisionLocal(alerta: MisionAsignadaAlerta): MisionLo
       incidenteFolio: alerta.incidenteFolio,
       notificacionId: alerta.notificacionId,
       tipoMision: alerta.tipoMision,
-      patrullaId: alerta.patrullaId,
+      patrullaId: alerta.patrullaId ?? null,
+      cuadrillaId: alerta.cuadrillaId ?? null,
     },
     actualizadoEn: new Date().toISOString(),
   };

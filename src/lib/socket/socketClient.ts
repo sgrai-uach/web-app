@@ -4,6 +4,7 @@ import { getAuthCookie } from '@/lib/utils/cookieUtils';
 
 let socketInstance: Socket | null = null;
 let currentPatrullaId: string | null = null;
+let currentCuadrillaId: string | null = null;
 
 function resolveSocketUrl(): string {
   if (typeof window === 'undefined') return 'http://localhost:3001';
@@ -41,6 +42,11 @@ export function getSocket(tokenOverride?: string): Socket {
         socketInstance?.emit('join', room);
         socketInstance?.emit('unirse', room);
       }
+      if (currentCuadrillaId) {
+        const room = `cuadrilla:${currentCuadrillaId}`;
+        socketInstance?.emit('join', room);
+        socketInstance?.emit('unirse', room);
+      }
     });
   }
 
@@ -68,10 +74,16 @@ export function desconectarSocket(): void {
       socketInstance.emit('leave', room);
       socketInstance.emit('salir', room);
     }
+    if (currentCuadrillaId) {
+      const room = `cuadrilla:${currentCuadrillaId}`;
+      socketInstance.emit('leave', room);
+      socketInstance.emit('salir', room);
+    }
     socketInstance.disconnect();
     socketInstance = null;
   }
   currentPatrullaId = null;
+  currentCuadrillaId = null;
 }
 
 /**
@@ -99,6 +111,36 @@ export function salirDeSalaPatrulla(patrullaId: string): void {
   }
   if (socketInstance && socketInstance.connected) {
     const room = `patrulla:${patrullaId}`;
+    socketInstance.emit('leave', room);
+    socketInstance.emit('salir', room);
+  }
+}
+
+/**
+ * Suscribe al cliente a la sala operativa de su cuadrilla (H40).
+ */
+export function unirseASalaCuadrilla(cuadrillaId: string): void {
+  if (!cuadrillaId) return;
+  currentCuadrillaId = cuadrillaId;
+  const socket = getSocket();
+  const room = `cuadrilla:${cuadrillaId}`;
+
+  if (socket.connected) {
+    socket.emit('join', room);
+    socket.emit('unirse', room);
+  }
+}
+
+/**
+ * Abandona la sala operativa de la cuadrilla.
+ */
+export function salirDeSalaCuadrilla(cuadrillaId: string): void {
+  if (!cuadrillaId) return;
+  if (currentCuadrillaId === cuadrillaId) {
+    currentCuadrillaId = null;
+  }
+  if (socketInstance && socketInstance.connected) {
+    const room = `cuadrilla:${cuadrillaId}`;
     socketInstance.emit('leave', room);
     socketInstance.emit('salir', room);
   }
