@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  XCircle,
   CheckCircle2,
   WifiOff,
   FileCheck,
@@ -12,13 +11,13 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
-import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
 import { useToastOptional } from '@/components/ui/Toast';
 import {
   MisionDetalleTopBar,
   MisionDetalleHeaderCard,
+  MisionDespachoActionsCard,
   MisionEstadoActivoCard,
   MisionNoEncontradaCard,
   MisionSoloLecturaNotice,
@@ -36,7 +35,11 @@ import {
   obtenerReporteCierreCuadrillaMision,
   type ResultadoCierreCuadrilla,
 } from '@/services/cierreCuadrillaService';
-import { obtenerDetalleMision, rechazarMision } from '@/services/misionesService';
+import {
+  obtenerDetalleMision,
+  aceptarMision,
+  rechazarMision,
+} from '@/services/misionesService';
 import { extraerAdjuntosDeMision } from '@/services/offlineQueue';
 import type { AdjuntoLocal, MisionLocal } from '@/types/offline';
 import styles from '@/components/misiones/MisionDetailLayout.module.css';
@@ -66,6 +69,8 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
 
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
+  const [aceptando, setAceptando] = useState<boolean>(false);
+  const [errorAceptacion, setErrorAceptacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
   const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
@@ -133,11 +138,18 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const tienePermisoEvidencia =
     typeof tienePermiso === 'function' ? tienePermiso('reportes:crear') : false;
 
+  const esDespachada = estadoNormalizado === 'DESPACHADA';
+  const mostrarBotonAceptar = Boolean(
+    unidadActiva &&
+      esCuadrilla &&
+      tienePermisoEjecutar &&
+      esDespachada
+  );
   const esRechazable = Boolean(
     unidadActiva &&
       esCuadrilla &&
       tienePermisoEjecutar &&
-      estadoNormalizado === 'DESPACHADA'
+      esDespachada
   );
 
   const esMisionActiva =
@@ -198,6 +210,49 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     !unidadActiva ||
     esFinalizada ||
     estadoNormalizado === 'RECHAZADA';
+
+  const handleAceptarAsignacion = async () => {
+    if (!mision || aceptando) return;
+    setAceptando(true);
+    setErrorAceptacion(null);
+    setMensajeConfirmacion(null);
+
+    try {
+      const resultado = await aceptarMision(mision.id, {
+        misionActual: mision,
+        tipoUnidad: 'cuadrilla',
+      });
+      setMision(resultado.mision);
+      setMensajeConfirmacion(resultado.mensaje);
+      if (toast) {
+        if (resultado.enColaOffline) {
+          toast.showWarning(resultado.mensaje, 'Guardado sin conexión', {
+            dedupKey: `aceptar-mision-offline-${mision.id}`,
+          });
+        } else if (resultado.yaAceptadaPreviamente) {
+          toast.showInfo(resultado.mensaje, 'Misión ya en curso', {
+            dedupKey: `aceptar-mision-idemp-${mision.id}`,
+          });
+        } else {
+          toast.showSuccess(resultado.mensaje, 'Asignación aceptada', {
+            dedupKey: `aceptar-mision-${mision.id}`,
+          });
+        }
+      }
+      await actualizarPendientes();
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'No se pudo confirmar la aceptación de la asignación.';
+      setErrorAceptacion(msg);
+      if (toast) {
+        toast.showError(msg, 'No se pudo aceptar la asignación');
+      }
+    } finally {
+      setAceptando(false);
+    }
+  };
 
   const handleConfirmarRechazo = async (
     motivo: string,
@@ -294,8 +349,10 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       <MisionDetalleHeaderCard
         mision={mision}
         trabajoTexto={trabajoTexto}
-        etiquetaFecha="Despachada"
-        fechaPrincipal={mision.fechaDespacho}
+        etiquetaFecha={
+          esMisionActiva && mision.fechaInicio ? 'Inicio de trayecto' : 'Despachada'
+        }
+        fechaPrincipal={mision.fechaInicio || mision.fechaDespacho}
         fechaCierre={esFinalizada ? fechaCierreTexto : null}
         onVerMapa={() => setMapaAbierto(true)}
       />
@@ -318,30 +375,21 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
           </div>
         )}
 
-      {/* Acciones de Despacho (H41) */}
-      {esRechazable && (
-        <section
-          className={styles.actionCard}
-          aria-label="Acciones de despacho de cuadrilla"
-        >
-          <h2 className={styles.actionTitle}>Acciones de Despacho</h2>
-          <p className={styles.actionDescription}>
-            Si la cuadrilla presenta un impedimento técnico o de fuerza mayor para
-            atender la asignación, registre el rechazo motivado para reasignación
-            inmediata.
-          </p>
-          <div className={styles.actionsStack}>
-            <Button
-              variant="destructive"
-              size="md"
-              fullWidth
-              icon={<XCircle size={18} />}
-              onClick={() => setModalRechazoAbierto(true)}
-            >
-              Rechazar Misión
-            </Button>
-          </div>
-        </section>
+      {/* Acciones de Despacho (H40 / H41) */}
+      {(mostrarBotonAceptar || esRechazable) && (
+        <MisionDespachoActionsCard
+          ariaLabel="Acciones de despacho de cuadrilla"
+          titulo="Acciones de Despacho"
+          descripcion="Confirme la aceptación para notificar a la central de operaciones que la cuadrilla inicia el desplazamiento y asume la atención de la emergencia, o registre un rechazo motivado si existe un impedimento técnico o de fuerza mayor."
+          mostrarAceptar={mostrarBotonAceptar}
+          etiquetaAceptar="Aceptar Asignación"
+          aceptando={aceptando}
+          errorAceptacion={errorAceptacion}
+          onAceptar={() => void handleAceptarAsignacion()}
+          mostrarRechazar={esRechazable}
+          etiquetaRechazar="Rechazar Misión"
+          onRechazar={() => setModalRechazoAbierto(true)}
+        />
       )}
 
       {estadoNormalizado === 'RECHAZADA' && justificacionRegistrada && (
@@ -366,7 +414,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
           }
           titulo="Faena en Curso"
           sincronizacionPendiente={Boolean(mision.sincronizacionPendiente)}
-          mensajeOffline="Acción registrada localmente. Pendiente de sincronizar con el Centro de Mando."
+          mensajeOffline="Pendiente de sincronizar: La acción fue guardada en la cola local del dispositivo y se enviará automáticamente al recuperar conexión."
           mensajeConfirmacion={mensajeConfirmacion}
           estadosCanonicos={[
             { etiqueta: 'Misión', valor: 'En curso' },

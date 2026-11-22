@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Tag,
-  CheckCircle,
   CheckCircle2,
   Navigation,
   ClipboardCheck,
@@ -13,12 +12,12 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
-import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { useToastOptional } from '@/components/ui/Toast';
 import {
   MisionDetalleTopBar,
   MisionDetalleHeaderCard,
+  MisionDespachoActionsCard,
   MisionEstadoActivoCard,
   MisionNoEncontradaCard,
   MisionSoloLecturaNotice,
@@ -144,6 +143,21 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       });
       setMision(resultado.mision);
       setMensajeConfirmacion(resultado.mensaje);
+      if (toast) {
+        if (resultado.enColaOffline) {
+          toast.showWarning(resultado.mensaje, 'Guardado sin conexión', {
+            dedupKey: `aceptar-mision-offline-${mision.id}`,
+          });
+        } else if (resultado.yaAceptadaPreviamente) {
+          toast.showInfo(resultado.mensaje, 'Misión ya en curso', {
+            dedupKey: `aceptar-mision-idemp-${mision.id}`,
+          });
+        } else {
+          toast.showSuccess(resultado.mensaje, 'Asignación aceptada', {
+            dedupKey: `aceptar-mision-${mision.id}`,
+          });
+        }
+      }
       await actualizarPendientes();
     } catch (err) {
       const msg =
@@ -151,6 +165,9 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           ? err.message
           : 'No se pudo confirmar la aceptación de la misión.';
       setErrorAceptacion(msg);
+      if (toast) {
+        toast.showError(msg, 'No se pudo aceptar la asignación');
+      }
     } finally {
       setAceptando(false);
     }
@@ -240,35 +257,16 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
 
       {/* Acción principal: Confirmar y Aceptar Misión (HU-36) */}
       {mostrarBotonAceptar && (
-        <section
-          className={styles.actionCard}
-          aria-label="Confirmación de salida de patrulla"
-        >
-          <h2 className={styles.actionTitle}>Confirmación de salida a terreno</h2>
-          <p className={styles.actionDescription}>
-            Presione el botón para informar al Centro de Mando que la patrulla ha
-            tomado conocimiento de la emergencia y se dirige al lugar para iniciar
-            la evaluación.
-          </p>
-
-          {errorAceptacion && (
-            <div className={styles.errorAlert} role="alert">
-              {errorAceptacion}
-            </div>
-          )}
-
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={aceptando}
-            icon={<CheckCircle size={20} />}
-            onClick={handleAceptarMision}
-            className={styles.actionPrimaryButton}
-          >
-            Aceptar Misión
-          </Button>
-        </section>
+        <MisionDespachoActionsCard
+          ariaLabel="Confirmación de salida de patrulla"
+          titulo="Confirmación de salida a terreno"
+          descripcion="Presione el botón para informar al Centro de Mando que la patrulla ha tomado conocimiento de la emergencia y se dirige al lugar para iniciar la evaluación."
+          mostrarAceptar={Boolean(mostrarBotonAceptar)}
+          etiquetaAceptar="Aceptar Misión"
+          aceptando={aceptando}
+          errorAceptacion={errorAceptacion}
+          onAceptar={() => void handleAceptarMision()}
+        />
       )}
 
       {/* Vista activa: En Trayecto / Evaluación (HU-36) */}

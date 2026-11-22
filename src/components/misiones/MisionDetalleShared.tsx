@@ -8,9 +8,11 @@ import {
   MapPin,
   Map,
   Calendar,
+  CheckCircle,
   CheckCircle2,
   WifiOff,
   Archive,
+  XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
@@ -274,6 +276,90 @@ export function MisionNoEncontradaCard({
         <p className={styles.notFoundDescription}>{descripcion}</p>
       </div>
     </div>
+  );
+}
+
+export interface MisionDespachoActionsCardProps {
+  ariaLabel: string;
+  titulo: string;
+  descripcion: string;
+  mostrarAceptar?: boolean;
+  etiquetaAceptar?: string;
+  aceptando?: boolean;
+  errorAceptacion?: string | null;
+  onAceptar?: () => void;
+  mostrarRechazar?: boolean;
+  etiquetaRechazar?: string;
+  rechazando?: boolean;
+  onRechazar?: () => void;
+}
+
+/**
+ * Tarjeta compartida de acciones operativas para misiones en estado DESPACHADA
+ * (aceptación y/o rechazo motivado) homologada entre Patrulla Verificadora y Cuadrilla.
+ */
+export function MisionDespachoActionsCard({
+  ariaLabel,
+  titulo,
+  descripcion,
+  mostrarAceptar = false,
+  etiquetaAceptar = 'Aceptar Misión',
+  aceptando = false,
+  errorAceptacion,
+  onAceptar,
+  mostrarRechazar = false,
+  etiquetaRechazar = 'Rechazar Misión',
+  rechazando = false,
+  onRechazar,
+}: MisionDespachoActionsCardProps) {
+  const tieneAceptar = Boolean(mostrarAceptar && onAceptar);
+  const tieneRechazar = Boolean(mostrarRechazar && onRechazar);
+
+  if (!tieneAceptar && !tieneRechazar) {
+    return null;
+  }
+
+  return (
+    <section className={styles.actionCard} aria-label={ariaLabel}>
+      <h2 className={styles.actionTitle}>{titulo}</h2>
+      <p className={styles.actionDescription}>{descripcion}</p>
+
+      {errorAceptacion && (
+        <div className={styles.errorAlert} role="alert">
+          {errorAceptacion}
+        </div>
+      )}
+
+      <div className={styles.actionsStack}>
+        {tieneAceptar && onAceptar && (
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={aceptando}
+            disabled={aceptando || rechazando}
+            icon={<CheckCircle size={20} />}
+            onClick={onAceptar}
+            className={styles.actionPrimaryButton}
+          >
+            {etiquetaAceptar}
+          </Button>
+        )}
+
+        {tieneRechazar && onRechazar && (
+          <Button
+            variant="destructive"
+            size="md"
+            fullWidth
+            disabled={aceptando || rechazando}
+            icon={<XCircle size={18} />}
+            onClick={onRechazar}
+          >
+            {etiquetaRechazar}
+          </Button>
+        )}
+      </div>
+    </section>
   );
 }
 
