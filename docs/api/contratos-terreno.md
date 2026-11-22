@@ -143,6 +143,75 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 
 ---
 
+### 2.1.b Confirmar y Aceptar Asignación de Incidente por Delegado de Cuadrilla (H40)
+- **Historia:** H40
+- **Método:** `POST`
+- **Ruta:** `/api/misiones/{id}/aceptar`
+- **Permiso RBAC requerido:** `misiones:terreno:ejecutar`
+- **Tipo de misión:** `ATENCION_CUADRILLA`
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+#### Request Body (Opcional — timeout GPS no bloqueante de 5 segundos)
+```json
+{
+  "latitud": -39.819588,
+  "longitud": -73.245209
+}
+```
+> Si el dispositivo no cuenta con coordenadas GPS o supera los `5000 ms`, la PWA envía `{}` para no retrasar el despliegue.
+
+#### Response Exitosa (200 OK)
+```json
+{
+  "message": "Asignación de misión aceptada exitosamente. La cuadrilla inicia el desplazamiento y asume la atención del incidente.",
+  "data": {
+    "mision": {
+      "id": "70000000-0000-4000-8000-000000000001",
+      "codigo": "MIS-2026-0005",
+      "titulo": "Atención táctica - Incidente INC-2026-0001",
+      "descripcion": "Despeje de árbol caído sobre calzada",
+      "tipoMision": "ATENCION_CUADRILLA",
+      "estado": "EN_CURSO",
+      "prioridad": "ALTA",
+      "incidenteId": "30000000-0000-4000-8000-000000000001",
+      "patrullaId": null,
+      "cuadrillaId": "50000000-0000-4000-8000-000000000001",
+      "fechaInicio": "2026-11-22T14:00:00.000Z",
+      "actualizadoEn": "2026-11-22T14:00:00.000Z"
+    },
+    "cuadrilla": {
+      "id": "50000000-0000-4000-8000-000000000001",
+      "nombre": "Cuadrilla Vías y Canales 1",
+      "estado": "EN_MISION",
+      "delegacionId": "30000000-0000-4000-8000-000000000002"
+    },
+    "patrulla": null,
+    "incidente": {
+      "id": "30000000-0000-4000-8000-000000000001",
+      "codigo": "INC-2026-0001",
+      "estado": "EN_ATENCION",
+      "prioridad": "ALTA"
+    },
+    "hito": {
+      "id": "80000000-0000-4000-8000-000000000010",
+      "misionId": "70000000-0000-4000-8000-000000000001",
+      "hito": "MISION_ACEPTADA",
+      "descripcion": "Asignación Aceptada por Cuadrilla",
+      "registradoPorId": "d0000000-0000-4000-8000-000000000001",
+      "latitud": -39.819588,
+      "longitud": -73.245209,
+      "creadoEn": "2026-11-22T14:00:00.000Z"
+    }
+  }
+}
+```
+
+#### Eventos WebSocket Emitidos y Cola Offline
+- Al ejecutarse la transacción atómica en `sgrai-api`, se emiten `mision:actualizada`, `incidente:actualizado` (incidente en `EN_ATENCION`) y `cuadrilla:actualizada` hacia el Centro de Mando (`sgrai-web`) y la sala operativa de la unidad.
+- En ausencia de señal, la PWA persiste la misión optimista (`EN_CURSO`, `EN_MISION`, `EN_ATENCION`) en IndexedDB y encola `ACEPTAR_MISION` en `outbox` manejando de forma idempotente respuestas `409 Conflict` con estado `EN_CURSO`.
+
+---
+
 ### 2.2 Rechazo Motivado de Misión por Patrulla Verificadora (H41, H69)
 - **Historia:** H41, H69
 - **Método:** `POST`

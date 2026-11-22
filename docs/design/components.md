@@ -79,4 +79,16 @@ Catálogo dinámico de módulos y funcionalidades habilitadas en terreno filtrad
 
 ## 6. `<ToastProvider />` y `useToast`
 
-Sistema universal de alertas flotantes montado en la raíz (`layout.tsx`).
+Sistema universal de alertas flotantes montado en la raíz (`layout.tsx`). Soporta `dedupKey` opcional (ventana de deduplicación de 3 segundos) vía `useToastOptional()` para evitar duplicados en terreno al confirmar o sincronizar acciones.
+
+---
+
+## 7. Componentes Compartidos de Detalle de Misión (`src/components/misiones/MisionDetalleShared.tsx`)
+
+Primitivas visuales homologadas bajo Flat UI (`border-radius: 0px`, `MisionDetailLayout.module.css`, iconografía `lucide-react`) compartidas entre **Patrulla Verificadora** (`/patrulla/misiones/[id]`) y **Delegado de Cuadrilla** (`/cuadrilla/misiones/[id]`):
+
+- **`<MisionDetalleTopBar />`:** Barra superior con retorno a bandeja y `<ConnectionStatusBadge />`.
+- **`<MisionDetalleHeaderCard />`:** Ficha superior con código de incidente, chip de prioridad, `<EstadoBadge />`, tipología formateada, ubicación con acceso al mapa, trabajo y fecha operativa dinámica.
+- **`<MisionDespachoActionsCard />`:** Tarjeta de acciones de despacho configurable para aceptación (`Aceptar Misión` / `Aceptar Asignación`) y/o rechazo motivado.
+- **`<MisionEstadoActivoCard />`:** Tarjeta de estado activo (*En Trayecto / Evaluación* o *Faena en Curso*) con indicador de sincronización offline y grilla de 3 estados canónicos.
+- **`<MisionNoEncontradaCard />` y `<MisionSoloLecturaNotice />`:** Estado vacío estandarizado y pie informativo de solo lectura.

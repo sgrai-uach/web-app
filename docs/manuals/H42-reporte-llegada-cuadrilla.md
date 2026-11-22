@@ -27,7 +27,7 @@ Este manual describe el procedimiento operativo mediante el cual el **Delegado d
 ## 3. Instrucciones Paso a Paso
 
 1. Ingrese a la PWA de terreno (**SGRAI Terreno**) con su cuenta de Delegado de Cuadrilla.
-2. En la pantalla principal de **Inicio** o en el módulo de **Misiones / Faenas** (`/cuadrilla/misiones`), seleccione la misión asignada que se encuentre en estado **Despachada**.
+2. En la pantalla principal de **Inicio** o en el módulo de **Misiones / Faenas** (`/cuadrilla/misiones`), seleccione la misión asignada y asegúrese de haber aceptado previamente la asignación (**Aceptar Asignación — H40**), quedando la misión en estado **En curso** (`EN_CURSO`).
 3. En la pantalla de detalle de la misión (`/cuadrilla/misiones/[id]`), revise la dirección del incidente y las instrucciones tácticas de trabajo.
 4. Una vez que el vehículo y el equipo se encuentren detenidos frente al lugar de los hechos, ubique la tarjeta destacada **Confirmación de arribo**.
 5. Presione el botón destacado **"Llegada a Terreno"** (botón de color verde menta institucional con altura táctil ergonómica de 48px).
