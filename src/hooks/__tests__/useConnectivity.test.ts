@@ -123,4 +123,128 @@ describe('useConnectivity hook', () => {
     );
   });
 
+  it('sincroniza acción ACEPTAR_MISION de cuadrilla preservando estadoCuadrilla y estadoIncidente (H40)', async () => {
+    vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+      id: 'mis-cuad-40',
+      incidenteId: 'inc-40',
+      codigoIncidente: 'INC-2026-0040',
+      tipologia: 'Caída de árbol',
+      direccion: 'Valdivia',
+      prioridad: 'ALTA',
+      estado: 'EN_CURSO',
+      fechaDespacho: '2026-11-22T13:30:00Z',
+      sincronizacionPendiente: true,
+      actualizadoEn: '2026-11-22T13:30:00Z',
+    });
+
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (callback) => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        clone: () => ({
+          json: async () => ({
+            data: {
+              mision: {
+                id: 'mis-cuad-40',
+                fechaInicio: '2026-11-22T14:00:00Z',
+              },
+              cuadrilla: { id: 'cuad-1', nombre: 'Cuadrilla 1', estado: 'EN_MISION' },
+              incidente: { id: 'inc-40', codigo: 'INC-2026-0040', estado: 'EN_ATENCION' },
+              hito: { descripcion: 'Asignación Aceptada por Cuadrilla' },
+            },
+          }),
+        }),
+      } as unknown as Response);
+
+      await callback({
+        id: 'outbox-acep-40',
+        tipo: 'ACEPTAR_MISION',
+        url: '/api/misiones/mis-cuad-40/aceptar',
+        metodo: 'POST',
+        payload: {},
+        timestamp: new Date().toISOString(),
+        intentos: 0,
+      });
+
+      return { total: 1, exitosas: 1, fallidas: 0 };
+    });
+
+    const { result } = renderHook(() => useConnectivity());
+
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'mis-cuad-40',
+        estado: 'EN_CURSO',
+        fechaInicio: '2026-11-22T14:00:00Z',
+        sincronizacionPendiente: false,
+        datosAdicionales: expect.objectContaining({
+          estadoCuadrilla: 'EN_MISION',
+          estadoIncidente: 'EN_ATENCION',
+          hitoAceptacion: 'Asignación Aceptada por Cuadrilla',
+        }),
+      })
+    );
+  });
+
+  it('sincroniza acción REPORTAR_LLEGADA actualizando fechaLlegada y limpiando sincronizacionPendiente (H42)', async () => {
+    vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+      id: 'mis-cuad-42',
+      incidenteId: 'inc-42',
+      codigoIncidente: 'INC-2026-0042',
+      tipologia: 'Anegamiento',
+      direccion: 'Valdivia',
+      prioridad: 'ALTA',
+      estado: 'EN_CURSO',
+      fechaDespacho: '2026-11-22T13:30:00Z',
+      fechaInicio: '2026-11-22T14:00:00Z',
+      sincronizacionPendiente: true,
+      actualizadoEn: '2026-11-22T14:00:00Z',
+    });
+
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (callback) => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        clone: () => ({
+          json: async () => ({
+            data: {
+              registradoEn: '2026-11-22T14:20:00Z',
+            },
+          }),
+        }),
+      } as unknown as Response);
+
+      await callback({
+        id: 'outbox-lleg-42',
+        tipo: 'REPORTAR_LLEGADA',
+        url: '/api/misiones/mis-cuad-42/llegada',
+        metodo: 'POST',
+        payload: { latitud: -39.81, longitud: -73.24 },
+        timestamp: new Date().toISOString(),
+        intentos: 0,
+      });
+
+      return { total: 1, exitosas: 1, fallidas: 0 };
+    });
+
+    const { result } = renderHook(() => useConnectivity());
+
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'mis-cuad-42',
+        estado: 'EN_CURSO',
+        fechaLlegada: '2026-11-22T14:20:00Z',
+        sincronizacionPendiente: false,
+      })
+    );
+  });
+
 });

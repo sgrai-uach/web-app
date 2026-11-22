@@ -5,6 +5,7 @@ import PatrullaMisionDetailPage from '../page';
 import * as AuthContextModule from '@/context/AuthContext';
 import * as misionesService from '@/services/misionesService';
 import * as useConnectivityModule from '@/hooks/useConnectivity';
+import { ToastProvider } from '@/components/ui/Toast';
 import type { MisionLocal } from '@/types/offline';
 
 vi.mock('@/context/AuthContext');
@@ -166,11 +167,13 @@ describe('PatrullaMisionDetailPage — Confirmar y aceptar misión asignada (HU-
 
     await act(async () => {
       render(
-        <Suspense fallback={<div>Cargando...</div>}>
-          <PatrullaMisionDetailPage
-            params={Promise.resolve({ id: misionDespachadaMock.id })}
-          />
-        </Suspense>
+        <ToastProvider>
+          <Suspense fallback={<div>Cargando...</div>}>
+            <PatrullaMisionDetailPage
+              params={Promise.resolve({ id: misionDespachadaMock.id })}
+            />
+          </Suspense>
+        </ToastProvider>
       );
     });
 
@@ -187,7 +190,8 @@ describe('PatrullaMisionDetailPage — Confirmar y aceptar misión asignada (HU-
       expect.objectContaining({ misionActual: misionDespachadaMock })
     );
 
-    // El botón Aceptar Misión desaparece y se habilita la vista En Trayecto / Evaluación
+    // El botón Aceptar Misión desaparece, se emite toast y se habilita la vista En Trayecto / Evaluación
+    expect(screen.getByText('Asignación aceptada')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /aceptar misi[oó]n/i })
     ).not.toBeInTheDocument();
@@ -409,7 +413,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
   });
 
   it('muestra el botón "Rechazar Misión" y el recuadro unificado de acciones de despacho cuando la misión está DESPACHADA', async () => {
-    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' }} />);
+    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' } as unknown as Promise<{ id: string }>} />);
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-00100')).toBeInTheDocument();
@@ -436,7 +440,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
       },
     });
 
-    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' }} />);
+    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' } as unknown as Promise<{ id: string }>} />);
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-00100')).toBeInTheDocument();
@@ -505,7 +509,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
       recargarSesion: vi.fn(),
     });
 
-    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' }} />);
+    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' } as unknown as Promise<{ id: string }>} />);
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-00100')).toBeInTheDocument();
@@ -525,7 +529,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
     };
     vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(misionRechazada);
 
-    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' }} />);
+    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' } as unknown as Promise<{ id: string }>} />);
 
     await waitFor(() => {
       expect(screen.getByText(/Misión Rechazada por Patrulla Verificadora/i)).toBeInTheDocument();
@@ -566,7 +570,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
       recargarSesion: vi.fn(),
     });
 
-    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' }} />);
+    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' } as unknown as Promise<{ id: string }>} />);
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-00100')).toBeInTheDocument();
@@ -578,7 +582,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
   it('muestra la tarjeta de misión no encontrada cuando la misión no existe en local ni remoto', async () => {
     vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(null);
 
-    render(<PatrullaMisionDetailPage params={{ id: 'mis-inexistente' }} />);
+    render(<PatrullaMisionDetailPage params={{ id: 'mis-inexistente' } as unknown as Promise<{ id: string }>} />);
 
     await waitFor(() => {
       expect(screen.getByText('Misión no encontrada')).toBeInTheDocument();

@@ -23,6 +23,8 @@ vi.mock('@/lib/socket/socketClient', () => ({
   desconectarSocket: vi.fn(),
   unirseASalaPatrulla: vi.fn(),
   salirDeSalaPatrulla: vi.fn(),
+  unirseASalaCuadrilla: vi.fn(),
+  salirDeSalaCuadrilla: vi.fn(),
   onMisionAsignada: vi.fn(),
   onSocketConnect: vi.fn(),
   emitirAckNotificacionSocket: vi.fn(),
@@ -252,5 +254,63 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
         codigo: 'MIS-2026-0077',
       })
     );
+  });
+
+  it('H40: suscribe a la sala cuadrilla:{unidadId}, despliega alerta ATENCION_CUADRILLA y navega a /cuadrilla/misiones/{id}', async () => {
+    vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
+      usuario: {
+        ...usuarioPatrulla,
+        rolCodigo: 'DELEGADO_CUADRILLA',
+        rolNombre: 'Delegado de Cuadrilla',
+        unidadId: 'cuadrilla-uuid-40',
+        unidadNombre: 'Cuadrilla Vías 1',
+      },
+      token: 'jwt-mock-cuadrilla',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: false,
+      esCuadrilla: true,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
+    });
+
+    render(
+      <NotificacionesTerrenoProvider>
+        <TestConsumer />
+      </NotificacionesTerrenoProvider>
+    );
+
+    expect(socketClient.unirseASalaCuadrilla).toHaveBeenCalledWith('cuadrilla-uuid-40');
+
+    await act(async () => {
+      socketHandler({
+        notificacionId: 'notif-cuad-40',
+        misionId: 'mis-cuad-40',
+        codigo: 'MIS-2026-0040',
+        tipoMision: 'ATENCION_CUADRILLA',
+        patrullaId: null,
+        cuadrillaId: 'cuadrilla-uuid-40',
+        incidenteId: 'inc-40',
+        incidenteCodigo: 'INC-2026-0040',
+        incidenteFolio: 'FOL-40',
+        tipoAfectacion: 'Despeje de árbol caído',
+        direccion: 'Av. Alemania 600',
+        prioridad: 'ALTA',
+        asignadoEn: '2026-11-22T14:00:00Z',
+      });
+    });
+
+    const btnVer = screen.getByTestId('btn-ver-mision-banner');
+    await act(async () => {
+      fireEvent.click(btnVer);
+    });
+
+    expect(mockPush).toHaveBeenCalledWith('/cuadrilla/misiones/mis-cuad-40');
   });
 });
