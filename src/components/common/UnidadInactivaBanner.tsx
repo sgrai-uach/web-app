@@ -18,7 +18,7 @@ export const UnidadInactivaBanner: React.FC<UnidadInactivaBannerProps> = ({
   return (
     <div className={styles.banner} role="alert" aria-live="polite">
       <div className={styles.iconWrapper}>
-        <AlertTriangle size={24} aria-hidden="true" />
+        <AlertTriangle size={16} aria-hidden="true" />
       </div>
       <div className={styles.content}>
         <h3 className={styles.title}>

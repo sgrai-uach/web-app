@@ -62,17 +62,11 @@ export async function loginUsuario(
     throw new SeguridadServiceError(response?.status || 500, formatted.message, formatted);
   }
 
-  return data.data as unknown as LoginResponseData;
+  return data.data;
 }
 
 export async function obtenerUsuarioActivo(): Promise<UsuarioActivoDetalle> {
-  const { data, error, response } = await apiClient.GET('/api/seguridad/usuario-activo', {
-    params: {
-      header: {
-        'x-user-id': '',
-      },
-    },
-  });
+  const { data, error, response } = await apiClient.GET('/api/seguridad/usuario-activo');
 
   if (error || !data || !('data' in data) || !data.data) {
     let mensaje = 'Error al consultar la sesión y permisos del usuario activo';
@@ -90,5 +84,5 @@ export async function obtenerUsuarioActivo(): Promise<UsuarioActivoDetalle> {
     throw new SeguridadServiceError(response?.status || 500, formatted.message, formatted);
   }
 
-  return data.data as unknown as UsuarioActivoDetalle;
+  return data.data;
 }

@@ -23,19 +23,12 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const prefijoTerreno = basePath || '/terreno';
 
-  // Redirigir /terreno/login hacia el portal de autenticación unificado (/login)
+  // Permitir renderizar /terreno/login cuando no hay token; si ya tiene token, llevar a /terreno
   if (pathname === '/login') {
     if (token) {
       return NextResponse.redirect(new URL(prefijoTerreno, request.nextUrl.origin));
     }
-    const returnUrl = encodeURIComponent(prefijoTerreno);
-    let targetOrigin = request.nextUrl.origin;
-    if (request.nextUrl.port === '3002') {
-      targetOrigin = `${request.nextUrl.protocol}//${request.nextUrl.hostname}:3000`;
-    }
-    return NextResponse.redirect(
-      new URL(`${UNIFIED_LOGIN_PATH}?returnUrl=${returnUrl}`, targetOrigin)
-    );
+    return NextResponse.next();
   }
 
   // Rutas públicas de infraestructura PWA
@@ -43,17 +36,13 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Si no cuenta con token de sesión, redirigir al login unificado (/login)
+  // Si no cuenta con token de sesión, redirigir a /terreno/login en el mismo origen
   if (!token) {
     const fullPath = `${prefijoTerreno}${pathname === '/' ? '' : pathname}${search}`;
     const returnUrl = encodeURIComponent(fullPath);
-    let targetOrigin = request.nextUrl.origin;
-    if (request.nextUrl.port === '3002') {
-      targetOrigin = `${request.nextUrl.protocol}//${request.nextUrl.hostname}:3000`;
-    }
     const loginUrl = new URL(
-      `${UNIFIED_LOGIN_PATH}?returnUrl=${returnUrl}`,
-      targetOrigin
+      `${prefijoTerreno}/login?returnUrl=${returnUrl}`,
+      request.nextUrl.origin
     );
     return NextResponse.redirect(loginUrl);
   }

@@ -63,6 +63,8 @@ describe('CuadrillaMisionDetailPage — Reporte de Llegada a Terreno (H42)', () 
       esPatrulla: false,
       esCuadrilla: true,
       unidadActiva,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: unidadActiva ? 'ACTIVA' : 'DESACTIVADA',
       tienePermiso: vi
         .fn()
         .mockImplementation(

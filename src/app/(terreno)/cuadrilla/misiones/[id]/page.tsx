@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/Button';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
+import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
 import {
   obtenerDetalleMision,
@@ -37,7 +38,13 @@ interface PageProps {
 
 export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const { id: misionId } = use(params);
-  const { usuario, unidadActiva, tienePermiso } = useAuth();
+  const {
+    usuario,
+    unidadActiva,
+    tieneUnidadAsignada,
+    estadoAsignacion,
+    tienePermiso,
+  } = useAuth();
   const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
 
   const [mision, setMision] = useState<MisionLocal | null>(null);
@@ -55,23 +62,12 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       if (encontrada) {
         setMision(encontrada);
       } else {
-        setMision({
-          id: misionId,
-          incidenteId: `inc-${misionId}`,
-          codigoIncidente: `INC-2026-${misionId.substring(0, 5).toUpperCase()}`,
-          tipologia: 'Despeje de vía pública',
-          direccion: 'Av. Ramón Picarte 1100, Valdivia',
-          coordenadas: { lat: -39.81422, lng: -73.24591 },
-          prioridad: 'ALTA',
-          estado: unidadActiva ? 'DESPACHADA' : 'FINALIZADA',
-          fechaDespacho: '2026-10-20T14:30:00Z',
-          actualizadoEn: '2026-10-20T14:35:00Z',
-        });
+        setMision(null);
       }
     } finally {
       setCargando(false);
     }
-  }, [misionId, unidadActiva]);
+  }, [misionId]);
 
   useEffect(() => {
     void cargarDetalle();
@@ -163,7 +159,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       <div className={styles.topBar}>
         <Link href="/cuadrilla/misiones" className={styles.backLink}>
           <ArrowLeft size={16} aria-hidden="true" />
-          <span>{unidadActiva ? 'Misiones' : 'Historial'}</span>
+          <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}</span>
         </Link>
         <ConnectionStatusBadge
           status={status}
@@ -172,12 +168,17 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         />
       </div>
 
-      {!unidadActiva && (
+      {!tieneUnidadAsignada ? (
+        <SinUnidadBanner
+          tipoUnidad="cuadrilla"
+          nombreOperador={usuario?.nombre}
+        />
+      ) : !unidadActiva ? (
         <UnidadInactivaBanner
           tipoUnidad="cuadrilla"
           nombreUnidad={usuario?.unidadNombre}
         />
-      )}
+      ) : null}
 
       {/* Banner de aviso cuando la llegada se encuentra guardada en la cola local */}
       {mision.sincronizacionPendiente && (

@@ -7,8 +7,8 @@ import { Heading } from '@/components/ui/Heading';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { sincronizarMisiones } from '@/services/misionesService';
-import { guardarMisionesLocales } from '@/services/offlineQueue';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
+import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { ordenarMisionesPorPrioridadYFecha } from '@/lib/utils/formatters';
 import {
   MisionFiltrosChips,
@@ -16,11 +16,13 @@ import {
   type ConteoFiltros,
 } from '@/components/misiones/MisionFiltrosChips';
 import { MisionCard } from '@/components/misiones/MisionCard';
+import { NuevaMisionBanner } from '@/components/misiones/NuevaMisionBanner';
+import { useMisionesSocket } from '@/hooks/useMisionesSocket';
 import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaMisionesPage.module.css';
 
 function PatrullaMisionesContenido() {
-  const { usuario, unidadActiva } = useAuth();
+  const { usuario, unidadActiva, tieneUnidadAsignada, estadoAsignacion } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -40,48 +42,47 @@ function PatrullaMisionesContenido() {
   const cargarMisiones = useCallback(async () => {
     setCargando(true);
     try {
-      let locales = await sincronizarMisiones({
-        tipoMision: 'VERIFICACION',
-      });
-
-      if (!unidadActiva && locales.length === 0) {
-        const historicas: MisionLocal[] = [
-          {
-            id: 'patrulla-hist-01',
-            incidenteId: 'inc-102',
-            codigoIncidente: 'INC-2026-00102',
-            tipologia: 'Caída de árbol',
-            direccion: 'Av. Alemania 600, Valdivia',
-            prioridad: 'ALTA',
-            estado: 'FINALIZADA',
-            fechaDespacho: '2026-10-18T11:00:00Z',
-            actualizadoEn: '2026-10-18T11:45:00Z',
-          },
-          {
-            id: 'patrulla-hist-02',
-            incidenteId: 'inc-067',
-            codigoIncidente: 'INC-2026-00067',
-            tipologia: 'Deslizamiento',
-            direccion: 'Camino a Niebla Km 4, Valdivia',
-            prioridad: 'CRITICA',
-            estado: 'FINALIZADA',
-            fechaDespacho: '2026-10-14T16:20:00Z',
-            actualizadoEn: '2026-10-14T17:10:00Z',
-          },
-        ];
-        await guardarMisionesLocales(historicas);
-        locales = historicas;
+      if (!tieneUnidadAsignada || estadoAsignacion === 'SIN_ASIGNACION') {
+        setMisiones([]);
+        return;
       }
+
+      const locales = await sincronizarMisiones({
+        tipoMision: 'VERIFICACION',
+        patrullaId: usuario?.unidadId || undefined,
+      });
 
       setMisiones(locales);
     } finally {
       setCargando(false);
     }
-  }, [unidadActiva]);
+  }, [tieneUnidadAsignada, estadoAsignacion, usuario?.unidadId]);
 
   useEffect(() => {
     cargarMisiones();
+
+    const handleActualizar = () => {
+      void cargarMisiones();
+    };
+
+    window.addEventListener('sgrai:mision_actualizada', handleActualizar);
+    window.addEventListener('sgrai:outbox-synced', handleActualizar);
+
+    return () => {
+      window.removeEventListener('sgrai:mision_actualizada', handleActualizar);
+      window.removeEventListener('sgrai:outbox-synced', handleActualizar);
+    };
   }, [cargarMisiones]);
+
+  const { ultimaMisionAsignada, descartarUltimaMision } = useMisionesSocket({
+    onNuevaMision: () => {
+      void cargarMisiones();
+    },
+    onMisionActualizada: () => {
+      void cargarMisiones();
+    },
+    habilitado: Boolean(unidadActiva),
+  });
 
   const cambiarFiltro = (nuevoFiltro: FiltroEstado) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -145,16 +146,30 @@ function PatrullaMisionesContenido() {
 
   return (
     <div className={styles.container}>
-      {!unidadActiva && (
+      {ultimaMisionAsignada && (
+        <NuevaMisionBanner
+          codigoMision={ultimaMisionAsignada.codigo}
+          misionId={ultimaMisionAsignada.misionId}
+          urlDetalle={`/patrulla/misiones/${ultimaMisionAsignada.misionId}`}
+          alCerrar={descartarUltimaMision}
+        />
+      )}
+
+      {!tieneUnidadAsignada ? (
+        <SinUnidadBanner
+          tipoUnidad="patrulla"
+          nombreOperador={usuario?.nombre}
+        />
+      ) : !unidadActiva ? (
         <UnidadInactivaBanner
           tipoUnidad="patrulla"
           nombreUnidad={usuario?.unidadNombre}
         />
-      )}
+      ) : null}
 
       <div className={styles.titleArea}>
         <Heading variant="h1">
-          {!unidadActiva ? 'Historial' : 'Misiones'}
+          {tieneUnidadAsignada && !unidadActiva ? 'Historial' : 'Misiones'}
         </Heading>
       </div>
 
@@ -177,7 +192,9 @@ function PatrullaMisionesContenido() {
               Sin registros disponibles
             </p>
             <p style={{ fontSize: '0.875rem', margin: 0 }}>
-              {!unidadActiva
+              {!tieneUnidadAsignada
+                ? 'El funcionario no posee una patrulla asignada. Solicite su asignación en el Centro de Mando.'
+                : !unidadActiva
                 ? 'No se encontraron misiones históricas para esta patrulla.'
                 : 'La patrulla se encuentra disponible para despacho.'}
             </p>

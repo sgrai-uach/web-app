@@ -25,7 +25,7 @@ Describir el comportamiento y la experiencia de usuario en la aplicación móvil
    - El delegado de la cuadrilla desactivada puede iniciar sesión normalmente en `/terreno/login` con su RUT o correo institucional.
 2. **Banner Persistente de Advertencia:**
    - En la parte superior de la pantalla se despliega de forma permanente el banner institucional de advertencia:
-     > **"Cuadrilla Desactivada — [Nombre Unidad]:** Esta unidad ha sido retirada del servicio activo (§3.7 de baja lógica). Se encuentra en modo histórico de solo lectura para consulta de faenas anteriores. No es posible recibir nuevos despachos ni ejecutar acciones operativas."
+     > **"Cuadrilla Desactivada — [Nombre Unidad]:** Esta unidad ha sido retirada del servicio activo. Se encuentra en modo histórico de solo lectura para consulta de faenas anteriores. No es posible recibir nuevos despachos ni ejecutar acciones operativas."
 3. **Restricciones Operativas:**
    - No se reciben despachos de emergencias en tiempo real ni alertas de sonido/vibración.
    - Los botones de acción operativa ("Aceptar Misión", "Llegada con GPS", "Solicitar Apoyo", "Cerrar Faena") se encuentran deshabilitados o no disponibles.
