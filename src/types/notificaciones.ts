@@ -23,7 +23,8 @@ export interface MisionAsignadaAlerta {
   misionId: string;
   codigo: string;
   tipoMision: string;
-  patrullaId: string;
+  patrullaId?: string | null;
+  cuadrillaId?: string | null;
   incidenteId?: string | null;
   incidenteCodigo?: string | null;
   incidenteFolio?: string | null;
