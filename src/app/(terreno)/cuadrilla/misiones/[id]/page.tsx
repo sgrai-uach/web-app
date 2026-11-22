@@ -1,35 +1,38 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, use } from 'react';
-import Link from 'next/link';
 import {
-  ArrowLeft,
-  MapPin,
-  Calendar,
-  Archive,
-  Map,
   MapPinCheck,
   CheckCircle2,
   AlertTriangle,
   Clock,
   Navigation,
-  WifiOff,
+  HardHat,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
-import { EstadoBadge } from '@/components/misiones/EstadoBadge';
-import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
+import { useToastOptional } from '@/components/ui/Toast';
+import {
+  MisionDetalleTopBar,
+  MisionDetalleHeaderCard,
+  MisionDespachoActionsCard,
+  MisionEstadoActivoCard,
+  MisionNoEncontradaCard,
+  MisionSoloLecturaNotice,
+} from '@/components/misiones/MisionDetalleShared';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
 import {
   obtenerDetalleMision,
+  aceptarMision,
   reportarLlegadaCuadrilla,
   GeolocationError,
 } from '@/services/misionesService';
-import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
+import { formatearEstado, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
+import sharedStyles from '@/components/misiones/MisionDetailLayout.module.css';
 import styles from './CuadrillaDetailPage.module.css';
 
 interface PageProps {
@@ -37,52 +40,111 @@ interface PageProps {
 }
 
 export default function CuadrillaMisionDetailPage({ params }: PageProps) {
-  const { id: misionId } = use(params);
+  const resolvedParams =
+    params && typeof (params as unknown as { then?: unknown }).then === 'function'
+      ? use(params)
+      : (params as unknown as { id: string });
+  const misionId = resolvedParams?.id;
+  const toast = useToastOptional();
+
   const {
     usuario,
     unidadActiva,
     tieneUnidadAsignada,
     estadoAsignacion,
+    esCuadrilla,
     tienePermiso,
   } = useAuth();
   const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
 
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
+  const [aceptando, setAceptando] = useState<boolean>(false);
+  const [errorAceptacion, setErrorAceptacion] = useState<string | null>(null);
   const [reportando, setReportando] = useState<boolean>(false);
   const [errorGps, setErrorGps] = useState<string | null>(null);
   const [puedeUsarContingencia, setPuedeUsarContingencia] = useState<boolean>(false);
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
 
-  const cargarDetalle = useCallback(async () => {
-    setCargando(true);
-    try {
-      const encontrada = await obtenerDetalleMision(misionId);
-      if (encontrada) {
-        setMision(encontrada);
-      } else {
-        setMision(null);
+  const cargarDetalle = useCallback(
+    async (silencioso = false) => {
+      if (!silencioso) {
+        setCargando(true);
       }
-    } finally {
-      setCargando(false);
-    }
-  }, [misionId]);
+      try {
+        const encontrada = await obtenerDetalleMision(misionId);
+        setMision(encontrada || null);
+      } finally {
+        if (!silencioso) {
+          setCargando(false);
+        }
+      }
+    },
+    [misionId]
+  );
 
   useEffect(() => {
     void cargarDetalle();
   }, [cargarDetalle]);
 
-  // Refrescar detalle local cuando la cola offline termine de sincronizarse al recuperar conexión
   useEffect(() => {
-    const handleOutboxSynced = () => {
-      void cargarDetalle();
+    const handleSync = () => {
+      void cargarDetalle(true);
     };
-    window.addEventListener('sgrai:outbox-synced', handleOutboxSynced);
+    window.addEventListener('sgrai:outbox-synced', handleSync);
+    window.addEventListener('sgrai:mision-sincronizada', handleSync);
     return () => {
-      window.removeEventListener('sgrai:outbox-synced', handleOutboxSynced);
+      window.removeEventListener('sgrai:outbox-synced', handleSync);
+      window.removeEventListener('sgrai:mision-sincronizada', handleSync);
     };
   }, [cargarDetalle]);
+
+  const handleAceptarAsignacion = async () => {
+    if (!mision || aceptando) return;
+    setAceptando(true);
+    setErrorAceptacion(null);
+    setMensajeConfirmacion(null);
+
+    try {
+      const resultado = await aceptarMision(mision.id, {
+        misionActual: mision,
+        tipoUnidad: 'cuadrilla',
+      });
+      setMision(resultado.mision);
+      setMensajeConfirmacion(resultado.mensaje);
+      if (toast) {
+        if (resultado.enColaOffline) {
+          toast.showWarning(resultado.mensaje, 'Guardado sin conexión', {
+            dedupKey: `aceptar-mision-offline-${mision.id}`,
+          });
+        } else if (resultado.yaAceptadaPreviamente) {
+          toast.showInfo(resultado.mensaje, 'Misión ya en curso', {
+            dedupKey: `aceptar-mision-idemp-${mision.id}`,
+          });
+        } else {
+          toast.showSuccess(resultado.mensaje, 'Asignación aceptada', {
+            dedupKey: `aceptar-mision-${mision.id}`,
+          });
+        }
+      }
+      await actualizarPendientes();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
+      }
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'No se pudo confirmar la aceptación de la asignación.';
+      setErrorAceptacion(msg);
+      if (toast) {
+        toast.showError(msg, 'No se pudo aceptar la asignación');
+      }
+    } finally {
+      setAceptando(false);
+    }
+  };
 
   const handleReportarLlegada = async (usarContingencia = false) => {
     if (!mision || reportando) return;
@@ -98,12 +160,33 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       setMision(resultado.mision);
       setMensajeConfirmacion(resultado.mensaje);
       setPuedeUsarContingencia(false);
+      if (toast) {
+        if (resultado.enColaOffline) {
+          toast.showWarning(resultado.mensaje, 'Guardado sin conexión', {
+            dedupKey: `llegada-mision-offline-${mision.id}`,
+          });
+        } else if (resultado.yaReportadaPreviamente) {
+          toast.showInfo(resultado.mensaje, 'Llegada ya registrada', {
+            dedupKey: `llegada-mision-idemp-${mision.id}`,
+          });
+        } else {
+          toast.showSuccess(resultado.mensaje, 'Llegada registrada', {
+            dedupKey: `llegada-mision-${mision.id}`,
+          });
+        }
+      }
       await actualizarPendientes();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
+      }
     } catch (err) {
       if (err instanceof GeolocationError) {
         setErrorGps(err.message);
         if (mision.coordenadas && Boolean(mision.coordenadas.lat && mision.coordenadas.lng)) {
           setPuedeUsarContingencia(true);
+        }
+        if (toast) {
+          toast.showWarning(err.message, 'Ubicación GPS no disponible');
         }
       } else {
         const msg =
@@ -111,13 +194,16 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
             ? err.message
             : 'No fue posible reportar la llegada a terreno. Intente nuevamente.';
         setErrorGps(msg);
+        if (toast) {
+          toast.showError(msg, 'No se pudo reportar la llegada');
+        }
       }
     } finally {
       setReportando(false);
     }
   };
 
-  if (cargando || !mision) {
+  if (cargando) {
     return (
       <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
         Cargando misión...
@@ -125,48 +211,81 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     );
   }
 
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
+  if (!mision) {
+    return (
+      <MisionNoEncontradaCard
+        backHref="/cuadrilla/misiones"
+        backLabel={estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}
+        status={status}
+        pendingCount={pendientes}
+        onRetry={sincronizar}
+        descripcion="La misión solicitada no existe o no se encuentra asignada a su cuadrilla operativa, o no está disponible en caché local."
+      />
+    );
   }
 
   const estadoNormalizado = mision.estado?.toUpperCase() || '';
   const esDespachada = estadoNormalizado === 'DESPACHADA';
-  const esEnCurso = estadoNormalizado === 'EN_CURSO';
+  const esEnCurso =
+    estadoNormalizado === 'EN_CURSO' ||
+    estadoNormalizado === 'EN_TERRENO' ||
+    estadoNormalizado === 'ACEPTADA';
+  const esFinalizada =
+    estadoNormalizado === 'FINALIZADA' ||
+    estadoNormalizado === 'COMPLETADA' ||
+    estadoNormalizado === 'CERRADA';
 
   const tienePermisoEjecutar =
     typeof tienePermiso === 'function'
       ? tienePermiso('misiones:terreno:ejecutar')
       : false;
 
-  const mostrarBotonLlegada =
-    unidadActiva && esDespachada && tienePermisoEjecutar;
+  // Prioridad H40: En estado DESPACHADA se muestra "Aceptar Asignación"
+  const mostrarBotonAceptar = Boolean(
+    unidadActiva && esCuadrilla && tienePermisoEjecutar && esDespachada
+  );
 
-  const trabajoTexto = (mision.datosAdicionales?.trabajo as string) || mision.direccion;
+  // H42 se habilita una vez aceptada la misión (EN_CURSO) y mientras no haya arribo registrado
+  const tieneLlegadaRegistrada = Boolean(
+    mision.fechaLlegada || mision.datosAdicionales?.hitoLlegada
+  );
+  const mostrarBotonLlegada = Boolean(
+    unidadActiva &&
+      esCuadrilla &&
+      tienePermisoEjecutar &&
+      esEnCurso &&
+      !tieneLlegadaRegistrada
+  );
+
+  const trabajoTexto =
+    (mision.datosAdicionales?.trabajo as string) || mision.direccion;
   const esSoloLectura =
-    !unidadActiva ||
-    estadoNormalizado === 'FINALIZADA' ||
-    estadoNormalizado === 'COMPLETADA' ||
-    estadoNormalizado === 'CERRADA';
+    !unidadActiva || esFinalizada || estadoNormalizado === 'RECHAZADA';
+
+  const estadoCuadrilla =
+    typeof mision.datosAdicionales?.estadoCuadrilla === 'string'
+      ? mision.datosAdicionales.estadoCuadrilla
+      : 'EN_MISION';
+  const estadoIncidente =
+    typeof mision.datosAdicionales?.estadoIncidente === 'string'
+      ? mision.datosAdicionales.estadoIncidente
+      : 'EN_ATENCION';
 
   const fechaLlegadaDisplay = mision.fechaLlegada || mision.fechaInicio;
+  const fechaCierreTexto =
+    typeof mision.datosAdicionales?.fechaCierre === 'string'
+      ? mision.datosAdicionales.fechaCierre
+      : null;
 
   return (
-    <div className={styles.container}>
-      <div className={styles.topBar}>
-        <Link href="/cuadrilla/misiones" className={styles.backLink}>
-          <ArrowLeft size={16} aria-hidden="true" />
-          <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}</span>
-        </Link>
-        <ConnectionStatusBadge
-          status={status}
-          pendingCount={pendientes}
-          onRetry={sincronizar}
-        />
-      </div>
+    <div className={sharedStyles.container}>
+      <MisionDetalleTopBar
+        backHref="/cuadrilla/misiones"
+        backLabel={estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}
+        status={status}
+        pendingCount={pendientes}
+        onRetry={sincronizar}
+      />
 
       {!tieneUnidadAsignada ? (
         <SinUnidadBanner
@@ -180,89 +299,55 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         />
       ) : null}
 
-      {/* Banner de aviso cuando la llegada se encuentra guardada en la cola local */}
-      {mision.sincronizacionPendiente && (
-        <div className={styles.offlineAlertBanner} role="status">
-          <WifiOff size={16} aria-hidden="true" />
-          <span>
-            Llegada registrada localmente. Pendiente de sincronizar con el Centro de Mando.
-          </span>
-        </div>
+      <MisionDetalleHeaderCard
+        mision={mision}
+        trabajoTexto={trabajoTexto}
+        etiquetaFecha={
+          esEnCurso && mision.fechaInicio ? 'Inicio de trayecto' : 'Despachada'
+        }
+        fechaPrincipal={mision.fechaInicio || mision.fechaDespacho}
+        fechaCierre={fechaCierreTexto}
+        onVerMapa={() => setMapaAbierto(true)}
+      />
+
+      {/* Acciones Operativas de Despacho (H40 — Prioridad en DESPACHADA) */}
+      {mostrarBotonAceptar && (
+        <MisionDespachoActionsCard
+          ariaLabel="Acciones operativas de despacho"
+          titulo="Acciones de Despacho"
+          descripcion="Confirme la asignación para notificar a la central que la cuadrilla inicia el desplazamiento y asume la atención del incidente."
+          mostrarAceptar={mostrarBotonAceptar}
+          etiquetaAceptar="Aceptar Asignación"
+          aceptando={aceptando}
+          errorAceptacion={errorAceptacion}
+          onAceptar={() => void handleAceptarAsignacion()}
+        />
       )}
 
-      {/* Mensaje de confirmación temporal */}
-      {mensajeConfirmacion && !mision.sincronizacionPendiente && (
-        <div className={styles.successAlertBanner} role="status">
-          <CheckCircle2 size={16} aria-hidden="true" />
-          <span>{mensajeConfirmacion}</span>
-        </div>
+      {/* Vista activa: Faena en Curso (H40) */}
+      {unidadActiva && esEnCurso && (
+        <MisionEstadoActivoCard
+          ariaLabel="Estado de faena en curso"
+          icono={
+            <HardHat
+              size={20}
+              color="var(--color-primary-teal)"
+              aria-hidden="true"
+            />
+          }
+          titulo="Faena en Curso"
+          sincronizacionPendiente={Boolean(mision.sincronizacionPendiente)}
+          mensajeOffline="Pendiente de sincronizar: La acción fue guardada en la cola local del dispositivo y se enviará automáticamente al recuperar conexión."
+          mensajeConfirmacion={mensajeConfirmacion}
+          estadosCanonicos={[
+            { etiqueta: 'Misión', valor: 'En curso' },
+            { etiqueta: 'Cuadrilla', valor: formatearEstado(estadoCuadrilla) },
+            { etiqueta: 'Incidente', valor: formatearEstado(estadoIncidente) },
+          ]}
+        />
       )}
 
-      <div className={styles.missionHeader}>
-        <div className={styles.headerRow}>
-          <div className={styles.codeArea}>
-            <span className={styles.code}>{mision.codigoIncidente}</span>
-            <span className={`${styles.priorityChip} ${prioridadClase}`}>
-              {formatearPrioridad(mision.prioridad)}
-            </span>
-          </div>
-          <EstadoBadge estado={mision.estado} />
-        </div>
-
-        <div className={styles.detailGrid}>
-          {/* Bloque Tipo */}
-          <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>Tipo</span>
-            <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
-              {mision.tipologia}
-            </span>
-          </div>
-
-          {/* Bloque Ubicación */}
-          <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>Ubicación</span>
-            <div className={styles.locationActionRow}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <MapPin size={16} color="var(--color-primary-teal)" aria-hidden="true" />
-                <span className={styles.itemValue}>{mision.direccion}</span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                icon={<Map size={14} />}
-                onClick={() => setMapaAbierto(true)}
-              >
-                Ver mapa
-              </Button>
-            </div>
-          </div>
-
-          {/* Bloque Trabajo */}
-          <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>Trabajo</span>
-            <span className={styles.itemValue}>{trabajoTexto}</span>
-          </div>
-
-          {/* Fecha Despacho / Arribo */}
-          <div className={styles.sectionBlock}>
-            <span className={styles.itemLabel}>
-              {esEnCurso && fechaLlegadaDisplay ? 'Arribo a Terreno' : 'Despachada'}
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Calendar size={15} color="var(--color-text-muted)" aria-hidden="true" />
-              <span className={styles.itemValue}>
-                {formatearFechaHora24h(
-                  esEnCurso && fechaLlegadaDisplay
-                    ? fechaLlegadaDisplay
-                    : mision.fechaDespacho
-                )}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Acción destacada: Llegada a Terreno (H42) */}
+      {/* Confirmación de arribo a terreno (H42 — Post-aceptación) */}
       {mostrarBotonLlegada && (
         <section
           className={styles.arrivalCard}
@@ -315,8 +400,8 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         </section>
       )}
 
-      {/* Panel informativo cuando la misión se encuentra En Trabajos de Terreno */}
-      {esEnCurso && (
+      {/* Panel informativo cuando la cuadrilla ya registró arribo a terreno (H42) */}
+      {unidadActiva && esEnCurso && tieneLlegadaRegistrada && (
         <section
           className={styles.activeWorkPanel}
           aria-label="Trabajos de terreno en curso"
@@ -343,14 +428,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         </section>
       )}
 
-      {esSoloLectura && (
-        <div className={styles.readOnlyNotice}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-            <Archive size={16} aria-hidden="true" />
-            <span>Solo lectura</span>
-          </div>
-        </div>
-      )}
+      {esSoloLectura && <MisionSoloLecturaNotice />}
 
       <MapaModal
         abierto={mapaAbierto}
