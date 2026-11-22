@@ -3607,16 +3607,16 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Confirmar y aceptar misión asignada desde terreno (HU-36)
-         * @description Permite a la patrulla verificadora confirmar y aceptar la misión asignada desde su dispositivo móvil (PWA). Ejecuta una transición atómica actualizando mision.estado de DESPACHADA a EN_CURSO, fijando mision.fecha_inicio = CURRENT_TIMESTAMP y registrando el hito 'Misión Aceptada por Patrulla' (código 'MISION_ACEPTADA') en mision_hito. Mantiene patrulla_verificadora.estado en EN_VERIFICACION e incidente.estado en VERIFICANDO, y emite el evento WebSocket 'mision:actualizada' hacia la sala 'encargado'. Requiere el permiso RBAC 'misiones:terreno:verificar'.
+         * Confirmar y aceptar misión asignada desde terreno (H36, H40)
+         * @description Permite a la patrulla verificadora o al delegado de cuadrilla confirmar y aceptar la misión asignada desde su dispositivo móvil (PWA). Ejecuta una transición atómica actualizando mision.estado de DESPACHADA a EN_CURSO, fijando mision.fecha_inicio = CURRENT_TIMESTAMP y registrando el hito en mision_hito. Para VERIFICACION mantiene patrulla en EN_VERIFICACION e incidente en VERIFICANDO ('Misión Aceptada por Patrulla'); para ATENCION_CUADRILLA actualiza cuadrilla a EN_MISION e incidente a EN_ATENCION ('Asignación Aceptada por Cuadrilla'), emitiendo los eventos WebSocket hacia el Centro de Mando. Requiere el permiso RBAC 'misiones:terreno:verificar' o 'misiones:terreno:ejecutar'.
          */
         post: {
             parameters: {
                 query?: never;
                 header?: {
-                    /** @description Token Bearer JWT de sesión de la patrulla verificadora */
+                    /** @description Token Bearer JWT de sesión de la unidad operativa en terreno */
                     authorization?: string;
-                    /** @description UUID del usuario autenticado con permiso misiones:terreno:verificar */
+                    /** @description UUID del usuario autenticado con permiso misiones:terreno:verificar o misiones:terreno:ejecutar */
                     "x-user-id"?: string;
                 };
                 path: {
@@ -3655,7 +3655,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Acceso denegado. Se requiere el permiso 'misiones:terreno:verificar' y pertenecer a la patrulla asignada */
+                /** @description Acceso denegado. Se requiere el permiso 'misiones:terreno:verificar' o 'misiones:terreno:ejecutar' y pertenecer a la unidad asignada */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -13760,10 +13760,24 @@ export interface components {
                     incidenteId: string | null;
                     /** Format: uuid */
                     patrullaId: string | null;
+                    /** Format: uuid */
+                    cuadrillaId: string | null;
                     /** @description Timestamp ISO 8601 fijado al momento de aceptar la misión */
                     fechaInicio: string;
                     actualizadoEn: string;
                 };
+                cuadrilla: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /**
+                     * @description Estado actualizado de la cuadrilla al aceptar la asignación
+                     * @example EN_MISION
+                     */
+                    estado: string;
+                    /** Format: uuid */
+                    delegacionId?: string | null;
+                } | null;
                 patrulla: {
                     /** Format: uuid */
                     id: string;
@@ -13779,10 +13793,12 @@ export interface components {
                     id: string;
                     codigo: string;
                     /**
-                     * @description Permanece en estado canónico VERIFICANDO (no 'En camino')
+                     * @description Estado operativo del incidente tras aceptar la misión (VERIFICANDO o EN_ATENCION)
                      * @example VERIFICANDO
                      */
                     estado: string;
+                    /** @enum {string} */
+                    prioridad?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
                 } | null;
                 hito: components["schemas"]["MisionHitoRegistrado"];
             };
