@@ -269,6 +269,19 @@ export async function reportarLlegadaCuadrilla(
 
       // Idempotencia: 409 Conflict indica que la llegada ya fue reportada
       if (status === 409) {
+        const msgConflict = (error as { message?: string } | undefined)?.message || '';
+        if (/CANCELADA|RECHAZADA|CERRADA|FINALIZADA/i.test(msgConflict)) {
+          try {
+            await obtenerDetalleMision(misionId);
+          } catch {
+            // Ignorar fallo secundario al sincronizar estado real
+          }
+          throw new MisionServiceError(
+            409,
+            msgConflict || 'La misión se encuentra en un estado incompatible para reportar llegada.'
+          );
+        }
+
         const ahoraIso = new Date().toISOString();
         const misionIdempotente: MisionLocal = {
           ...misionBase,
@@ -369,6 +382,7 @@ export interface OpcionesAceptarMision {
   coordenadas?: AceptarMisionPayload;
   misionActual?: MisionLocal;
   timeoutGpsMs?: number;
+  tipoUnidad?: 'patrulla' | 'cuadrilla';
 }
 
 /**
@@ -488,6 +502,9 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
         const baseDatosAdicionales = {
           trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
           titulo: item.titulo,
+          tipoMision: item.tipoMision,
+          patrullaId: item.patrullaId ?? null,
+          cuadrillaId: item.cuadrillaId ?? null,
         };
 
         return {
@@ -503,6 +520,12 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
           fechaDespacho: item.fechaInicio || item.creadoEn,
           fechaInicio:
             mantenerOptimista && previa ? previa.fechaInicio : item.fechaInicio || null,
+          fechaLlegada:
+            mantenerOptimista && previa
+              ? previa.fechaLlegada ?? null
+              : item.estado === 'EN_CURSO'
+                ? previa?.fechaLlegada ?? null
+                : null,
           sincronizacionPendiente: mantenerOptimista,
           datosAdicionales:
             mantenerOptimista && previa?.datosAdicionales
@@ -545,15 +568,34 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         previa?.sincronizacionPendiente && d.estado === 'DESPACHADA'
       );
 
-      const datosRemotos = {
+      const hitoLlegadaRemoto = Array.isArray(d.bitacoraTiempos)
+        ? d.bitacoraTiempos.find((h) => h.hito === 'LLEGADA_TERRENO')
+        : undefined;
+
+      const datosRemotos: Record<string, unknown> = {
         trabajo:
           d.descripcion ||
           d.incidente?.descripcion ||
           'Sin instrucciones adicionales especificadas.',
         titulo: d.titulo,
-        estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION',
-        estadoIncidente: d.incidente?.estado || 'VERIFICANDO',
+        tipoMision: d.tipoMision,
+        ...(!d.cuadrilla && d.tipoMision !== 'ATENCION_CUADRILLA'
+          ? { estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION' }
+          : d.patrulla?.estado
+            ? { estadoPatrulla: d.patrulla.estado }
+            : {}),
+        ...(d.cuadrilla?.estado ? { estadoCuadrilla: d.cuadrilla.estado } : {}),
+        estadoIncidente:
+          d.incidente?.estado ||
+          (d.cuadrilla || d.tipoMision === 'ATENCION_CUADRILLA'
+            ? 'EN_ATENCION'
+            : 'VERIFICANDO'),
+        ...(hitoLlegadaRemoto ? { hitoLlegada: hitoLlegadaRemoto.descripcion } : {}),
       };
+
+      const fechaLlegadaResuelta =
+        hitoLlegadaRemoto?.timestamp ??
+        (mantenerOptimista || d.estado === 'EN_CURSO' ? previa?.fechaLlegada ?? null : null);
 
       const misionLocal: MisionLocal = {
         id: d.id,
@@ -572,6 +614,7 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         fechaDespacho: d.fechaInicio || d.creadoEn,
         fechaInicio:
           mantenerOptimista && previa ? previa.fechaInicio : d.fechaInicio || null,
+        fechaLlegada: fechaLlegadaResuelta,
         sincronizacionPendiente: mantenerOptimista,
         datosAdicionales:
           mantenerOptimista && previa?.datosAdicionales
@@ -743,13 +786,15 @@ export async function rechazarMision(
 }
 
 /**
- * Confirma y acepta una misión asignada a la Patrulla Verificadora (HU-36).
+ * Confirma y acepta una misión asignada desde terreno (H36 Patrulla / H40 Cuadrilla).
  * - Invoca `POST /api/misiones/{id}/aceptar` con coordenadas GPS opcionales (timeout no bloqueante de 5s).
- * - Si hay conexión (`200 OK`), actualiza el estado local a `EN_CURSO` con la `fechaInicio` del servidor.
- * - Si el servidor responde `409 Conflict` (idempotencia por doble clic o reintento), da la misión por aceptada (`EN_CURSO`) sin error bloqueante.
+ * - Si hay conexión (`200 OK`), actualiza el estado local a `EN_CURSO` con la `fechaInicio` del servidor
+ *   y los estados canónicos de patrulla o cuadrilla e incidente.
+ * - Si el servidor responde `409 Conflict` con `/EN_CURSO/i` (idempotencia por doble clic o reintento),
+ *   da la misión por aceptada (`EN_CURSO`) sin error bloqueante.
  * - Si hay corte de red / modo offline, actualiza el estado de forma optimista en IndexedDB y encola la mutación `ACEPTAR_MISION` en `outbox`.
  */
-export async function aceptarMisionPatrulla(
+export async function aceptarMision(
   misionId: string,
   opciones?: OpcionesAceptarMision
 ): Promise<ResultadoAceptarMision> {
@@ -760,19 +805,28 @@ export async function aceptarMisionPatrulla(
 
   const payloadValidado: AceptarMisionPayload = validarPayloadAceptarMision(coordenadasRaw);
 
-  const misionBase: MisionLocal =
-    opciones?.misionActual ||
-    (await obtenerMisionLocalPorId(misionId)) || {
-      id: misionId,
-      incidenteId: '',
-      codigoIncidente: misionId,
-      tipologia: 'Verificación de terreno',
-      direccion: 'Valdivia',
-      prioridad: 'ALTA',
-      estado: 'DESPACHADA',
-      fechaDespacho: new Date().toISOString(),
-      actualizadoEn: new Date().toISOString(),
-    };
+  const misionLocalPrevia = opciones?.misionActual || (await obtenerMisionLocalPorId(misionId));
+  const esCuadrillaBase =
+    opciones?.tipoUnidad === 'cuadrilla'
+      ? true
+      : opciones?.tipoUnidad === 'patrulla'
+        ? false
+        : (typeof misionLocalPrevia?.datosAdicionales?.tipoMision === 'string' &&
+            misionLocalPrevia.datosAdicionales.tipoMision.toUpperCase() ===
+              'ATENCION_CUADRILLA') ||
+          Boolean(misionLocalPrevia?.datosAdicionales?.cuadrillaId);
+
+  const misionBase: MisionLocal = misionLocalPrevia || {
+    id: misionId,
+    incidenteId: '',
+    codigoIncidente: misionId,
+    tipologia: esCuadrillaBase ? 'Atención de cuadrilla' : 'Verificación de terreno',
+    direccion: 'Valdivia',
+    prioridad: 'ALTA',
+    estado: 'DESPACHADA',
+    fechaDespacho: new Date().toISOString(),
+    actualizadoEn: new Date().toISOString(),
+  };
 
   const estaOffline =
     typeof window !== 'undefined' &&
@@ -790,6 +844,32 @@ export async function aceptarMisionPatrulla(
 
       if (!error && data && data.data) {
         const resData: AceptarMisionApiData['data'] = data.data;
+        const esRespuestaCuadrilla =
+          Boolean(resData.cuadrilla) ||
+          resData.mision.tipoMision === 'ATENCION_CUADRILLA' ||
+          esCuadrillaBase;
+
+        const datosActualizados: Record<string, unknown> = {
+          ...(misionBase.datosAdicionales || {}),
+          ...(resData.mision.tipoMision ? { tipoMision: resData.mision.tipoMision } : {}),
+          ...(esRespuestaCuadrilla
+            ? {
+                ...(resData.mision.cuadrillaId
+                  ? { cuadrillaId: resData.mision.cuadrillaId }
+                  : {}),
+                estadoCuadrilla: resData.cuadrilla?.estado || 'EN_MISION',
+                estadoIncidente: resData.incidente?.estado || 'EN_ATENCION',
+                hitoAceptacion:
+                  resData.hito?.descripcion || 'Asignación Aceptada por Cuadrilla',
+              }
+            : {
+                estadoPatrulla: resData.patrulla?.estado || 'EN_VERIFICACION',
+                estadoIncidente: resData.incidente?.estado || 'VERIFICANDO',
+                hitoAceptacion:
+                  resData.hito?.descripcion || 'Misión Aceptada por Patrulla',
+              }),
+        };
+
         const misionActualizada: MisionLocal = {
           ...misionBase,
           id: resData.mision.id || misionId,
@@ -800,12 +880,7 @@ export async function aceptarMisionPatrulla(
           fechaDespacho: resData.mision.fechaInicio || misionBase.fechaDespacho,
           fechaInicio: resData.mision.fechaInicio,
           sincronizacionPendiente: false,
-          datosAdicionales: {
-            ...(misionBase.datosAdicionales || {}),
-            estadoPatrulla: resData.patrulla?.estado || 'EN_VERIFICACION',
-            estadoIncidente: resData.incidente?.estado || 'VERIFICANDO',
-            hitoAceptacion: resData.hito?.descripcion || 'Misión Aceptada por Patrulla',
-          },
+          datosAdicionales: datosActualizados,
           actualizadoEn: resData.mision.actualizadoEn || new Date().toISOString(),
         };
 
@@ -816,13 +891,15 @@ export async function aceptarMisionPatrulla(
           enColaOffline: false,
           mensaje:
             data.message ||
-            'Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación.',
+            (esRespuestaCuadrilla
+              ? 'Asignación de misión aceptada exitosamente. La cuadrilla inicia el desplazamiento y asume la atención del incidente.'
+              : 'Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación.'),
         };
       }
 
       const status = response?.status ?? 500;
 
-      // Regla de idempotencia HU-36: 409 Conflict indica que la misión ya estaba EN_CURSO
+      // Regla de idempotencia H36/H40: 409 Conflict indica que la misión ya estaba EN_CURSO
       // únicamente cuando el mensaje del servidor confirma dicho estado
       if (status === 409) {
         const msgConflict = (error as { message?: string } | undefined)?.message || '';
@@ -847,9 +924,17 @@ export async function aceptarMisionPatrulla(
           sincronizacionPendiente: false,
           datosAdicionales: {
             ...(misionBase.datosAdicionales || {}),
-            estadoPatrulla: 'EN_VERIFICACION',
-            estadoIncidente: 'VERIFICANDO',
-            hitoAceptacion: 'Misión Aceptada por Patrulla',
+            ...(esCuadrillaBase
+              ? {
+                  estadoCuadrilla: 'EN_MISION',
+                  estadoIncidente: 'EN_ATENCION',
+                  hitoAceptacion: 'Asignación Aceptada por Cuadrilla',
+                }
+              : {
+                  estadoPatrulla: 'EN_VERIFICACION',
+                  estadoIncidente: 'VERIFICANDO',
+                  hitoAceptacion: 'Misión Aceptada por Patrulla',
+                }),
           },
           actualizadoEn: ahoraIso,
         };
@@ -860,7 +945,9 @@ export async function aceptarMisionPatrulla(
           mision: misionIdempotente,
           enColaOffline: false,
           yaAceptadaPreviamente: true,
-          mensaje: 'La misión ya se encuentra en curso (En Trayecto / Evaluación).',
+          mensaje: esCuadrillaBase
+            ? 'La asignación ya se encuentra en curso (Faena en Curso).'
+            : 'La misión ya se encuentra en curso (En Trayecto / Evaluación).',
         };
       }
 
@@ -900,9 +987,18 @@ export async function aceptarMisionPatrulla(
     sincronizacionPendiente: true,
     datosAdicionales: {
       ...(misionBase.datosAdicionales || {}),
-      estadoPatrulla: 'EN_VERIFICACION',
-      estadoIncidente: 'VERIFICANDO',
-      hitoAceptacion: 'Misión Aceptada por Patrulla (Pendiente de sincronizar)',
+      ...(esCuadrillaBase
+        ? {
+            estadoCuadrilla: 'EN_MISION',
+            estadoIncidente: 'EN_ATENCION',
+            hitoAceptacion:
+              'Asignación Aceptada por Cuadrilla (Pendiente de sincronizar)',
+          }
+        : {
+            estadoPatrulla: 'EN_VERIFICACION',
+            estadoIncidente: 'VERIFICANDO',
+            hitoAceptacion: 'Misión Aceptada por Patrulla (Pendiente de sincronizar)',
+          }),
     },
     actualizadoEn: ahoraOffline,
   };
@@ -918,7 +1014,13 @@ export async function aceptarMisionPatrulla(
   return {
     mision: misionOptimista,
     enColaOffline: true,
-    mensaje:
-      'Sin conexión: Misión aceptada localmente y guardada en cola para sincronizar al recuperar señal.',
+    mensaje: esCuadrillaBase
+      ? 'Sin conexión: Asignación aceptada localmente y guardada en cola para sincronizar al recuperar señal.'
+      : 'Sin conexión: Misión aceptada localmente y guardada en cola para sincronizar al recuperar señal.',
   };
 }
+
+/**
+ * Alias retrocompatible para la aceptación de misiones de Patrulla Verificadora (H36).
+ */
+export const aceptarMisionPatrulla = aceptarMision;

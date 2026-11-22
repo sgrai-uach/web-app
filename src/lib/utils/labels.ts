@@ -19,6 +19,10 @@ export const ETIQUETAS_ESTADO: Record<string, string> = {
   DISPONIBLE: 'Disponible',
   NO_DISPONIBLE: 'No disponible',
   EN_MANTENCION: 'En mantención',
+  EN_MISION: 'En misión',
+  EN_ATENCION: 'En atención',
+  EN_VERIFICACION: 'En verificación',
+  VERIFICANDO: 'Verificando',
 };
 
 export const ETIQUETAS_PRIORIDAD: Record<string, string> = {

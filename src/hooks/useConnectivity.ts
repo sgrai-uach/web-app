@@ -100,21 +100,55 @@ export function useConnectivity() {
                 if (local) {
                   let fechaInicioServidor =
                     local.fechaInicio || new Date().toISOString();
+                  let estadoCuadrillaServidor: string | undefined;
+                  let estadoPatrullaServidor: string | undefined;
+                  let estadoIncidenteServidor: string | undefined;
+                  let hitoAceptacionServidor: string | undefined;
                   if (esExito) {
                     try {
                       const bodyJson = await res.clone().json();
                       if (bodyJson?.data?.mision?.fechaInicio) {
                         fechaInicioServidor = bodyJson.data.mision.fechaInicio;
                       }
+                      if (typeof bodyJson?.data?.cuadrilla?.estado === 'string') {
+                        estadoCuadrillaServidor = bodyJson.data.cuadrilla.estado;
+                      }
+                      if (typeof bodyJson?.data?.patrulla?.estado === 'string') {
+                        estadoPatrullaServidor = bodyJson.data.patrulla.estado;
+                      }
+                      if (typeof bodyJson?.data?.incidente?.estado === 'string') {
+                        estadoIncidenteServidor = bodyJson.data.incidente.estado;
+                      }
+                      if (typeof bodyJson?.data?.hito?.descripcion === 'string') {
+                        hitoAceptacionServidor = bodyJson.data.hito.descripcion;
+                      }
                     } catch {
                       // Ignorar si la respuesta no contiene JSON
                     }
                   }
+                  const datosActualizados = {
+                    ...(local.datosAdicionales || {}),
+                    ...(estadoCuadrillaServidor
+                      ? { estadoCuadrilla: estadoCuadrillaServidor }
+                      : {}),
+                    ...(estadoPatrullaServidor
+                      ? { estadoPatrulla: estadoPatrullaServidor }
+                      : {}),
+                    ...(estadoIncidenteServidor
+                      ? { estadoIncidente: estadoIncidenteServidor }
+                      : {}),
+                    ...(hitoAceptacionServidor
+                      ? { hitoAceptacion: hitoAceptacionServidor }
+                      : {}),
+                  };
                   await guardarMisionLocal({
                     ...local,
                     estado: 'EN_CURSO',
                     fechaInicio: fechaInicioServidor,
                     sincronizacionPendiente: false,
+                    ...(Object.keys(datosActualizados).length > 0
+                      ? { datosAdicionales: datosActualizados }
+                      : {}),
                     actualizadoEn: new Date().toISOString(),
                   });
                 }
