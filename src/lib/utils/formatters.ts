@@ -9,6 +9,8 @@ import {
   ETIQUETAS_PRIORIDAD,
   ETIQUETAS_TIPOLOGIA,
   ETIQUETAS_ROL,
+  ETIQUETAS_DICTAMEN_ATENCION,
+  ETIQUETAS_ESTADO_TERRENO,
   limpiarTituloMision,
 } from './labels';
 
@@ -31,10 +33,12 @@ export function formatearPrioridad(prioridad?: string | null): string {
 }
 
 /**
- * Convierte un código de tipología a lenguaje natural.
+ * Convierte un código o texto de tipología a lenguaje natural sanitizando prefijos técnicos.
  */
 export function formatearTipologia(tipologia?: string | null): string {
-  return formatearEtiquetaSegura(tipologia, ETIQUETAS_TIPOLOGIA);
+  if (!tipologia) return 'Sin tipología';
+  const limpia = limpiarTituloMision(tipologia);
+  return formatearEtiquetaSegura(limpia || tipologia, ETIQUETAS_TIPOLOGIA);
 }
 
 /**
@@ -42,6 +46,20 @@ export function formatearTipologia(tipologia?: string | null): string {
  */
 export function formatearRol(rol?: string | null): string {
   return formatearEtiquetaSegura(rol, ETIQUETAS_ROL);
+}
+
+/**
+ * Convierte un código de dictamen de atención operativa a lenguaje natural.
+ */
+export function formatearDictamenAtencion(dictamen?: string | null): string {
+  return formatearEtiquetaSegura(dictamen, ETIQUETAS_DICTAMEN_ATENCION);
+}
+
+/**
+ * Convierte un estado constatado de terreno a lenguaje natural.
+ */
+export function formatearEstadoTerreno(estadoTerreno?: string | null): string {
+  return formatearEtiquetaSegura(estadoTerreno, ETIQUETAS_ESTADO_TERRENO);
 }
 
 /**
@@ -87,3 +105,18 @@ export function ordenarMisionesPorPrioridadYFecha<T extends { prioridad?: string
     return fechaB - fechaA;
   });
 }
+
+/**
+ * Ordena un listado de misiones de forma descendente según la fecha de última actualización (H37).
+ * Si actualizadoEn está ausente, recurre a fechaDespacho o creadoEn.
+ */
+export function ordenarMisionesPorActualizacion<
+  T extends { actualizadoEn?: string | null; fechaDespacho?: string | null; creadoEn?: string | null }
+>(misiones: T[]): T[] {
+  return [...misiones].sort((a, b) => {
+    const fechaA = new Date(a.actualizadoEn || a.fechaDespacho || a.creadoEn || 0).getTime();
+    const fechaB = new Date(b.actualizadoEn || b.fechaDespacho || b.creadoEn || 0).getTime();
+    return fechaB - fechaA;
+  });
+}
+

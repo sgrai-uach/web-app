@@ -85,11 +85,11 @@ const MODULOS_TERRENO: ModuloTerrenoConfig[] = [
     id: 'cuadrilla-ejecucion',
     titulo: 'Evidencia, Apoyos y Cierre de Faena',
     descripcion:
-      'Captura fotográfica comprimida en terreno, solicitud estructurada de apoyos adicionales e informe final con insumos consumidos.',
+      'Captura fotográfica, video y documentos técnicos en terreno, solicitud estructurada de apoyos e informe final de faena.',
     href: '/cuadrilla/misiones',
     icon: Camera,
     rolesPermitidos: ['DELEGADO_CUADRILLA'],
-    requiredPermissions: ['cuadrilla:faena:ejecutar', 'evidencia:adjuntar'],
+    requiredPermissions: ['reportes:crear', 'misiones:terreno:ejecutar', 'cuadrilla:faena:ejecutar'],
     accionPrimaria: 'Gestionar Faena Activa',
     soloLecturaEnInactividad: true,
   },

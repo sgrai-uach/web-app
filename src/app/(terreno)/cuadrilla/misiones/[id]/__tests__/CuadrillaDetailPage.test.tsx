@@ -8,6 +8,15 @@ import * as useConnectivityModule from '@/hooks/useConnectivity';
 import { ToastProvider } from '@/components/ui/Toast';
 import type { MisionLocal } from '@/types/offline';
 
+const mockPush = vi.fn();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: vi.fn(),
+  }),
+}));
+
 vi.mock('@/context/AuthContext');
 vi.mock('@/services/misionesService', async (importOriginal) => {
   const actual = await importOriginal<typeof misionesService>();
@@ -15,6 +24,7 @@ vi.mock('@/services/misionesService', async (importOriginal) => {
     ...actual,
     obtenerDetalleMision: vi.fn(),
     aceptarMision: vi.fn(),
+    rechazarMision: vi.fn(),
     reportarLlegadaCuadrilla: vi.fn(),
   };
 });
@@ -110,7 +120,7 @@ describe('CuadrillaMisionDetailPage — Aceptación de Asignación (H40 — Prio
       status: 'connected',
       sincronizar: vi.fn(),
       actualizarPendientes: actualizarPendientesMock,
-    });
+    } as never);
     vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(mockMisionDespachada);
   });
 
@@ -559,5 +569,194 @@ describe('CuadrillaMisionDetailPage — Reporte de Llegada a Terreno (H42 post-H
 
     expect(screen.queryByRole('button', { name: /llegada a terreno/i })).not.toBeInTheDocument();
     expect(screen.getAllByText(/solo lectura/i).length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41) y Evidencia (H43)', () => {
+  const actualizarPendientesMock = vi.fn().mockResolvedValue(0);
+
+  const misionDespachada: MisionLocal = {
+    id: '70000000-0000-4000-8000-000000000001',
+    incidenteId: '30000000-0000-4000-8000-000000000001',
+    codigoIncidente: 'INC-2026-0001',
+    tipologia: 'Árbol caído en calzada',
+    direccion: 'Av. Ramón Picarte 1100, Valdivia',
+    coordenadas: { lat: -39.81422, lng: -73.24589 },
+    prioridad: 'ALTA',
+    estado: 'DESPACHADA',
+    fechaDespacho: '2026-11-16T22:00:00.000Z',
+    actualizadoEn: '2026-11-16T22:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    vi.mocked(useConnectivityModule.useConnectivity).mockReturnValue({
+      online: true,
+      sincronizando: false,
+      status: 'synced',
+      pendientes: 0,
+      sincronizar: vi.fn(),
+      actualizarPendientes: actualizarPendientesMock,
+    } as never);
+
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: {
+        id: 'd0000000-0000-4000-8000-000000000001',
+        nombre: 'Juan Delegado',
+        unidadId: '50000000-0000-4000-8000-000000000001',
+        unidadNombre: 'Cuadrilla Vías y Canales 1',
+      },
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      esCuadrilla: true,
+      esPatrulla: false,
+      tienePermiso: (p: string) => p === 'misiones:terreno:ejecutar',
+    } as never);
+
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(misionDespachada);
+  });
+
+  it('muestra el botón Rechazar Misión cuando la misión está DESPACHADA y el delegado tiene permiso', async () => {
+    render(
+      <ToastProvider>
+        <CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();
+    });
+
+    const btnRechazar = screen.getByRole('button', { name: /Rechazar Misión/i });
+    expect(btnRechazar).toBeInTheDocument();
+  });
+
+  it('oculta el botón Rechazar Misión si la misión no está en estado DESPACHADA o falta el permiso RBAC', async () => {
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: { id: '1', nombre: 'Juan' },
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      esCuadrilla: true,
+      esPatrulla: false,
+      tienePermiso: () => false,
+    } as never);
+
+    render(
+      <ToastProvider>
+        <CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByRole('button', { name: /Rechazar Misión/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('despliega el modal, bloquea envío con < 5 caracteres y ejecuta rechazo válido con retorno seguro', async () => {
+    vi.mocked(misionesService.rechazarMision).mockResolvedValueOnce({
+      exito: true,
+      mensaje: 'Misión rechazada exitosamente.',
+    });
+
+    render(
+      <ToastProvider>
+        <CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /Rechazar Misión/i })
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Rechazar Misión/i }));
+
+    expect(
+      screen.getByText('Rechazar Asignación de Cuadrilla')
+    ).toBeInTheDocument();
+
+    const btnConfirmar = screen.getByRole('button', { name: /Confirmar Rechazo/i });
+    expect(btnConfirmar).toBeDisabled();
+
+    const textarea = screen.getByLabelText(/Motivo del Rechazo/i);
+    fireEvent.change(textarea, { target: { value: 'abc' } });
+    expect(btnConfirmar).toBeDisabled();
+
+    fireEvent.change(textarea, {
+      target: { value: 'Camión tolva presenta falla hidráulica en salida.' },
+    });
+    expect(btnConfirmar).not.toBeDisabled();
+
+    fireEvent.click(btnConfirmar);
+
+    await waitFor(() => {
+      expect(misionesService.rechazarMision).toHaveBeenCalledWith(misionDespachada.id, {
+        justificacion_rechazo: 'Camión tolva presenta falla hidráulica en salida.',
+        latitud: undefined,
+        longitud: undefined,
+      });
+    });
+
+    await waitFor(() => {
+      expect(actualizarPendientesMock).toHaveBeenCalled();
+      expect(mockPush).toHaveBeenCalledWith('/cuadrilla/misiones');
+    });
+  });
+
+  it('muestra el módulo Evidencia Multimedia (H43) cuando la misión está EN_CURSO y el usuario tiene permiso reportes:crear', async () => {
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: {
+        id: 'd0000000-0000-4000-8000-000000000001',
+        nombre: 'Juan Delegado',
+        unidadId: '50000000-0000-4000-8000-000000000001',
+        unidadNombre: 'Cuadrilla Vías y Canales 1',
+      },
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      esCuadrilla: true,
+      esPatrulla: false,
+      tienePermiso: (p: string) =>
+        p === 'misiones:terreno:ejecutar' || p === 'reportes:crear',
+    } as never);
+
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue({
+      ...misionDespachada,
+      estado: 'EN_CURSO',
+    });
+
+    render(
+      <ToastProvider>
+        <CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Evidencia Multimedia')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /Tomar Foto/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Grabar Video/i })).toBeInTheDocument();
+  });
+
+  it('oculta los controles de carga de evidencia si la misión está DESPACHADA o falta permiso reportes:crear', async () => {
+    render(
+      <ToastProvider>
+        <CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Evidencia Multimedia')).not.toBeInTheDocument();
   });
 });

@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, use } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   MapPinCheck,
   CheckCircle2,
   AlertTriangle,
   Clock,
-  Navigation,
   HardHat,
+  Navigation,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
@@ -25,13 +26,20 @@ import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
 import {
+  RechazoMisionModal,
+  type CoordenadasGPS,
+} from '@/components/misiones/RechazoMisionModal';
+import { CargaEvidenciaCard } from '@/components/misiones/CargaEvidenciaCard';
+import {
   obtenerDetalleMision,
   aceptarMision,
+  rechazarMision,
   reportarLlegadaCuadrilla,
   GeolocationError,
 } from '@/services/misionesService';
+import { extraerAdjuntosDeMision } from '@/services/offlineQueue';
 import { formatearEstado, formatearFechaHora24h } from '@/lib/utils/formatters';
-import type { MisionLocal } from '@/types/offline';
+import type { AdjuntoLocal, MisionLocal } from '@/types/offline';
 import sharedStyles from '@/components/misiones/MisionDetailLayout.module.css';
 import styles from './CuadrillaDetailPage.module.css';
 
@@ -41,10 +49,11 @@ interface PageProps {
 
 export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const resolvedParams =
-    params && typeof (params as unknown as { then?: unknown }).then === 'function'
-      ? use(params)
+    params && typeof (params as { then?: unknown }).then === 'function'
+      ? use(params as Promise<{ id: string }>)
       : (params as unknown as { id: string });
   const misionId = resolvedParams?.id;
+  const router = useRouter();
   const toast = useToastOptional();
 
   const {
@@ -66,6 +75,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const [puedeUsarContingencia, setPuedeUsarContingencia] = useState<boolean>(false);
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
+  const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
 
   const cargarDetalle = useCallback(
     async (silencioso = false) => {
@@ -239,11 +249,14 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     typeof tienePermiso === 'function'
       ? tienePermiso('misiones:terreno:ejecutar')
       : false;
+  const tienePermisoEvidencia =
+    typeof tienePermiso === 'function' ? tienePermiso('reportes:crear') : false;
 
-  // Prioridad H40: En estado DESPACHADA se muestra "Aceptar Asignación"
+  // Prioridad H40: En estado DESPACHADA se muestra "Aceptar Asignación" y "Rechazar Misión" (H41)
   const mostrarBotonAceptar = Boolean(
     unidadActiva && esCuadrilla && tienePermisoEjecutar && esDespachada
   );
+  const esRechazable = mostrarBotonAceptar;
 
   // H42 se habilita una vez aceptada la misión (EN_CURSO) y mientras no haya arribo registrado
   const tieneLlegadaRegistrada = Boolean(
@@ -257,8 +270,22 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       !tieneLlegadaRegistrada
   );
 
+  // H43: Adjuntar evidencia multimedia en faena activa
+  const puedeAdjuntarEvidencia = Boolean(
+    unidadActiva && esCuadrilla && tienePermisoEvidencia && esEnCurso
+  );
+  const adjuntosMision = extraerAdjuntosDeMision(mision);
+  const reporteTerrenoIdMision =
+    typeof mision.datosAdicionales?.reporteTerrenoId === 'string'
+      ? mision.datosAdicionales.reporteTerrenoId
+      : undefined;
+
   const trabajoTexto =
     (mision.datosAdicionales?.trabajo as string) || mision.direccion;
+  const justificacionRegistrada =
+    typeof mision.datosAdicionales?.justificacionRechazo === 'string'
+      ? mision.datosAdicionales.justificacionRechazo
+      : null;
   const esSoloLectura =
     !unidadActiva || esFinalizada || estadoNormalizado === 'RECHAZADA';
 
@@ -276,6 +303,64 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     typeof mision.datosAdicionales?.fechaCierre === 'string'
       ? mision.datosAdicionales.fechaCierre
       : null;
+
+  const handleConfirmarRechazo = async (
+    motivo: string,
+    coordenadas?: CoordenadasGPS
+  ) => {
+    const res = await rechazarMision(mision.id, {
+      justificacion_rechazo: motivo,
+      latitud: coordenadas?.lat,
+      longitud: coordenadas?.lng,
+    });
+
+    setMision((prev) =>
+      prev
+        ? {
+            ...prev,
+            estado: 'RECHAZADA',
+            sincronizacionPendiente: Boolean(res.modoOffline),
+            actualizadoEn: new Date().toISOString(),
+            datosAdicionales: {
+              ...prev.datosAdicionales,
+              justificacionRechazo: motivo,
+            },
+          }
+        : null
+    );
+    setMensajeConfirmacion(res.mensaje);
+    setModalRechazoAbierto(false);
+    if (toast) {
+      if (res.modoOffline) {
+        toast.showWarning(res.mensaje, 'Guardado sin conexión', {
+          dedupKey: `rechazar-mision-offline-${mision.id}`,
+        });
+      } else {
+        toast.showSuccess(res.mensaje, 'Misión rechazada', {
+          dedupKey: `rechazar-mision-${mision.id}`,
+        });
+      }
+    }
+    await actualizarPendientes();
+    router.push('/cuadrilla/misiones');
+  };
+
+  const handleEvidenciaCargada = async (adjunto: AdjuntoLocal) => {
+    setMision((prev) => {
+      if (!prev) return null;
+      const actuales = extraerAdjuntosDeMision(prev);
+      const filtrados = actuales.filter((item) => item.id !== adjunto.id);
+      return {
+        ...prev,
+        datosAdicionales: {
+          ...prev.datosAdicionales,
+          adjuntos: [adjunto, ...filtrados],
+        },
+        actualizadoEn: new Date().toISOString(),
+      };
+    });
+    await actualizarPendientes();
+  };
 
   return (
     <div className={sharedStyles.container}>
@@ -310,18 +395,31 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         onVerMapa={() => setMapaAbierto(true)}
       />
 
-      {/* Acciones Operativas de Despacho (H40 — Prioridad en DESPACHADA) */}
-      {mostrarBotonAceptar && (
+      {/* Acciones Operativas de Despacho (H40 — Aceptar / H41 — Rechazar) */}
+      {(mostrarBotonAceptar || esRechazable) && (
         <MisionDespachoActionsCard
           ariaLabel="Acciones operativas de despacho"
           titulo="Acciones de Despacho"
-          descripcion="Confirme la asignación para notificar a la central que la cuadrilla inicia el desplazamiento y asume la atención del incidente."
+          descripcion="Confirme la asignación para notificar a la central que la cuadrilla inicia el desplazamiento, o registre un rechazo motivado si existe un impedimento."
           mostrarAceptar={mostrarBotonAceptar}
           etiquetaAceptar="Aceptar Asignación"
           aceptando={aceptando}
           errorAceptacion={errorAceptacion}
           onAceptar={() => void handleAceptarAsignacion()}
+          mostrarRechazar={esRechazable}
+          etiquetaRechazar="Rechazar Misión"
+          rechazando={aceptando}
+          onRechazar={() => setModalRechazoAbierto(true)}
         />
+      )}
+
+      {estadoNormalizado === 'RECHAZADA' && justificacionRegistrada && (
+        <div className={styles.rejectedInfoBox}>
+          <span className={styles.rejectedInfoLabel}>
+            Justificación de rechazo registrada
+          </span>
+          <span>{justificacionRegistrada}</span>
+        </div>
       )}
 
       {/* Vista activa: Faena en Curso (H40) */}
@@ -354,12 +452,17 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
           aria-label="Reporte de llegada a terreno"
         >
           <h2 className={styles.arrivalTitle}>
-            <MapPinCheck size={20} color="var(--color-primary-teal)" aria-hidden="true" />
+            <MapPinCheck
+              size={20}
+              color="var(--color-primary-teal)"
+              aria-hidden="true"
+            />
             <span>Confirmación de arribo</span>
           </h2>
           <p className={styles.arrivalDescription}>
-            Presione el botón para certificar la presencia física del equipo en el lugar
-            mediante las coordenadas GPS del dispositivo móvil y notificar a la central.
+            Presione el botón para certificar la presencia física del equipo en el
+            lugar mediante las coordenadas GPS del dispositivo móvil y notificar a la
+            central.
           </p>
 
           {errorGps && (
@@ -422,10 +525,22 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
             </div>
           )}
           <p className={styles.arrivalDescription}>
-            La cuadrilla se encuentra operando en el sitio. Proceda con las maniobras de faena
-            y el registro de evidencias multimedia.
+            La cuadrilla se encuentra operando en el sitio. Proceda con las maniobras
+            de faena y el registro de evidencias multimedia.
           </p>
         </section>
+      )}
+
+      {/* Evidencia multimedia de faena (H43) */}
+      {(puedeAdjuntarEvidencia || adjuntosMision.length > 0) && (
+        <CargaEvidenciaCard
+          misionId={mision.id}
+          incidenteId={mision.incidenteId}
+          reporteTerrenoId={reporteTerrenoIdMision}
+          adjuntos={adjuntosMision}
+          soloLectura={!puedeAdjuntarEvidencia}
+          alAdjuntarEvidencia={handleEvidenciaCargada}
+        />
       )}
 
       {esSoloLectura && <MisionSoloLecturaNotice />}
@@ -437,6 +552,15 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         longitud={mision.coordenadas?.lng}
         titulo={mision.tipologia || mision.codigoIncidente}
         direccion={mision.direccion}
+      />
+
+      <RechazoMisionModal
+        abierto={modalRechazoAbierto}
+        codigoMision={mision.codigoIncidente}
+        titulo="Rechazar Asignación de Cuadrilla"
+        unidadEtiqueta="cuadrilla"
+        alConfirmar={handleConfirmarRechazo}
+        alCancelar={() => setModalRechazoAbierto(false)}
       />
     </div>
   );

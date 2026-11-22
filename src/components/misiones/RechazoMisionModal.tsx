@@ -13,6 +13,8 @@ export interface CoordenadasGPS {
 export interface RechazoMisionModalProps {
   abierto: boolean;
   codigoMision: string;
+  titulo?: string;
+  unidadEtiqueta?: string;
   alConfirmar: (justificacion: string, coordenadas?: CoordenadasGPS) => Promise<void>;
   alCancelar: () => void;
 }
@@ -20,6 +22,8 @@ export interface RechazoMisionModalProps {
 export function RechazoMisionModal({
   abierto,
   codigoMision,
+  titulo = 'Rechazar Misión',
+  unidadEtiqueta = 'unidad',
   alConfirmar,
   alCancelar,
 }: RechazoMisionModalProps) {
@@ -121,7 +125,7 @@ export function RechazoMisionModal({
           </div>
           <div className={styles.titleContent}>
             <h2 id="rechazo-modal-title" className={styles.title}>
-              Rechazar Misión de Verificación
+              {titulo}
             </h2>
             <p className={styles.subtitle}>{codigoMision}</p>
           </div>
@@ -131,8 +135,8 @@ export function RechazoMisionModal({
         <p id="rechazo-modal-desc" className={styles.description}>
           Por normativa de despacho de emergencia, el rechazo de una misión
           exige una justificación técnica obligatoria (desperfecto de vehículo, corte de
-          ruta, emergencia crítica) para liberar la patrulla y permitir la reasignación
-          inmediata en el Centro de Mando.
+          ruta, emergencia crítica) para liberar la {unidadEtiqueta} y permitir la
+          reasignación inmediata en el Centro de Mando.
         </p>
 
         {/* Mensaje de error retornado por la API */}
@@ -190,8 +194,8 @@ export function RechazoMisionModal({
               {obteniendoGps
                 ? 'Obteniendo coordenadas GPS de terreno...'
                 : coordenadas
-                ? `GPS registrado (${coordenadas.lat.toFixed(4)}, ${coordenadas.lng.toFixed(4)})`
-                : 'Ubicación GPS no disponible (se registrará sin coordenadas)'}
+                  ? `GPS registrado (${coordenadas.lat.toFixed(4)}, ${coordenadas.lng.toFixed(4)})`
+                  : 'Ubicación GPS no disponible (se registrará sin coordenadas)'}
             </span>
           </div>
 
@@ -223,4 +227,3 @@ export function RechazoMisionModal({
 }
 
 export default RechazoMisionModal;
-

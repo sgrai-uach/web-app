@@ -5,10 +5,20 @@ import {
   contarAccionesPendientes,
   sincronizarColaOutbox,
   obtenerMisionLocalPorId,
+  obtenerMisionesLocales,
   guardarMisionLocal,
+  reemplazarAdjuntoLocalEnMision,
+  marcarErrorAdjuntoLocalEnMision,
 } from '@/services/offlineQueue';
+import {
+  construirFormDataEvidencia,
+  extraerMensajeErrorHttp,
+  parsearAdjuntoDesdeRespuesta,
+} from '@/services/evidenciaService';
+import { dataUrlToBlob } from '@/lib/utils/mediaUtils';
 import { obtenerDetalleMision } from '@/services/misionesService';
 import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge';
+import type { EvidenciaOutboxPayload } from '@/types/offline';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
 
 export function useConnectivity() {
@@ -54,14 +64,31 @@ export function useConnectivity() {
           ? { Authorization: `Bearer ${token}` }
           : {};
 
-        const res = await fetch(`${apiUrl}${accion.url}`, {
-          method: accion.metodo,
-          headers: {
-            'Content-Type': 'application/json',
-            ...authHeaders,
-          },
-          body: JSON.stringify(accion.payload),
-        });
+        let res: Response;
+        if (accion.tipo === 'SUBIR_EVIDENCIA') {
+          const evPayload = accion.payload as EvidenciaOutboxPayload;
+          const blob = dataUrlToBlob(evPayload.dataUrl);
+          const formData = construirFormDataEvidencia(
+            blob,
+            evPayload.nombreArchivo,
+            evPayload.incidente_id,
+            evPayload.reporte_terreno_id
+          );
+          res = await fetch(`${apiUrl}${accion.url}`, {
+            method: accion.metodo,
+            headers: authHeaders,
+            body: formData,
+          });
+        } else {
+          res = await fetch(`${apiUrl}${accion.url}`, {
+            method: accion.metodo,
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders,
+            },
+            body: JSON.stringify(accion.payload),
+          });
+        }
 
         const esExito = res.ok;
         let esIdempotenteEnCurso = false;
@@ -85,11 +112,34 @@ export function useConnectivity() {
           res.status === 400 ||
           res.status === 403 ||
           res.status === 404 ||
+          res.status === 413 ||
+          res.status === 415 ||
           res.status === 422;
 
         const procesada =
           esExito || esIdempotenteEnCurso || esConflictoTerminal || esErrorIrrecuperable;
 
+        if (procesada && accion.tipo === 'ACTUALIZAR_TIPOLOGIA') {
+          const match = accion.url.match(/\/api\/incidentes\/([^/]+)\/tipologia/);
+          const incidenteId = match?.[1];
+          const misionId = accion.payload?.misionId as string | undefined;
+          try {
+            let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+            if (!local && incidenteId) {
+              const todas = await obtenerMisionesLocales();
+              local = todas.find((m) => m.incidenteId === incidenteId);
+            }
+            if (local) {
+              await guardarMisionLocal({
+                ...local,
+                sincronizacionPendiente: false,
+                actualizadoEn: new Date().toISOString(),
+              });
+            }
+          } catch {
+            // Ignorar fallos de persistencia secundaria
+          }
+        }
         if (accion.tipo === 'ACEPTAR_MISION') {
           const match = accion.url.match(/\/api\/misiones\/([^/]+)\/aceptar/);
           const misionId = match?.[1];
@@ -169,6 +219,107 @@ export function useConnectivity() {
               } catch {
                 // Ignorar fallos al refrescar estado real
               }
+            }
+          }
+        } else if (accion.tipo === 'RECHAZAR_MISION') {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/rechazar/);
+          const misionId = match?.[1];
+          if (misionId && (esExito || esConflictoTerminal || esErrorIrrecuperable)) {
+            try {
+              const local = await obtenerMisionLocalPorId(misionId);
+              if (local) {
+                let actualizadoServidor = local.actualizadoEn || new Date().toISOString();
+                if (esExito) {
+                  try {
+                    const bodyJson = await res.clone().json();
+                    if (bodyJson?.data?.mision?.actualizadoEn) {
+                      actualizadoServidor = bodyJson.data.mision.actualizadoEn;
+                    }
+                  } catch {
+                    // Ignorar si la respuesta no contiene JSON
+                  }
+                }
+                await guardarMisionLocal({
+                  ...local,
+                  estado: esExito ? 'RECHAZADA' : local.estado,
+                  sincronizacionPendiente: false,
+                  actualizadoEn: actualizadoServidor,
+                });
+              }
+              if (!esExito) {
+                await obtenerDetalleMision(misionId);
+              }
+            } catch {
+              // Ignorar fallos de lectura/escritura secundaria en IndexedDB
+            }
+          }
+        } else if (accion.tipo === 'SUBIR_EVIDENCIA') {
+          const evPayload = accion.payload as EvidenciaOutboxPayload;
+          if (esExito) {
+            try {
+              const bodyJson = await res.clone().json();
+              const adjuntoDefinitivo = parsearAdjuntoDesdeRespuesta(bodyJson, {
+                id: evPayload.adjuntoLocalId,
+                nombreArchivo: evPayload.nombreArchivo,
+                url: '',
+                tipoMime: evPayload.tipoMime,
+                tamanoBytes: evPayload.tamanoBytes,
+                creadoEn: new Date().toISOString(),
+                sincronizacionPendiente: false,
+              });
+              await reemplazarAdjuntoLocalEnMision(
+                evPayload.misionId,
+                evPayload.adjuntoLocalId,
+                adjuntoDefinitivo
+              );
+            } catch {
+              // Ignorar fallos secundarios al actualizar caché de misión
+            }
+          } else if (esErrorIrrecuperable || esConflictoTerminal) {
+            await marcarErrorAdjuntoLocalEnMision(
+              evPayload.misionId,
+              evPayload.adjuntoLocalId,
+              extraerMensajeErrorHttp(res.status)
+            );
+          }
+        }
+        if (procesada && accion.tipo === 'AJUSTAR_PRIORIDAD') {
+          const misionId = accion.payload?.misionId as string | undefined;
+          const match = accion.url.match(/\/api\/incidentes\/([^/]+)\/prioridad/);
+          const incidenteId = match?.[1];
+          try {
+            let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+            if (!local && incidenteId) {
+              const todas = await obtenerMisionesLocales();
+              local = todas.find((m) => m.incidenteId === incidenteId);
+            }
+            if (local) {
+              await guardarMisionLocal({
+                ...local,
+                sincronizacionPendiente: false,
+                actualizadoEn: new Date().toISOString(),
+              });
+            }
+          } catch {
+            // Ignorar fallos de persistencia secundaria
+          }
+        }
+        if (procesada && accion.tipo === 'ENVIAR_REPORTE') {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/reporte/);
+          const misionId = match?.[1];
+          if (misionId) {
+            try {
+              const local = await obtenerMisionLocalPorId(misionId);
+              if (local) {
+                await guardarMisionLocal({
+                  ...local,
+                  ...(res.ok ? { estado: 'COMPLETADA' } : {}),
+                  sincronizacionPendiente: false,
+                  actualizadoEn: new Date().toISOString(),
+                });
+              }
+            } catch {
+              // Ignorar fallos de persistencia secundaria
             }
           }
         }
@@ -295,8 +446,21 @@ export function useConnectivity() {
       void actualizarPendientes();
     };
 
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data && (event.data as { type?: string }).type === 'PROCESS_OFFLINE_QUEUE') {
+        void sincronizar();
+      }
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    if (
+      typeof navigator !== 'undefined' &&
+      'serviceWorker' in navigator &&
+      typeof navigator.serviceWorker?.addEventListener === 'function'
+    ) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
 
     // Revisar periódicamente el outbox y sincronizar si hay conexión activa y pendientes
     const interval = setInterval(() => {
@@ -306,6 +470,13 @@ export function useConnectivity() {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      if (
+        typeof navigator !== 'undefined' &&
+        'serviceWorker' in navigator &&
+        typeof navigator.serviceWorker?.removeEventListener === 'function'
+      ) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
       clearInterval(interval);
     };
   }, [sincronizar, actualizarPendientes]);

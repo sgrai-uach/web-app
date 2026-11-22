@@ -15,3 +15,6 @@ export type { TextareaProps } from './Textarea';
 
 export { ToastProvider, useToast, useToastOptional } from './Toast';
 export type { ToastMessage, ToastOptions, ToastType } from './Toast';
+
+export { Chip, default as ChipDefault } from './Chip';
+export type { ChipProps, ChipVariant, ChipSize } from './Chip';

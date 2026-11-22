@@ -27,8 +27,36 @@ export type AceptarMisionPayload = NonNullable<
  * Payload para el endpoint de reporte de llegada en terreno (H42),
  * tipado estrictamente contra el contrato OpenAPI generado.
  */
-export type ReportarLlegadaPayload = paths['/api/misiones/{id}/llegada']['post']['requestBody']['content']['application/json'];
+export type ReportarLlegadaPayload = NonNullable<
+  paths['/api/misiones/{id}/llegada']['post']['requestBody']
+>['content']['application/json'];
 export type ReportarLlegadaResponseData = paths['/api/misiones/{id}/llegada']['post']['responses'][201]['content']['application/json'];
+
+export type RechazarMisionPayload = NonNullable<
+  paths['/api/misiones/{id}/rechazar']['post']['requestBody']
+>['content']['application/json'];
+
+export interface AdjuntoLocal {
+  id: string;
+  nombreArchivo: string;
+  url: string;
+  tipoMime: string;
+  tamanoBytes: number;
+  creadoEn: string;
+  sincronizacionPendiente?: boolean;
+  errorSincronizacion?: string;
+}
+
+export interface EvidenciaOutboxPayload extends Record<string, unknown> {
+  adjuntoLocalId: string;
+  misionId: string;
+  incidente_id?: string;
+  reporte_terreno_id?: string;
+  nombreArchivo: string;
+  tipoMime: string;
+  tamanoBytes: number;
+  dataUrl: string;
+}
 
 export interface AccionOutbox {
   id: string;
@@ -66,3 +94,128 @@ export interface CatalogoLocal {
   datos: unknown[];
   actualizadoEn: string;
 }
+
+export interface TipoIncidenteCatalogoItem {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  activo: boolean;
+}
+
+export interface ReclasificarTipologiaPayload {
+  tipoIncidenteId: string;
+  justificacion: string;
+  misionId?: string;
+}
+
+export type PrioridadIncidente = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA';
+
+export type NivelCompromisoVivienda =
+  | 'SIN_DANO'
+  | 'LEVE'
+  | 'MODERADO'
+  | 'GRAVE_INHABITABLE';
+
+export interface FamiliaAfectadaItem {
+  id: string;
+  referencia?: string; // Ej: "Familia Pérez", "Casa 2", "Depto 201"
+  nucleoFamiliarTotal: number;
+  cantidadNinos: number;
+  cantidadAdultosMayores: number;
+  personasDiscapacitadas: number;
+  personasElectrodependientes: number;
+  mascotasAfectadas: number;
+  nivelCompromisoVivienda: NivelCompromisoVivienda;
+}
+
+export interface EvaluacionTerrenoPrioridadForm {
+  familias: FamiliaAfectadaItem[];
+  nucleoFamiliarTotal: number;
+  cantidadNinos: number;
+  cantidadAdultosMayores: number;
+  personasDiscapacitadas: number;
+  personasElectrodependientes: number;
+  mascotasAfectadas: number;
+  viviendasAfectadas: number;
+  nivelCompromisoVivienda: NivelCompromisoVivienda;
+  riesgoElectrico: boolean;
+  riesgoEstructural: boolean;
+  riesgoQuimicoSanitario: boolean;
+  aislamientoVial: boolean;
+  requiereEvacuacion: boolean;
+  requiereApoyoAdicional: boolean;
+  detallesAdicionales: string;
+}
+
+export interface EvaluadorReporteTerreno {
+  id?: string;
+  nombre: string;
+  email?: string;
+  rut?: string | null;
+}
+
+export interface ReportePrioridadTerrenoLocal {
+  id?: string;
+  versionReporte: number;
+  evaluacion: EvaluacionTerrenoPrioridadForm;
+  prioridadSugerida: PrioridadIncidente;
+  prioridadAsignada: PrioridadIncidente;
+  factoresGatillantes: string[];
+  justificacionPrioridad: string;
+  evaluador?: EvaluadorReporteTerreno;
+  creadoEn: string;
+  sincronizado: boolean;
+}
+
+export interface AsignarPrioridadPayload extends EvaluacionTerrenoPrioridadForm {
+  prioridad: PrioridadIncidente;
+  prioridadSugerida: PrioridadIncidente;
+  justificacionPrioridad: string;
+  factoresGatillantes: string[];
+  misionId?: string;
+  versionReporte: number;
+}
+
+export type DictamenAtencion = 'REQUIERE_CUADRILLA' | 'NO_ABORDABLE';
+
+export type EstadoTerrenoVerificacion =
+  | 'CRITICO'
+  | 'ESTABLE'
+  | 'INACCESIBLE'
+  | 'CONTROLADO'
+  | 'FINALIZADO';
+
+export interface AdjuntoReportePreliminar {
+  id?: string;
+  nombreArchivo?: string;
+  url?: string;
+  tipoMime?: string;
+  tamanoBytes?: number;
+}
+
+export interface ReporteVerificacionTerrenoForm {
+  dictamen: DictamenAtencion;
+  motivo_no_abordable: string;
+  resumen_tecnico: string;
+  estado_terreno?: EstadoTerrenoVerificacion;
+  personas_afectadas: number;
+  danos_estimados: string;
+  observaciones: string;
+  requiere_asistencia_social: boolean;
+  adjuntoIds: string[];
+  adjuntos: AdjuntoReportePreliminar[];
+}
+
+export interface ReporteVerificacionTerrenoLocal extends ReporteVerificacionTerrenoForm {
+  id?: string;
+  misionId: string;
+  evaluador?: EvaluadorReporteTerreno;
+  creadoEn: string;
+  sincronizado: boolean;
+}
+
+export type CrearReporteVerificacionPayload = NonNullable<
+  paths['/api/misiones/{id}/reporte']['post']['requestBody']
+>['content']['application/json'];
+
+
