@@ -120,4 +120,81 @@ describe('useConnectivity hook', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('drena acción ACEPTAR_MISION de cuadrilla actualizando fechaInicio, estadoCuadrilla y estadoIncidente desde la respuesta', async () => {
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+    vi.mocked(offlineQueue.contarAccionesPendientes).mockResolvedValue(0);
+    vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+      id: '70000000-0000-4000-8000-000000000001',
+      incidenteId: '30000000-0000-4000-8000-000000000001',
+      codigoIncidente: 'INC-2026-0001',
+      tipologia: 'Árbol caído',
+      direccion: 'Av. Ramón Picarte 1100',
+      prioridad: 'ALTA',
+      estado: 'EN_CURSO',
+      fechaDespacho: '2026-11-22T13:30:00.000Z',
+      fechaInicio: '2026-11-22T13:45:00.000Z',
+      sincronizacionPendiente: true,
+      datosAdicionales: {
+        tipoMision: 'ATENCION_CUADRILLA',
+        estadoCuadrilla: 'EN_MISION',
+        estadoIncidente: 'EN_ATENCION',
+      },
+      actualizadoEn: '2026-11-22T13:45:00.000Z',
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      clone: () => ({
+        json: async () => ({
+          data: {
+            mision: { fechaInicio: '2026-11-22T14:00:00.000Z' },
+            cuadrilla: { estado: 'EN_MISION' },
+            patrulla: null,
+            incidente: { estado: 'EN_ATENCION' },
+            hito: { descripcion: 'Asignación Aceptada por Cuadrilla' },
+          },
+        }),
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    let procesada = false;
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (ejecutor) => {
+      procesada = await ejecutor({
+        id: 'out-acc-1',
+        tipo: 'ACEPTAR_MISION',
+        url: '/api/misiones/70000000-0000-4000-8000-000000000001/aceptar',
+        metodo: 'POST',
+        timestamp: '2026-11-22T13:45:00.000Z',
+        intentos: 0,
+        payload: { latitud: -39.819588, longitud: -73.245209 },
+      });
+      return { total: 1, exitosas: 1, fallidas: 0 };
+    });
+
+    const { result } = renderHook(() => useConnectivity());
+
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+
+    expect(procesada).toBe(true);
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: '70000000-0000-4000-8000-000000000001',
+        estado: 'EN_CURSO',
+        fechaInicio: '2026-11-22T14:00:00.000Z',
+        sincronizacionPendiente: false,
+        datosAdicionales: expect.objectContaining({
+          estadoCuadrilla: 'EN_MISION',
+          estadoIncidente: 'EN_ATENCION',
+          hitoAceptacion: 'Asignación Aceptada por Cuadrilla',
+        }),
+      })
+    );
+
+    vi.unstubAllGlobals();
+  });
 });

@@ -30,6 +30,7 @@ vi.mock('@/hooks/useConnectivity', () => ({
 
 vi.mock('@/services/misionesService', () => ({
   obtenerDetalleMision: vi.fn(),
+  aceptarMision: vi.fn(),
   rechazarMision: vi.fn(),
 }));
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   sincronizarMisiones,
   obtenerDetalleMision,
+  aceptarMision,
   aceptarMisionPatrulla,
   validarPayloadAceptarMision,
   obtenerCoordenadasOpcionales,
@@ -424,6 +425,174 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
 
       const coordsSinGps = await obtenerCoordenadasOpcionales(10);
       expect(coordsSinGps).toEqual({});
+    });
+  });
+
+  describe('aceptarMision — Delegado de Cuadrilla (H40)', () => {
+    const misionCuadrillaDespachada = {
+      id: '70000000-0000-4000-8000-000000000001',
+      incidenteId: '30000000-0000-4000-8000-000000000001',
+      codigoIncidente: 'INC-2026-0001',
+      tipologia: 'Árbol caído',
+      direccion: 'Av. Ramón Picarte 1100, Valdivia',
+      prioridad: 'ALTA',
+      estado: 'DESPACHADA',
+      fechaDespacho: '2026-11-22T13:30:00.000Z',
+      datosAdicionales: {
+        tipoMision: 'ATENCION_CUADRILLA',
+        cuadrillaId: '50000000-0000-4000-8000-000000000001',
+      },
+      actualizadoEn: '2026-11-22T13:30:00.000Z',
+    };
+
+    it('invoca POST /api/misiones/{id}/aceptar para cuadrilla y actualiza estado a EN_CURSO, EN_MISION y EN_ATENCION (200 OK)', async () => {
+      const mockRespuestaCuadrilla200 = {
+        message:
+          'Asignación de misión aceptada exitosamente. La cuadrilla inicia el desplazamiento y asume la atención del incidente.',
+        data: {
+          mision: {
+            id: '70000000-0000-4000-8000-000000000001',
+            codigo: 'MIS-2026-0005',
+            titulo: 'Atención táctica - Incidente INC-2026-0001',
+            descripcion: 'Despeje de árbol caído sobre calzada',
+            tipoMision: 'ATENCION_CUADRILLA',
+            estado: 'EN_CURSO',
+            prioridad: 'ALTA',
+            incidenteId: '30000000-0000-4000-8000-000000000001',
+            patrullaId: null,
+            cuadrillaId: '50000000-0000-4000-8000-000000000001',
+            fechaInicio: '2026-11-22T14:00:00.000Z',
+            actualizadoEn: '2026-11-22T14:00:00.000Z',
+          },
+          cuadrilla: {
+            id: '50000000-0000-4000-8000-000000000001',
+            nombre: 'Cuadrilla Vías y Canales 1',
+            estado: 'EN_MISION',
+            delegacionId: '30000000-0000-4000-8000-000000000002',
+          },
+          patrulla: null,
+          incidente: {
+            id: '30000000-0000-4000-8000-000000000001',
+            codigo: 'INC-2026-0001',
+            estado: 'EN_ATENCION',
+            prioridad: 'ALTA',
+          },
+          hito: {
+            id: '80000000-0000-4000-8000-000000000010',
+            misionId: '70000000-0000-4000-8000-000000000001',
+            hito: 'MISION_ACEPTADA',
+            descripcion: 'Asignación Aceptada por Cuadrilla',
+            registradoPorId: 'd0000000-0000-4000-8000-000000000001',
+            latitud: -39.819588,
+            longitud: -73.245209,
+            creadoEn: '2026-11-22T14:00:00.000Z',
+          },
+        },
+      };
+
+      vi.mocked(apiClient.POST).mockResolvedValueOnce({
+        data: mockRespuestaCuadrilla200,
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
+
+      const resultado = await aceptarMision(misionCuadrillaDespachada.id, {
+        misionActual: misionCuadrillaDespachada,
+        tipoUnidad: 'cuadrilla',
+        coordenadas: { latitud: -39.819588, longitud: -73.245209 },
+      });
+
+      expect(apiClient.POST).toHaveBeenCalledWith('/api/misiones/{id}/aceptar', {
+        params: { path: { id: misionCuadrillaDespachada.id } },
+        body: { latitud: -39.819588, longitud: -73.245209 },
+      });
+      expect(resultado.enColaOffline).toBe(false);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.fechaInicio).toBe('2026-11-22T14:00:00.000Z');
+      expect(resultado.mision.datosAdicionales?.estadoCuadrilla).toBe('EN_MISION');
+      expect(resultado.mision.datosAdicionales?.estadoIncidente).toBe('EN_ATENCION');
+      expect(resultado.mision.datosAdicionales?.hitoAceptacion).toBe(
+        'Asignación Aceptada por Cuadrilla'
+      );
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(resultado.mision);
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('maneja 409 Conflict idempotente (/EN_CURSO/i) para cuadrilla dejando EN_MISION y EN_ATENCION', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValueOnce({
+        data: undefined,
+        error: { message: 'La misión ya se encuentra en estado EN_CURSO.' },
+        response: new Response(null, { status: 409 }),
+      } as never);
+
+      const resultado = await aceptarMision(misionCuadrillaDespachada.id, {
+        misionActual: misionCuadrillaDespachada,
+        tipoUnidad: 'cuadrilla',
+        coordenadas: {},
+      });
+
+      expect(resultado.yaAceptadaPreviamente).toBe(true);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.datosAdicionales?.estadoCuadrilla).toBe('EN_MISION');
+      expect(resultado.mision.datosAdicionales?.estadoIncidente).toBe('EN_ATENCION');
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('lanza MisionServiceError en 403 Forbidden y 409 no idempotente sin encolar en outbox', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValueOnce({
+        data: undefined,
+        error: { message: 'Requiere permiso misiones:terreno:ejecutar' },
+        response: new Response(null, { status: 403 }),
+      } as never);
+
+      await expect(
+        aceptarMision(misionCuadrillaDespachada.id, {
+          misionActual: misionCuadrillaDespachada,
+          tipoUnidad: 'cuadrilla',
+          coordenadas: {},
+        })
+      ).rejects.toThrow(MisionServiceError);
+
+      vi.mocked(apiClient.POST).mockResolvedValueOnce({
+        data: undefined,
+        error: { message: 'La misión está RECHAZADA.' },
+        response: new Response(null, { status: 409 }),
+      } as never);
+
+      await expect(
+        aceptarMision(misionCuadrillaDespachada.id, {
+          misionActual: misionCuadrillaDespachada,
+          tipoUnidad: 'cuadrilla',
+          coordenadas: {},
+        })
+      ).rejects.toThrow(MisionServiceError);
+
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('encola ACEPTAR_MISION en IndexedDB outbox con estados optimistas de cuadrilla cuando está offline', async () => {
+      Object.defineProperty(navigator, 'onLine', {
+        value: false,
+        configurable: true,
+      });
+
+      const resultado = await aceptarMision(misionCuadrillaDespachada.id, {
+        misionActual: misionCuadrillaDespachada,
+        tipoUnidad: 'cuadrilla',
+        coordenadas: { latitud: -39.819588, longitud: -73.245209 },
+      });
+
+      expect(resultado.enColaOffline).toBe(true);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.sincronizacionPendiente).toBe(true);
+      expect(resultado.mision.datosAdicionales?.estadoCuadrilla).toBe('EN_MISION');
+      expect(resultado.mision.datosAdicionales?.estadoIncidente).toBe('EN_ATENCION');
+      expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith({
+        tipo: 'ACEPTAR_MISION',
+        url: `/api/misiones/${misionCuadrillaDespachada.id}/aceptar`,
+        metodo: 'POST',
+        payload: { latitud: -39.819588, longitud: -73.245209 },
+      });
     });
   });
 
