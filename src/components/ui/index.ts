@@ -13,5 +13,5 @@ export type { SelectProps, SelectOption } from './Select';
 export { default as Textarea } from './Textarea';
 export type { TextareaProps } from './Textarea';
 
-export { ToastProvider, useToast } from './Toast';
-export type { ToastMessage, ToastType } from './Toast';
+export { ToastProvider, useToast, useToastOptional } from './Toast';
+export type { ToastMessage, ToastOptions, ToastType } from './Toast';
