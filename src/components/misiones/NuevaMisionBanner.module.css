@@ -1,0 +1,79 @@
+.banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-primary-teal-dark);
+  color: var(--color-text-light);
+  border-left: 4px solid var(--color-accent-mint);
+  border-radius: var(--radius-none, 0px);
+  margin-bottom: var(--space-4);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.titleArea {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bellIcon {
+  color: var(--color-accent-mint);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-accent-mint);
+  margin: 0;
+}
+
+.closeButton {
+  background: transparent;
+  border: none;
+  color: var(--color-text-light);
+  cursor: pointer;
+  padding: var(--space-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  min-width: 36px;
+}
+
+.closeButton:hover,
+.closeButton:focus-visible {
+  opacity: 0.8;
+}
+
+.bodyText {
+  font-size: var(--font-size-sm);
+  margin: 0;
+  line-height: 1.4;
+  color: var(--color-text-light);
+}
+
+.codeHighlight {
+  font-weight: 700;
+  color: var(--color-white);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.actionButton {
+  min-height: 48px;
+}
+
