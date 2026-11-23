@@ -4,6 +4,7 @@ import {
   emitirAckLectura,
   consultarMisionesPendientes,
   limpiarCacheNotificacionesMemoria,
+  mapearAlertaAMisionLocal,
 } from '../notificacionesService';
 import * as socketClient from '@/lib/socket/socketClient';
 import apiClient from '@/lib/api/client';
@@ -205,5 +206,27 @@ describe('notificacionesService (HU-35)', () => {
     const pendientes = await consultarMisionesPendientes('pat-1');
     expect(pendientes).toHaveLength(1);
     expect(pendientes[0].codigoMision).toBe('MIS-2026-0001');
+  });
+
+  it('mapearAlertaAMisionLocal soporta alertas ATENCION_CUADRILLA con cuadrillaId (H40)', () => {
+    const mision = mapearAlertaAMisionLocal({
+      notificacionId: 'notif-cuad-1',
+      misionId: 'mis-cuad-1',
+      codigo: 'MIS-2026-0040',
+      tipoMision: 'ATENCION_CUADRILLA',
+      patrullaId: null,
+      cuadrillaId: 'cuad-1',
+      incidenteId: 'inc-1',
+      incidenteCodigo: 'INC-2026-0040',
+      incidenteFolio: 'FOL-40',
+      tipoAfectacion: null,
+      direccion: 'Av. Picarte 1100',
+      prioridad: 'ALTA',
+      asignadoEn: '2026-11-22T14:00:00Z',
+    });
+
+    expect(mision.tipologia).toBe('Atención de Cuadrilla');
+    expect(mision.datosAdicionales?.cuadrillaId).toBe('cuad-1');
+    expect(mision.datosAdicionales?.patrullaId).toBeNull();
   });
 });

@@ -67,6 +67,11 @@ const nextConfig: NextConfig = {
         destination: `${apiBackendUrl}/api/:path*`,
         basePath: false,
       },
+      {
+        source: "/uploads/:path*",
+        destination: `${apiBackendUrl}/uploads/:path*`,
+        basePath: false,
+      },
     ];
   },
   async headers() {

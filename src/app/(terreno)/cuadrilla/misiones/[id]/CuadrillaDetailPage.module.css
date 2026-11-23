@@ -1,163 +1,175 @@
-.container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.backButtonArea {
-  display: flex;
-  align-self: flex-start;
-}
-
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 48px;
-  padding: 0 var(--space-4);
+.arrivalCard {
   background-color: var(--color-white);
-  border: 1px solid var(--color-border);
-  color: var(--color-primary-teal);
-  text-decoration: none !important;
-  font-weight: 700;
-  font-size: 0.875rem;
-  border-radius: 0;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
-}
-
-.backLink:hover {
-  background-color: var(--color-bg-light);
-  border-color: var(--color-primary-teal);
-  text-decoration: none !important;
-}
-
-.backLink:active {
-  background-color: #DEE4EA;
-  text-decoration: none !important;
-}
-
-.backLink:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: var(--focus-ring-offset);
-}
-
-.missionHeader {
-  background-color: var(--color-white);
-  border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-primary-teal);
+  border: 1px solid var(--border-color-neutral, #DFE3E8);
+  border-top: 4px solid var(--color-accent-mint);
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
 
-.headerRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.codeArea {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.code {
-  font-size: 1.125rem;
-  font-weight: 800;
-  color: var(--color-primary-teal);
-}
-
-.priorityChip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-family-base);
-  font-size: 0.75rem;
+.arrivalTitle {
+  font-size: 1rem;
   font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 0;
-  border: 1px solid transparent;
-  line-height: 1;
-  white-space: nowrap;
-  letter-spacing: 0.02em;
+  color: var(--color-text-dark);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-.priorityCritica {
-  background-color: var(--color-danger-bg);
-  color: var(--color-danger);
-  border-color: var(--color-danger);
-}
-
-.priorityAlta {
-  background-color: var(--color-warning-bg);
-  color: var(--color-warning);
-  border-color: var(--color-warning);
-}
-
-.priorityNeutro {
-  background-color: var(--color-bg-light);
+.arrivalDescription {
+  font-size: 0.875rem;
   color: var(--color-text-muted);
-  border-color: var(--color-border);
+  line-height: 1.4;
+  margin: 0;
 }
 
-.detailGrid {
+.arrivalButton {
+  min-height: 48px !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  background-color: var(--color-accent-mint) !important;
+  color: var(--color-white) !important;
+  border-radius: 0 !important;
+}
+
+.arrivalButton:hover:not(:disabled) {
+  background-color: #439686 !important;
+}
+
+.arrivalAlertError {
+  background-color: var(--color-danger-bg);
+  border-left: 4px solid var(--color-danger);
+  color: var(--color-danger);
+  padding: var(--space-3);
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.contingencyButton {
+  align-self: flex-start;
+  min-height: 44px;
+}
+
+.activeWorkPanel {
+  background-color: var(--color-white);
+  border: 1px solid var(--border-color-neutral, #DFE3E8);
+  border-left: 4px solid var(--color-success);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
 
-.sectionBlock {
+.activeWorkHeader {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--color-bg-light);
-}
-
-.sectionBlock:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.itemLabel {
-  font-size: 0.75rem;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-success);
   font-weight: 700;
-  color: var(--color-text-muted);
+  font-size: 1rem;
 }
 
-.itemValue {
-  font-size: 0.9375rem;
-  color: var(--color-text-dark);
-  font-weight: 400;
-  line-height: 1.4;
-}
-
-.itemValueBold {
-  font-weight: 700;
+.activeWorkTimeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.875rem;
   color: var(--color-text-dark);
 }
 
-.locationActionRow {
+.activeWorkTimeValue {
+  font-weight: 700;
+}
+
+.topBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   flex-wrap: wrap;
-  margin-top: 4px;
 }
 
-.readOnlyNotice {
-  background-color: var(--color-bg-light);
+.dispatchCard {
+  background-color: var(--color-white);
   border: 1px solid var(--color-border);
-  padding: var(--space-3);
-  text-align: center;
-  font-weight: 600;
-  font-size: 0.8125rem;
+  border-top: 4px solid var(--color-primary-teal);
+  border-radius: 0;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dispatchTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-dark);
+  margin: 0;
+}
+
+.dispatchDesc {
+  font-size: 0.875rem;
   color: var(--color-text-muted);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.actionsStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.offlineAlertBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background-color: var(--color-warning-bg);
+  border: 1px solid var(--color-warning);
+  border-left: 4px solid var(--color-warning);
+  color: var(--color-warning);
+  padding: var(--space-3);
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0;
+}
+
+.successAlertBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background-color: var(--color-success-bg);
+  border: 1px solid var(--color-success);
+  border-left: 4px solid var(--color-success);
+  color: var(--color-success);
+  padding: var(--space-3);
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0;
+}
+
+.rejectedInfoBox {
+  background-color: var(--color-danger-bg);
+  border: 1px solid var(--color-danger);
+  border-left: 4px solid var(--color-danger);
+  color: var(--color-text-dark);
+  padding: var(--space-3);
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border-radius: 0;
+}
+
+.rejectedInfoLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-danger);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }

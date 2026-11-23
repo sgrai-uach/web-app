@@ -143,11 +143,80 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 
 ---
 
-### 2.2 Rechazo Motivado de Misión por Patrulla Verificadora (H41, H69)
+### 2.1.b Confirmar y Aceptar Asignación de Incidente por Delegado de Cuadrilla (H40)
+- **Historia:** H40
+- **Método:** `POST`
+- **Ruta:** `/api/misiones/{id}/aceptar`
+- **Permiso RBAC requerido:** `misiones:terreno:ejecutar`
+- **Tipo de misión:** `ATENCION_CUADRILLA`
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+#### Request Body (Opcional — timeout GPS no bloqueante de 5 segundos)
+```json
+{
+  "latitud": -39.819588,
+  "longitud": -73.245209
+}
+```
+> Si el dispositivo no cuenta con coordenadas GPS o supera los `5000 ms`, la PWA envía `{}` para no retrasar el despliegue.
+
+#### Response Exitosa (200 OK)
+```json
+{
+  "message": "Asignación de misión aceptada exitosamente. La cuadrilla inicia el desplazamiento y asume la atención del incidente.",
+  "data": {
+    "mision": {
+      "id": "70000000-0000-4000-8000-000000000001",
+      "codigo": "MIS-2026-0005",
+      "titulo": "Atención táctica - Incidente INC-2026-0001",
+      "descripcion": "Despeje de árbol caído sobre calzada",
+      "tipoMision": "ATENCION_CUADRILLA",
+      "estado": "EN_CURSO",
+      "prioridad": "ALTA",
+      "incidenteId": "30000000-0000-4000-8000-000000000001",
+      "patrullaId": null,
+      "cuadrillaId": "50000000-0000-4000-8000-000000000001",
+      "fechaInicio": "2026-11-22T14:00:00.000Z",
+      "actualizadoEn": "2026-11-22T14:00:00.000Z"
+    },
+    "cuadrilla": {
+      "id": "50000000-0000-4000-8000-000000000001",
+      "nombre": "Cuadrilla Vías y Canales 1",
+      "estado": "EN_MISION",
+      "delegacionId": "30000000-0000-4000-8000-000000000002"
+    },
+    "patrulla": null,
+    "incidente": {
+      "id": "30000000-0000-4000-8000-000000000001",
+      "codigo": "INC-2026-0001",
+      "estado": "EN_ATENCION",
+      "prioridad": "ALTA"
+    },
+    "hito": {
+      "id": "80000000-0000-4000-8000-000000000010",
+      "misionId": "70000000-0000-4000-8000-000000000001",
+      "hito": "MISION_ACEPTADA",
+      "descripcion": "Asignación Aceptada por Cuadrilla",
+      "registradoPorId": "d0000000-0000-4000-8000-000000000001",
+      "latitud": -39.819588,
+      "longitud": -73.245209,
+      "creadoEn": "2026-11-22T14:00:00.000Z"
+    }
+  }
+}
+```
+
+#### Eventos WebSocket Emitidos y Cola Offline
+- Al ejecutarse la transacción atómica en `sgrai-api`, se emiten `mision:actualizada`, `incidente:actualizado` (incidente en `EN_ATENCION`) y `cuadrilla:actualizada` hacia el Centro de Mando (`sgrai-web`) y la sala operativa de la unidad.
+- En ausencia de señal, la PWA persiste la misión optimista (`EN_CURSO`, `EN_MISION`, `EN_ATENCION`) en IndexedDB y encola `ACEPTAR_MISION` en `outbox` manejando de forma idempotente respuestas `409 Conflict` con estado `EN_CURSO`.
+
+---
+
+### 2.2 Rechazo Motivado de Misión por Patrulla Verificadora o Cuadrilla (H41, H69)
 - **Historia:** H41, H69
 - **Método:** `POST`
 - **Ruta:** `/api/misiones/{id}/rechazar`
-- **Permiso RBAC requerido:** `misiones:terreno:verificar` (Patrulla Verificadora) / `misiones:terreno:atender` (Delegado de Cuadrilla)
+- **Permiso RBAC requerido:** `misiones:terreno:verificar` (Patrulla Verificadora) / `misiones:terreno:ejecutar` (Delegado de Cuadrilla)
 - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
 
 #### Request Body
@@ -180,7 +249,7 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 #### Códigos de Error HTTP
 - `400 Bad Request`: Formato de carga inválido o justificación menor a 5 caracteres (`VALIDATION_ERROR`).
 - `401 Unauthorized`: Token de sesión ausente, inválido o expirado.
-- `403 Forbidden`: Operador sin rol o sin permiso `misiones:terreno:verificar`, o unidad operativa en estado desactivada.
+- `403 Forbidden`: Operador sin rol o sin permiso `misiones:terreno:verificar` / `misiones:terreno:ejecutar`, o unidad operativa en estado desactivada.
 - `404 Not Found`: Identificador de misión no registrado en el sistema.
 - `409 Conflict`: La misión ya no se encuentra en estado `DESPACHADA` o `ASIGNADA` (ej. ya aceptada previamente o cancelada por despacho).
 
@@ -200,6 +269,120 @@ Esto notifica de inmediato al Encargado del Centro de Mando en `sgrai-web` para 
 #### Comportamiento Offline-First
 - En caso de pérdida de señal o error de red, la PWA valida localmente con Zod (`rechazoMisionSchema`), persiste el estado `RECHAZADA` con `sincronizacionPendiente: true` en IndexedDB y almacena la mutación `RECHAZAR_MISION` en `outbox`.
 - El badge de conectividad refleja de inmediato `1 pendiente` y el worker/hook `useConnectivity` reintenta la mutación al recuperar la conexión.
+
+---
+
+### 2.3 Adjuntar Evidencia Multimedia en Terreno (H43)
+- **Historia:** H43
+- **Método:** `POST`
+- **Ruta:** `/api/evidencia/adjuntos`
+- **Permiso RBAC requerido:** `reportes:crear`
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: multipart/form-data`
+
+#### Request Body (`multipart/form-data`)
+- `file` *(binary, obligatorio)*: Archivo de imagen (`image/jpeg`, `image/png`, `image/webp`), video (`video/mp4`, `video/webm`, `video/quicktime`) o documento (`application/pdf`), con peso máximo de `10 MB`.
+- `incidente_id` *(string UUID, opcional)*: Identificador del incidente asociado.
+- `reporte_terreno_id` *(string UUID, opcional)*: Identificador del reporte de terreno asociado.
+> Al menos uno de `incidente_id` o `reporte_terreno_id` debe enviarse.
+
+#### Response Exitosa (`201 Created`)
+```json
+{
+  "id": "33333333-3333-4333-8333-333333333333",
+  "nombreArchivo": "foto_terreno.webp",
+  "url": "/uploads/evidencia/9f86d081884c7d659a2feaa0c55ad015.webp",
+  "tipoMime": "image/webp",
+  "tamanoBytes": 148200,
+  "incidenteId": "22222222-2222-4222-8222-222222222222",
+  "reporteTerrenoId": null,
+  "creadoEn": "2026-11-17T19:00:00.000Z"
+}
+```
+> El servidor optimiza imágenes a WebP y transcodifica videos a MP4 (720p, `faststart`), devolviendo `url`, `tipoMime` y `tamanoBytes` definitivos. El cliente actualiza el adjunto local con estos valores y consume `/uploads/evidencia/[filename]` con soporte `Accept-Ranges: bytes` (`206 Partial Content`).
+
+#### Códigos de Error y Manejo Offline
+- `400`: Faltan `incidente_id` / `reporte_terreno_id` o formato UUID inválido.
+- `403`: Usuario sin permiso `reportes:crear`.
+- `404`: Incidente o reporte de terreno no encontrado.
+- `413`: Archivo supera los `10 MB`.
+- `415`: Tipo MIME o firma binaria (*magic bytes*) no autorizada.
+- Sin conexión o falla de red (`5xx`): La PWA valida con Zod, comprime imágenes en cliente ($\le 1280\text{px}$), encola `SUBIR_EVIDENCIA` en IndexedDB y sincroniza automáticamente vía `FormData` al recuperar conectividad.
+
+---
+
+### 2.4 Evaluar Terreno y Asignar/Modificar Prioridad del Incidente (H38)
+- **Historia:** H38
+- **Método:** `PATCH`
+- **Ruta:** `/api/incidentes/{id}/prioridad` (y cálculo auxiliar en `POST /api/incidentes/{id}/prioridad/calcular`)
+- **Permiso RBAC requerido:** `misiones:terreno:verificar`
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+#### Request Body (`PATCH /api/incidentes/{id}/prioridad`)
+```json
+{
+  "prioridad": "CRITICA",
+  "prioridadSugerida": "ALTA",
+  "justificacionPrioridad": "Se constata riesgo eléctrico activo sobre acceso único de vivienda con adultos mayores.",
+  "nucleoFamiliarTotal": 4,
+  "cantidadNinos": 1,
+  "cantidadAdultosMayores": 2,
+  "personasDiscapacitadas": 0,
+  "personasElectrodependientes": 0,
+  "mascotasAfectadas": 1,
+  "viviendasAfectadas": 1,
+  "nivelCompromisoVivienda": "MODERADO",
+  "riesgoElectrico": true,
+  "riesgoEstructural": false,
+  "riesgoQuimicoSanitario": false,
+  "aislamientoVial": false,
+  "requiereEvacuacion": false,
+  "detallesAdicionales": "Se requiere coordinación con empresa eléctrica y cuadrilla de despeje.",
+  "factoresGatillantes": [
+    "Peligro eléctrico activo en terreno",
+    "Adultos mayores afectados (2)"
+  ],
+  "versionReporte": 1,
+  "misionId": "60000000-0000-4000-8000-000000000001"
+}
+```
+
+#### Reglas de Validación y Versionado
+- Si `prioridad !== prioridadSugerida`, el campo `justificacionPrioridad` es obligatorio y debe tener al menos **5 caracteres**.
+- Cada envío o rectificación incrementa `versionReporte` (`1`, `2`, `...`), registrando un reporte distinguible en el Centro de Mando (con datos de `evaluador` visibles para toda la patrulla) y emitiendo los eventos WebSocket `incidente:actualizado` y `mision:actualizada`.
+
+---
+
+### 2.5 Enviar Informe Técnico de Verificación y Cerrar Misión (H39 / H86)
+- **Historia:** H39 (fusión H39 / H86)
+- **Método:** `POST`
+- **Ruta:** `/api/misiones/{id}/reporte`
+- **Permiso RBAC requerido:** `reportes:crear`
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+#### Request Body (`POST /api/misiones/{id}/reporte`)
+```json
+{
+  "dictamen": "REQUIERE_CUADRILLA",
+  "motivo_no_abordable": null,
+  "resumen_tecnico": "Se constata obstrucción completa de sumidero y socavón en berma norte; requiere cuadrilla vial con motobomba.",
+  "estado_terreno": "CRITICO",
+  "personas_afectadas": 4,
+  "danos_estimados": "Anegamiento de primer nivel en 2 viviendas y daño en cerco perimetral.",
+  "observaciones": "Acceso despejado para camión aljibe por calle paralela.",
+  "requiere_asistencia_social": true,
+  "adjuntoIds": [],
+  "adjuntos": []
+}
+```
+
+#### Reglas de Validación y Transacción Atómica
+- `dictamen`: obligatorio (`'REQUIERE_CUADRILLA'` o `'NO_ABORDABLE'`).
+- `resumen_tecnico`: obligatorio, mínimo **10 caracteres**.
+- `motivo_no_abordable`: obligatorio cuando `dictamen === 'NO_ABORDABLE'`, mínimo **15 caracteres**. Transiciona `incidente.estado = 'NO_ABORDABLE'` registrando `fecha_cierre` y motivo.
+- `personas_afectadas`: entero `>= 0`, precargado automáticamente desde el último reporte de prioridad (HU-38) mediante `evaluaciones.personasAfectadasPrevias` / `reportesTerreno` y editable por la patrulla.
+- `requiere_asistencia_social`: casilla Ficha FIBE (trasladada desde HU-38); si es `true`, marca `incidente.requiere_asistencia_social = true`.
+- `adjuntoIds` / `adjuntos`: sección preparada para integración con evidencia fotográfica (HU-43).
+- Al recibir `201 Created`, la misión pasa a `COMPLETADA` (`fecha_cierre`), la patrulla pasa a `DISPONIBLE` y se emiten los eventos WebSocket `mision:actualizada`, `incidente:actualizado` y `patrulla:actualizada` / `patrulla:liberada`, sincronizando el estado y autoría (`evaluador`) para todo el personal de la patrulla.
 
 ---
 

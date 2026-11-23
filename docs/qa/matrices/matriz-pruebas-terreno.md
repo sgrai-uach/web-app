@@ -21,10 +21,10 @@
 | **TC-08** | H38 | `EvaluacionTipologia` | Online / Offline | Modificar prioridad sin justificación vs con justificación $\ge 5$ caracteres. | Exige obligatoriamente fundamento; bloquea guardado si es $< 5$ caracteres. | APROBADO |
 | **TC-09** | H39 | `ReporteSituacionForm` | Online / Offline | Seleccionar "Incidente Abordable", marcar requerimiento de cuadrilla y enviar. | Misión pasa a finalizada, patrulla liberada en sistema central. | APROBADO |
 | **TC-10** | H39 | `ReporteSituacionForm` | Online / Offline | Seleccionar "No Abordable" con motivo de 8 caracteres vs 20 caracteres. | Bloquea envío si motivo $< 15$ chars; si $\ge 15$, finaliza misión y libera patrulla a `DISPONIBLE`. | APROBADO |
-| **TC-11** | H40 | `cuadrilla/misiones/[id]` | Online / Offline | Presionar "Aceptar Misión" como Delegado de Cuadrilla. | Misión transiciona a `EN_CURSO`. Si offline, encola en `outbox`. | APROBADO |
+| **TC-11** | H40 | `cuadrilla/misiones/[id]` | Online / Offline | Presionar "Aceptar Asignación" como Delegado de Cuadrilla. | Misión transiciona a `EN_CURSO` (`EN_MISION` / `EN_ATENCION`), emite Toast homologado y habilita H42. Si offline, encola `ACEPTAR_MISION` en `outbox`. | APROBADO |
 | **TC-12** | H41 | `RechazoMisionModal` | Online / Offline | Rechazo motivado de cuadrilla con justificación $\ge 5$ caracteres. | Encola rechazo en `outbox`, remueve de bandeja de faenas activas. | APROBADO |
-| **TC-13** | H42 | `ReporteLlegadaCard` | Online / Offline | Presionar "Registrar Llegada con GPS" en terreno. | Captura coordenadas satelitales, estampa hito y cambia a `EN_TERRENO`. | APROBADO |
-| **TC-14** | H43 | `CargaEvidenciaCard` | Online / Offline | Capturar foto de 4 MB con cámara. | Comprime en cliente a JPEG $\le 1280$px y $\approx 250$ KB, encola en `outbox`. | APROBADO |
+| **TC-13** | H42 | `cuadrilla/misiones/[id]` | Online / Offline | Presionar "Llegada a Terreno" tras aceptar la asignación (`EN_CURSO`). | Captura coordenadas GPS (o contingencia), estampa `LLEGADA_TERRENO`, emite Toast y muestra panel "En Trabajos de Terreno". | APROBADO |
+| **TC-14** | H43 | `CargaEvidenciaCard` | Online / Offline | Capturar foto (4 MB), grabar video (MP4/WebM/MOV $\le 10$ MB) o adjuntar PDF; probar rechazo $> 10$ MB o MIME inválido. | Comprime fotos en cliente a JPEG $\le 1280$px; videos/PDF pasan íntegros; valida MIME/10 MB; encola `SUBIR_EVIDENCIA` en `outbox` si offline y sincroniza vía `FormData` (`file`, `incidente_id`, `reporte_terreno_id`). | APROBADO |
 | **TC-15** | H44 | `SolicitudApoyoModal` | Online / Offline | Solicitar maquinaria pesada con motivo de 10 caracteres. | Modal valida $\ge 5$ caracteres, encola solicitud estructurada (`POST /misiones/{id}/apoyo`). | APROBADO |
 | **TC-16** | H68 | `CierreFaenaForm` | Online / Offline | Registrar observaciones y rendir 2 materiales consumidos (combustible, sacos). | Encola cierre en `outbox`, transiciona a `FINALIZADA` y libera cuadrilla. | APROBADO |
 | **TC-17** | H70 | `useTelemetry` | Online | Misión activa en curso. | Activa `watchPosition` de alta precisión, transmite coordenadas cada 15 segundos. | APROBADO |
@@ -34,9 +34,9 @@
 
 ## 2. Resumen de Ejecución Automatizada
 
-- **Total de Suites de Prueba (Test Files):** 19
-- **Total de Pruebas Unitarias e Integración:** 55
-- **Tasa de Aprobación:** 100% (55 aprobadas, 0 fallidas)
+- **Total de Suites de Prueba (Test Files):** 41
+- **Total de Pruebas Unitarias e Integración:** 202
+- **Tasa de Aprobación:** 100% (202 aprobadas, 0 fallidas)
 - **Cobertura de Requerimientos y Reglas de Negocio:**
   - Prohibición de emojis en UI / uso exclusivo de `lucide-react`: Cumplido.
   - Esquinas rectas en botones, modales e inputs (`--radius-none: 0px`): Cumplido.

@@ -16,9 +16,14 @@ export const ETIQUETAS_ESTADO: Record<string, string> = {
   CERRADA: 'Cerrada',
   CANCELADA: 'Cancelada',
   RECHAZADA: 'Rechazada',
+  NO_ABORDABLE: 'No abordable',
   DISPONIBLE: 'Disponible',
   NO_DISPONIBLE: 'No disponible',
   EN_MANTENCION: 'En mantención',
+  EN_MISION: 'En misión',
+  EN_ATENCION: 'En atención',
+  EN_VERIFICACION: 'En verificación',
+  VERIFICANDO: 'Verificando',
 };
 
 export const ETIQUETAS_PRIORIDAD: Record<string, string> = {
@@ -26,6 +31,13 @@ export const ETIQUETAS_PRIORIDAD: Record<string, string> = {
   ALTA: 'Alta',
   MEDIA: 'Media',
   BAJA: 'Baja',
+};
+
+export const ETIQUETAS_COMPROMISO_VIVIENDA: Record<string, string> = {
+  SIN_DANO: 'Sin daño',
+  LEVE: 'Daño leve',
+  MODERADO: 'Daño moderado',
+  GRAVE_INHABITABLE: 'Grave / Inhabitable',
 };
 
 export const ETIQUETAS_TIPOLOGIA: Record<string, string> = {
@@ -62,6 +74,19 @@ export const ETIQUETAS_TIPO_MISION: Record<string, string> = {
   ASISTENCIA_SOCIAL: 'Asistencia social',
 };
 
+export const ETIQUETAS_DICTAMEN_ATENCION: Record<string, string> = {
+  REQUIERE_CUADRILLA: 'Requiere cuadrilla',
+  NO_ABORDABLE: 'No abordable',
+};
+
+export const ETIQUETAS_ESTADO_TERRENO: Record<string, string> = {
+  CRITICO: 'Crítico',
+  ESTABLE: 'Estable',
+  INACCESIBLE: 'Inaccesible',
+  CONTROLADO: 'Controlado',
+  FINALIZADO: 'Finalizado',
+};
+
 /**
  * Convierte un código o enum a texto legible en español natural con respaldo seguro.
  * Nunca muestra valores crudos en mayúsculas ni con guiones bajos.
@@ -83,9 +108,12 @@ export function formatearEtiquetaSegura(
   // Búsqueda en los diccionarios canónicos del sistema
   if (ETIQUETAS_ESTADO[normalizado]) return ETIQUETAS_ESTADO[normalizado];
   if (ETIQUETAS_PRIORIDAD[normalizado]) return ETIQUETAS_PRIORIDAD[normalizado];
+  if (ETIQUETAS_COMPROMISO_VIVIENDA[normalizado]) return ETIQUETAS_COMPROMISO_VIVIENDA[normalizado];
   if (ETIQUETAS_TIPOLOGIA[normalizado]) return ETIQUETAS_TIPOLOGIA[normalizado];
   if (ETIQUETAS_ROL[normalizado]) return ETIQUETAS_ROL[normalizado];
   if (ETIQUETAS_TIPO_MISION[normalizado]) return ETIQUETAS_TIPO_MISION[normalizado];
+  if (ETIQUETAS_DICTAMEN_ATENCION[normalizado]) return ETIQUETAS_DICTAMEN_ATENCION[normalizado];
+  if (ETIQUETAS_ESTADO_TERRENO[normalizado]) return ETIQUETAS_ESTADO_TERRENO[normalizado];
 
   // Respaldo seguro: reemplaza guiones bajos por espacios y deja la primera letra en mayúscula
   const sinGuiones = limpio.replace(/_/g, ' ').toLowerCase();
@@ -106,6 +134,8 @@ export function limpiarTituloMision(titulo?: string | null): string {
   if (!titulo) return '';
   return titulo
     .replace(/^triage\s*[:\-–]?\s*/i, '')
-    .replace(/^evaluaci[oó]n\s+de\s+/i, '')
+    .replace(/^evaluaci[oó]n\s+(?:de\s+)?[:\-–]?\s*/i, '')
+    .replace(/^verificaci[oó]n\s*[:\-–]?\s*/i, '')
+    .replace(/\s*-\s*INC-[A-Z0-9-]+$/i, '')
     .trim();
 }

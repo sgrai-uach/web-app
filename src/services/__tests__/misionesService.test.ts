@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   sincronizarMisiones,
   obtenerDetalleMision,
+  reportarLlegadaCuadrilla,
+  validarPayloadLlegadaMision,
   rechazarMision,
+  aceptarMision,
   aceptarMisionPatrulla,
   validarPayloadAceptarMision,
   obtenerCoordenadasOpcionales,
@@ -25,6 +28,18 @@ vi.mock('@/services/offlineQueue', () => ({
   obtenerMisionesLocales: vi.fn(),
   obtenerMisionLocalPorId: vi.fn(),
   encolarAccionOutbox: vi.fn(),
+  obtenerEvaluacionMisionCache: vi.fn(),
+  fusionarDatosAdicionalesMision: vi.fn((mision, previos) =>
+    previos
+      ? {
+          ...mision,
+          datosAdicionales: {
+            ...previos,
+            ...(mision.datosAdicionales || {}),
+          },
+        }
+      : mision
+  ),
 }));
 
 describe('misionesService — Sincronización remota y persistencia IndexedDB (Offline-First)', () => {
@@ -190,6 +205,181 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
 
       expect(detalle).toEqual(mockLocal);
       expect(offlineQueue.obtenerMisionLocalPorId).toHaveBeenCalledWith('mis-fallback');
+    });
+  });
+
+  describe('validarPayloadLlegadaMision', () => {
+    it('debe aceptar coordenadas válidas dentro del rango geográfico', () => {
+      const payload = validarPayloadLlegadaMision({
+        latitud: -39.81422,
+        longitud: -73.24591,
+        observaciones: '  Equipo en terreno  ',
+      });
+
+      expect(payload.latitud).toBe(-39.81422);
+      expect(payload.longitud).toBe(-73.24591);
+      expect(payload.observaciones).toBe('Equipo en terreno');
+    });
+
+    it('debe arrojar MisionServiceError si la latitud está fuera de rango', () => {
+      expect(() =>
+        validarPayloadLlegadaMision({ latitud: -95, longitud: -73.24591 })
+      ).toThrow(MisionServiceError);
+    });
+
+    it('debe arrojar MisionServiceError si la longitud está fuera de rango', () => {
+      expect(() =>
+        validarPayloadLlegadaMision({ latitud: -39.8, longitud: 200 })
+      ).toThrow(MisionServiceError);
+    });
+  });
+
+  describe('reportarLlegadaCuadrilla (H42)', () => {
+    const mockMisionBase = {
+      id: 'mis-cuadrilla-01',
+      incidenteId: 'inc-01',
+      codigoIncidente: 'INC-2026-001',
+      tipologia: 'Caída de árbol',
+      direccion: 'Av. Ramón Picarte 1100',
+      coordenadas: { lat: -39.81422, lng: -73.24591 },
+      prioridad: 'ALTA',
+      estado: 'DESPACHADA',
+      fechaDespacho: '2026-11-08T19:00:00Z',
+      actualizadoEn: '2026-11-08T19:00:00Z',
+    };
+
+    it('debe reportar llegada exitosamente con 201 Created y actualizar a EN_CURSO', async () => {
+      const mockApiResponse = {
+        message: 'Llegada a terreno reportada exitosamente.',
+        data: {
+          hitoId: 'hito-001',
+          misionId: 'mis-cuadrilla-01',
+          codigoMision: 'MIS-2026-001',
+          hito: 'LLEGADA_TERRENO',
+          descripcion: 'Llegada a terreno reportada.',
+          latitud: -39.81422,
+          longitud: -73.24591,
+          registradoEn: '2026-11-08T19:30:00.000Z',
+          registradoPor: {
+            id: 'user-05',
+            nombre: 'Pedro Delegado',
+          },
+          estadoMision: 'EN_CURSO',
+          miembrosActualizados: 4,
+        },
+      };
+
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: mockApiResponse,
+        error: undefined,
+        response: new Response('', { status: 201 }),
+      } as never);
+
+      const resultado = await reportarLlegadaCuadrilla('mis-cuadrilla-01', {
+        misionActual: mockMisionBase,
+        coordenadas: { latitud: -39.81422, longitud: -73.24591 },
+      });
+
+      expect(resultado.enColaOffline).toBe(false);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.fechaLlegada).toBe('2026-11-08T19:30:00.000Z');
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalled();
+    });
+
+    it('debe manejar idempotencia ante respuesta 409 Conflict fijando estado EN_CURSO', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: undefined,
+        error: { message: 'La llegada a terreno ya fue reportada' },
+        response: new Response('', { status: 409 }),
+      } as never);
+
+      const resultado = await reportarLlegadaCuadrilla('mis-cuadrilla-01', {
+        misionActual: mockMisionBase,
+        coordenadas: { latitud: -39.81422, longitud: -73.24591 },
+      });
+
+      expect(resultado.yaReportadaPreviamente).toBe(true);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.enColaOffline).toBe(false);
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalled();
+    });
+
+    it('debe lanzar MisionServiceError con 403 si el usuario no tiene permisos o no es el delegado', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: undefined,
+        error: { message: 'No es el delegado asignado' },
+        response: new Response('', { status: 403 }),
+      } as never);
+
+      await expect(
+        reportarLlegadaCuadrilla('mis-cuadrilla-01', {
+          misionActual: mockMisionBase,
+          coordenadas: { latitud: -39.81422, longitud: -73.24591 },
+        })
+      ).rejects.toThrow(MisionServiceError);
+    });
+
+    it('debe usar coordenadas de la misión si se activa usarUbicacionMision', async () => {
+      const mockApiResponse = {
+        message: 'Llegada exitosa',
+        data: {
+          hitoId: 'hito-002',
+          misionId: 'mis-cuadrilla-01',
+          codigoMision: 'MIS-2026-001',
+          hito: 'LLEGADA_TERRENO',
+          descripcion: 'Llegada reportada con contingencia.',
+          latitud: -39.81422,
+          longitud: -73.24591,
+          registradoEn: '2026-11-08T19:35:00.000Z',
+          registradoPor: { id: 'user-05', nombre: 'Pedro Delegado' },
+          estadoMision: 'EN_CURSO',
+          miembrosActualizados: 4,
+        },
+      };
+
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: mockApiResponse,
+        error: undefined,
+        response: new Response('', { status: 201 }),
+      } as never);
+
+      const resultado = await reportarLlegadaCuadrilla('mis-cuadrilla-01', {
+        misionActual: mockMisionBase,
+        usarUbicacionMision: true,
+      });
+
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(apiClient.POST).toHaveBeenCalledWith(
+        '/api/misiones/{id}/llegada',
+        expect.objectContaining({
+          body: {
+            latitud: -39.81422,
+            longitud: -73.24591,
+          },
+        })
+      );
+    });
+
+    it('debe encolar en outbox y guardar optimistamente en IndexedDB en modo offline', async () => {
+      const onlineSpy = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+      const resultado = await reportarLlegadaCuadrilla('mis-cuadrilla-01', {
+        misionActual: mockMisionBase,
+        coordenadas: { latitud: -39.81422, longitud: -73.24591 },
+      });
+
+      expect(resultado.enColaOffline).toBe(true);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.sincronizacionPendiente).toBe(true);
+      expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tipo: 'REPORTAR_LLEGADA',
+          url: '/api/misiones/mis-cuadrilla-01/llegada',
+          metodo: 'POST',
+        })
+      );
+
+      onlineSpy.mockRestore();
     });
   });
 
@@ -596,6 +786,617 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
 
       const coordsSinGps = await obtenerCoordenadasOpcionales(10);
       expect(coordsSinGps).toEqual({});
+    });
+  });
+
+  describe('aceptarMision — Aceptación de Asignación por Delegado de Cuadrilla (H40)', () => {
+    const misionCuadrillaDespachada = {
+      id: '70000000-0000-4000-8000-000000000001',
+      incidenteId: '30000000-0000-4000-8000-000000000001',
+      codigoIncidente: 'INC-2026-0001',
+      tipologia: 'Caída de árbol',
+      direccion: 'Av. Alemania 600, Valdivia',
+      prioridad: 'ALTA',
+      estado: 'DESPACHADA',
+      fechaDespacho: '2026-11-22T13:30:00.000Z',
+      datosAdicionales: {
+        tipoMision: 'ATENCION_CUADRILLA',
+        cuadrillaId: '50000000-0000-4000-8000-000000000001',
+      },
+      actualizadoEn: '2026-11-22T13:30:00.000Z',
+    };
+
+    it('invoca POST /api/misiones/{id}/aceptar y actualiza estados canónicos EN_CURSO, EN_MISION y EN_ATENCION (200 OK)', async () => {
+      const mockRespuesta200 = {
+        message:
+          'Asignación de misión aceptada exitosamente. La cuadrilla inicia el desplazamiento y asume la atención del incidente.',
+        data: {
+          mision: {
+            id: misionCuadrillaDespachada.id,
+            codigo: 'MIS-2026-0005',
+            titulo: 'Atención táctica',
+            descripcion: 'Despeje de calzada',
+            tipoMision: 'ATENCION_CUADRILLA',
+            estado: 'EN_CURSO',
+            prioridad: 'ALTA',
+            incidenteId: misionCuadrillaDespachada.incidenteId,
+            patrullaId: null,
+            cuadrillaId: '50000000-0000-4000-8000-000000000001',
+            fechaInicio: '2026-11-22T14:00:00.000Z',
+            actualizadoEn: '2026-11-22T14:00:00.000Z',
+          },
+          cuadrilla: {
+            id: '50000000-0000-4000-8000-000000000001',
+            nombre: 'Cuadrilla Vías y Canales 1',
+            estado: 'EN_MISION',
+            delegacionId: '30000000-0000-4000-8000-000000000002',
+          },
+          patrulla: null,
+          incidente: {
+            id: misionCuadrillaDespachada.incidenteId,
+            codigo: 'INC-2026-0001',
+            estado: 'EN_ATENCION',
+            prioridad: 'ALTA',
+          },
+          hito: {
+            id: '80000000-0000-4000-8000-000000000010',
+            misionId: misionCuadrillaDespachada.id,
+            hito: 'MISION_ACEPTADA',
+            descripcion: 'Asignación Aceptada por Cuadrilla',
+            registradoPorId: 'd0000000-0000-4000-8000-000000000001',
+            latitud: -39.819588,
+            longitud: -73.245209,
+            creadoEn: '2026-11-22T14:00:00.000Z',
+          },
+        },
+      };
+
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: mockRespuesta200,
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
+
+      const resultado = await aceptarMision(misionCuadrillaDespachada.id, {
+        misionActual: misionCuadrillaDespachada,
+        coordenadas: { latitud: -39.819588, longitud: -73.245209 },
+        tipoUnidad: 'cuadrilla',
+      });
+
+      expect(resultado.enColaOffline).toBe(false);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.datosAdicionales?.estadoCuadrilla).toBe('EN_MISION');
+      expect(resultado.mision.datosAdicionales?.estadoIncidente).toBe('EN_ATENCION');
+      expect(resultado.mision.datosAdicionales?.hitoAceptacion).toBe(
+        'Asignación Aceptada por Cuadrilla'
+      );
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(resultado.mision);
+    });
+
+    it('maneja 409 Conflict idempotente (EN_CURSO) para cuadrilla', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: undefined,
+        error: { message: 'La misión ya se encuentra EN_CURSO' },
+        response: new Response(null, { status: 409 }),
+      } as never);
+
+      const resultado = await aceptarMision(misionCuadrillaDespachada.id, {
+        misionActual: misionCuadrillaDespachada,
+        coordenadas: {},
+        tipoUnidad: 'cuadrilla',
+      });
+
+      expect(resultado.yaAceptadaPreviamente).toBe(true);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.datosAdicionales?.estadoCuadrilla).toBe('EN_MISION');
+      expect(resultado.mision.datosAdicionales?.estadoIncidente).toBe('EN_ATENCION');
+    });
+
+    it('encola ACEPTAR_MISION en outbox y guarda estado optimista de cuadrilla cuando está offline', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+      const resultado = await aceptarMision(misionCuadrillaDespachada.id, {
+        misionActual: misionCuadrillaDespachada,
+        coordenadas: { latitud: -39.814, longitud: -73.245 },
+        tipoUnidad: 'cuadrilla',
+      });
+
+      expect(resultado.enColaOffline).toBe(true);
+      expect(resultado.mision.estado).toBe('EN_CURSO');
+      expect(resultado.mision.sincronizacionPendiente).toBe(true);
+      expect(resultado.mision.datosAdicionales?.estadoCuadrilla).toBe('EN_MISION');
+      expect(resultado.mision.datosAdicionales?.estadoIncidente).toBe('EN_ATENCION');
+      expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith({
+        tipo: 'ACEPTAR_MISION',
+        url: `/api/misiones/${misionCuadrillaDespachada.id}/aceptar`,
+        metodo: 'POST',
+        payload: { latitud: -39.814, longitud: -73.245 },
+      });
+    });
+
+    it('mapea estadoCuadrilla y hito LLEGADA_TERRENO en obtenerDetalleMision', async () => {
+      vi.mocked(apiClient.GET).mockResolvedValue({
+        data: {
+          message: 'OK',
+          data: {
+            id: misionCuadrillaDespachada.id,
+            codigo: 'MIS-2026-0005',
+            titulo: 'Atención táctica',
+            descripcion: 'Despeje de calzada',
+            tipoMision: 'ATENCION_CUADRILLA',
+            estado: 'EN_CURSO',
+            prioridad: 'ALTA',
+            justificacionRechazo: null,
+            fechaInicio: '2026-11-22T14:00:00.000Z',
+            fechaCierre: null,
+            creadoEn: '2026-11-22T13:30:00.000Z',
+            actualizadoEn: '2026-11-22T14:15:00.000Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: {
+              id: '30000000-0000-4000-8000-000000000001',
+              codigo: 'INC-2026-0001',
+              codigoSeguimiento: 'SEG-001',
+              tipoAfectacion: 'CAIDA_ARBOL',
+              descripcion: 'Árbol en vía',
+              direccion: 'Av. Alemania 600',
+              latitud: -39.81,
+              longitud: -73.24,
+              estado: 'EN_ATENCION',
+              prioridad: 'ALTA',
+              requiereAsistenciaSocial: false,
+              delegacionNombre: 'Centro',
+            },
+            prevencion: null,
+            cuadrilla: {
+              id: '50000000-0000-4000-8000-000000000001',
+              nombre: 'Cuadrilla 1',
+              estado: 'EN_MISION',
+            },
+            patrulla: null,
+            bitacoraTiempos: [
+              {
+                hito: 'LLEGADA_TERRENO',
+                fecha: '2026-11-22',
+                hora: '14:15:00',
+                timestamp: '2026-11-22T14:15:00.000Z',
+                descripcion: 'Llegada a terreno reportada.',
+              },
+            ],
+            reportesTerreno: [],
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle = await obtenerDetalleMision(misionCuadrillaDespachada.id);
+
+      expect(detalle?.fechaLlegada).toBe('2026-11-22T14:15:00.000Z');
+      expect(detalle?.datosAdicionales?.estadoCuadrilla).toBe('EN_MISION');
+      expect(detalle?.datosAdicionales?.estadoIncidente).toBe('EN_ATENCION');
+    });
+  });
+
+  describe('rechazarMision (H41, H69)', () => {
+    it('rechaza localmente con Zod si la justificación tiene menos de 5 caracteres', async () => {
+      await expect(
+        rechazarMision('70000000-0000-4000-8000-000000000001', {
+          justificacion_rechazo: '  abc ',
+        })
+      ).rejects.toThrow();
+
+      expect(apiClient.POST).not.toHaveBeenCalled();
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('envía POST /api/misiones/{id}/rechazar y actualiza IndexedDB cuando responde 200 OK', async () => {
+      const misionId = '70000000-0000-4000-8000-000000000001';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: misionId,
+        incidenteId: '30000000-0000-4000-8000-000000000001',
+        codigoIncidente: 'INC-2026-0001',
+        tipologia: 'Árbol caído',
+        direccion: 'Av. Picarte 1100',
+        prioridad: 'ALTA',
+        estado: 'DESPACHADA',
+        fechaDespacho: '2026-11-16T22:00:00.000Z',
+        actualizadoEn: '2026-11-16T22:00:00.000Z',
+      });
+
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: {
+          message: 'Misión rechazada exitosamente.',
+          data: {
+            mision: {
+              id: misionId,
+              codigo: 'MIS-2026-0005',
+              tipoMision: 'ATENCION_CUADRILLA',
+              estado: 'RECHAZADA',
+              justificacionRechazo: 'Camión tolva presenta falla hidráulica.',
+              fechaCierre: '2026-11-16T23:15:00.000Z',
+              actualizadoEn: '2026-11-16T23:15:00.000Z',
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
+
+      const res = await rechazarMision(misionId, {
+        justificacion_rechazo: 'Camión tolva presenta falla hidráulica.',
+        latitud: -39.81422,
+        longitud: -73.24589,
+      });
+
+      expect(apiClient.POST).toHaveBeenCalledWith('/api/misiones/{id}/rechazar', {
+        params: { path: { id: misionId } },
+        body: {
+          justificacion_rechazo: 'Camión tolva presenta falla hidráulica.',
+          latitud: -39.81422,
+          longitud: -73.24589,
+        },
+      });
+      expect(res.exito).toBe(true);
+      expect(res.modoOffline).toBeUndefined();
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: misionId,
+          estado: 'RECHAZADA',
+          sincronizacionPendiente: false,
+        })
+      );
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('lanza MisionServiceError en 400/403/409 sin encolar en outbox', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: undefined,
+        error: { message: 'La misión no se encuentra en estado DESPACHADA.' },
+        response: new Response(null, { status: 409 }),
+      } as never);
+
+      await expect(
+        rechazarMision('70000000-0000-4000-8000-000000000001', {
+          justificacion_rechazo: 'Falla mecánica en ruta',
+        })
+      ).rejects.toThrow(MisionServiceError);
+
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('encola RECHAZAR_MISION en outbox y actualiza caché local ante falla de red', async () => {
+      const misionId = '70000000-0000-4000-8000-000000000001';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: misionId,
+        incidenteId: '30000000-0000-4000-8000-000000000001',
+        codigoIncidente: 'INC-2026-0001',
+        tipologia: 'Árbol caído',
+        direccion: 'Av. Picarte 1100',
+        prioridad: 'ALTA',
+        estado: 'DESPACHADA',
+        fechaDespacho: '2026-11-16T22:00:00.000Z',
+        actualizadoEn: '2026-11-16T22:00:00.000Z',
+      });
+      vi.mocked(apiClient.POST).mockRejectedValue(new TypeError('Failed to fetch'));
+
+      const res = await rechazarMision(misionId, {
+        justificacion_rechazo: 'Desperfecto eléctrico en camión',
+      });
+
+      expect(res.exito).toBe(true);
+      expect(res.modoOffline).toBe(true);
+      expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith({
+        tipo: 'RECHAZAR_MISION',
+        url: `/api/misiones/${misionId}/rechazar`,
+        metodo: 'POST',
+        payload: {
+          justificacion_rechazo: 'Desperfecto eléctrico en camión',
+        },
+      });
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: misionId,
+          estado: 'RECHAZADA',
+          sincronizacionPendiente: true,
+        })
+      );
+    });
+  });
+
+  describe('Sincronización de tipología y estado de evaluaciones desde backend', () => {
+    it('usa incidenteTipoAfectacion en sincronizarMisiones y deriva tipologiaEvaluada/prioridadEvaluada en obtenerDetalleMision', async () => {
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: [
+            {
+              id: 'mis-7700',
+              codigo: 'MIS-2026-7700',
+              titulo: 'Verificación: Anegamiento - INC-592395-562',
+              descripcion: 'Revisar corte de suministro',
+              tipoMision: 'VERIFICACION',
+              estado: 'EN_CURSO',
+              prioridad: 'ALTA',
+              incidenteId: 'inc-562',
+              incidenteCodigo: 'INC-592395-562',
+              incidenteTipoAfectacion: 'Corte de agua potable',
+              cuadrillaId: null,
+              cuadrillaNombre: null,
+              patrullaId: 'pat-001',
+              patrullaNombre: 'Patrulla 1',
+              delegacionId: 'del-001',
+              delegacionNombre: 'Norte',
+              fechaInicio: '2026-10-30T04:00:00Z',
+              fechaCierre: null,
+              creadoEn: '2026-10-30T04:00:00Z',
+              actualizadoEn: '2026-10-30T04:00:00Z',
+            },
+          ],
+          meta: {
+            total: 1,
+            page: 1,
+            limit: 20,
+            totalPages: 1,
+            hasNext: false,
+            hasPrev: false,
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const lista = await sincronizarMisiones({ tipoMision: 'VERIFICACION' });
+      expect(lista[0]?.tipologia).toBe('Corte de agua potable');
+
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: {
+            id: 'mis-7700',
+            codigo: 'MIS-2026-7700',
+            titulo: 'Verificación: Corte de agua potable - INC-592395-562',
+            descripcion: 'Revisar corte de suministro',
+            tipoMision: 'VERIFICACION',
+            estado: 'EN_CURSO',
+            prioridad: 'ALTA',
+            justificacionRechazo: null,
+            fechaInicio: '2026-10-30T04:00:00Z',
+            fechaCierre: null,
+            creadoEn: '2026-10-30T04:00:00Z',
+            actualizadoEn: '2026-10-30T05:00:00Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: {
+              id: 'inc-562',
+              codigo: 'INC-592395-562',
+              codigoSeguimiento: 'SEG-562',
+              tipoAfectacion: 'Corte de agua potable',
+              descripcion: 'Sin suministro',
+              direccion: 'Av. Alemania 500',
+              latitud: -39.81,
+              longitud: -73.24,
+              estado: 'VERIFICANDO',
+              prioridad: 'ALTA',
+              requiereAsistenciaSocial: false,
+              delegacionNombre: 'Norte',
+            },
+            prevencion: null,
+            cuadrilla: null,
+            patrulla: null,
+            bitacoraTiempos: [
+              {
+                id: 'hito-1',
+                hito: 'TIPOLOGIA_RECLASIFICADA',
+                fecha: '2026-10-30',
+                hora: '04:30:00',
+                timestamp: '2026-10-30T04:30:00Z',
+                descripcion: 'Reclasificado. Justificación: Matriz rota',
+                metadatos: {
+                  tipoAnterior: 'Anegamiento',
+                  tipoNuevo: 'Corte de agua potable',
+                  justificacion: 'Matriz rota',
+                },
+              },
+            ],
+            reportesTerreno: [{ id: 'rep-1', versionReporte: 1 }],
+            evaluaciones: {
+              tipologiaEvaluada: true,
+              tipologiaEvaluadaEn: '2026-10-30T04:30:00Z',
+              prioridadEvaluada: true,
+              prioridadEvaluadaEn: '2026-10-30T04:45:00Z',
+              versionReportePrioridad: 1,
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle = await obtenerDetalleMision('mis-7700');
+      expect(detalle?.tipologia).toBe('Corte de agua potable');
+      expect(detalle?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+      expect(detalle?.datosAdicionales?.esReclasificacion).toBe(true);
+      expect(detalle?.datosAdicionales?.justificacionTipologia).toBe('Matriz rota');
+      expect(detalle?.datosAdicionales?.prioridadEvaluada).toBe(true);
+      expect(detalle?.datosAdicionales?.versionReportePrioridad).toBe(1);
+    });
+
+    it('extrae autoría de categorización (evaluadorTipologia) y preserva reportes cacheados tras cambio de usuario ante 403 en detalle', async () => {
+      vi.mocked(offlineQueue.obtenerEvaluacionMisionCache).mockReturnValue({
+        tipologiaEvaluada: true,
+        esReclasificacion: true,
+        justificacionTipologia: 'Cauce desbordado verificado.',
+        fechaEvaluacionTipologia: '2026-11-16T15:00:00Z',
+        evaluadorTipologia: {
+          id: 'usr-p1',
+          nombre: 'Patrullero 1',
+          email: 'patrulla@valdivia.cl',
+        },
+        prioridadEvaluada: true,
+        versionReportePrioridad: 1,
+        reportesPrioridad: [
+          {
+            id: 'rep-prio-1',
+            versionReporte: 1,
+            prioridadSugerida: 'ALTA',
+            prioridadAsignada: 'CRITICA',
+            evaluador: {
+              id: 'usr-p1',
+              nombre: 'Patrullero 1',
+              email: 'patrulla@valdivia.cl',
+            },
+          },
+        ],
+      });
+
+      // 1. sincronizarMisiones conserva caché tras logout -> login de patrulla2@valdivia.cl
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: [
+            {
+              id: 'mis-sync-patrulla',
+              codigo: 'MIS-2026-888',
+              titulo: 'Verificación: Inundación - INC-888',
+              descripcion: 'Sector Las Ánimas',
+              tipoMision: 'VERIFICACION',
+              estado: 'EN_CURSO',
+              prioridad: 'CRITICA',
+              incidenteId: 'inc-888',
+              incidenteCodigo: 'INC-888',
+              incidenteTipoAfectacion: 'Inundación',
+              cuadrillaId: null,
+              cuadrillaNombre: null,
+              patrullaId: 'pat-001',
+              patrullaNombre: 'Patrulla 1',
+              delegacionId: 'del-001',
+              delegacionNombre: 'Norte',
+              fechaInicio: '2026-11-16T14:50:00Z',
+              fechaCierre: null,
+              creadoEn: '2026-11-16T14:40:00Z',
+              actualizadoEn: '2026-11-16T15:05:00Z',
+            },
+          ],
+          meta: { total: 1, page: 1, limit: 20, totalPages: 1, hasNext: false, hasPrev: false },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const listaSync = await sincronizarMisiones({ tipoMision: 'VERIFICACION' });
+      expect(listaSync[0]?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+      expect(listaSync[0]?.datosAdicionales?.prioridadEvaluada).toBe(true);
+
+      // 2. Si GET /api/misiones/{id} responde 403, fallback combina IndexedDB + caché de evaluaciones
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValueOnce({
+        id: 'mis-sync-patrulla',
+        incidenteId: 'inc-888',
+        codigoIncidente: 'INC-888',
+        tipologia: 'Inundación',
+        direccion: 'Sector Las Ánimas',
+        prioridad: 'CRITICA',
+        estado: 'EN_CURSO',
+        fechaDespacho: '2026-11-16T14:50:00Z',
+        actualizadoEn: '2026-11-16T15:05:00Z',
+      });
+
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: undefined,
+        error: { message: 'No cuenta con el permiso requerido: misiones:leer' },
+        response: new Response(null, { status: 403 }),
+      } as never);
+
+      const detalle403 = await obtenerDetalleMision('mis-sync-patrulla');
+      expect(detalle403?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+      expect(detalle403?.datosAdicionales?.evaluadorTipologia).toEqual({
+        id: 'usr-p1',
+        nombre: 'Patrullero 1',
+        email: 'patrulla@valdivia.cl',
+      });
+      expect(detalle403?.datosAdicionales?.prioridadEvaluada).toBe(true);
+
+      // 3. Cuando GET /api/misiones/{id} responde 200 OK, rescata registrador e esReclasificacion desde metadatos/hito
+      vi.mocked(offlineQueue.obtenerEvaluacionMisionCache).mockReturnValue(undefined);
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValueOnce(undefined);
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: {
+            id: 'mis-sync-patrulla',
+            codigo: 'MIS-2026-888',
+            titulo: 'Verificación: Inundación - INC-888',
+            descripcion: 'Sector Las Ánimas',
+            tipoMision: 'VERIFICACION',
+            estado: 'EN_CURSO',
+            prioridad: 'CRITICA',
+            justificacionRechazo: null,
+            fechaInicio: '2026-11-16T14:50:00Z',
+            fechaCierre: null,
+            creadoEn: '2026-11-16T14:40:00Z',
+            actualizadoEn: '2026-11-16T15:05:00Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: {
+              id: 'inc-888',
+              codigo: 'INC-888',
+              codigoSeguimiento: 'SEG-888',
+              tipoAfectacion: 'Inundación',
+              descripcion: 'Agua en calzada',
+              direccion: 'Sector Las Ánimas',
+              latitud: -39.81,
+              longitud: -73.24,
+              estado: 'VERIFICANDO',
+              prioridad: 'CRITICA',
+              requiereAsistenciaSocial: false,
+              delegacionNombre: 'Norte',
+            },
+            prevencion: null,
+            cuadrilla: null,
+            patrulla: null,
+            bitacoraTiempos: [
+              {
+                id: 'hito-tip-1',
+                hito: 'TIPOLOGIA_RECLASIFICADA',
+                fecha: '2026-11-16',
+                hora: '15:00:00',
+                timestamp: '2026-11-16T15:00:00Z',
+                descripcion: 'Tipología ratificada',
+                registradoPor: {
+                  id: 'usr-p1',
+                  nombre: 'Patrullero 1',
+                  email: 'patrulla@valdivia.cl',
+                },
+                metadatos: {
+                  tipoAnteriorId: 'tipo-1',
+                  tipoNuevoId: 'tipo-1',
+                  esReclasificacion: false,
+                  justificacion: 'Ratificada',
+                },
+              },
+            ],
+            reportesTerreno: [{ id: 'rep-srv-1', versionReporte: 1 }],
+            evaluaciones: {
+              tipologiaEvaluada: true,
+              tipologiaEvaluadaEn: '2026-11-16T15:00:00Z',
+              prioridadEvaluada: true,
+              prioridadEvaluadaEn: '2026-11-16T15:05:00Z',
+              versionReportePrioridad: 1,
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle200 = await obtenerDetalleMision('mis-sync-patrulla');
+      expect(detalle200?.datosAdicionales?.esReclasificacion).toBe(false);
+      expect(detalle200?.datosAdicionales?.evaluadorTipologia).toEqual({
+        id: 'usr-p1',
+        nombre: 'Patrullero 1',
+        email: 'patrulla@valdivia.cl',
+        rut: null,
+      });
     });
   });
 });
