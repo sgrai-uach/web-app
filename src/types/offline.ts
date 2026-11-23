@@ -69,6 +69,19 @@ export interface AccionOutbox {
   errorUltimoIntento?: string;
 }
 
+export interface MisionBitacoraHitoLocal {
+  id?: string;
+  hito: string;
+  codigoHito?: string;
+  descripcion?: string;
+  fecha: string;
+  hora: string;
+  timestamp?: string;
+  latitud?: number | null;
+  longitud?: number | null;
+  registradoPorNombre?: string | null;
+}
+
 export interface MisionLocal {
   id: string;
   incidenteId: string;
@@ -85,6 +98,7 @@ export interface MisionLocal {
   fechaInicio?: string | null;
   fechaLlegada?: string | null;
   sincronizacionPendiente?: boolean;
+  bitacoraTiempos?: MisionBitacoraHitoLocal[];
   datosAdicionales?: Record<string, unknown>;
   actualizadoEn: string;
 }

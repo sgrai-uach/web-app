@@ -21,6 +21,8 @@ import {
   MisionEstadoActivoCard,
   MisionNoEncontradaCard,
   MisionSoloLecturaNotice,
+  MisionRechazoBanner,
+  MisionBitacoraTimeline,
 } from '@/components/misiones/MisionDetalleShared';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
@@ -414,12 +416,10 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       )}
 
       {estadoNormalizado === 'RECHAZADA' && justificacionRegistrada && (
-        <div className={styles.rejectedInfoBox}>
-          <span className={styles.rejectedInfoLabel}>
-            Justificación de rechazo registrada
-          </span>
-          <span>{justificacionRegistrada}</span>
-        </div>
+        <MisionRechazoBanner
+          titulo="Misión Rechazada por Cuadrilla"
+          justificacion={justificacionRegistrada}
+        />
       )}
 
       {/* Vista activa: Faena en Curso (H40) */}
@@ -540,6 +540,14 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
           adjuntos={adjuntosMision}
           soloLectura={!puedeAdjuntarEvidencia}
           alAdjuntarEvidencia={handleEvidenciaCargada}
+        />
+      )}
+
+      {Array.isArray(mision.bitacoraTiempos) && mision.bitacoraTiempos.length > 0 && (
+        <MisionBitacoraTimeline
+          bitacora={mision.bitacoraTiempos}
+          tipoUnidad="CUADRILLA"
+          responsableFallback={usuario?.nombre}
         />
       )}
 

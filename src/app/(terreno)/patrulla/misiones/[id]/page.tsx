@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  XCircle,
   CheckCircle,
   CheckCircle2,
   AlertCircle,
@@ -25,6 +24,8 @@ import {
   MisionEstadoActivoCard,
   MisionNoEncontradaCard,
   MisionSoloLecturaNotice,
+  MisionRechazoBanner,
+  MisionBitacoraTimeline,
 } from '@/components/misiones/MisionDetalleShared';
 import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
 import { EvaluacionPrioridadCard } from '@/components/misiones/EvaluacionPrioridadCard';
@@ -355,18 +356,14 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       )}
 
       {estadoNormalizado === 'RECHAZADA' && (
-        <div className={styles.rejectedBanner} role="status">
-          <div className={styles.rejectedHeader}>
-            <XCircle size={18} aria-hidden="true" />
-            <span>Misión Rechazada por Patrulla Verificadora</span>
-          </div>
-          {Boolean(mision.datosAdicionales?.justificacionRechazo) && (
-            <p className={styles.rejectedReason}>
-              <strong>Motivo documentado:</strong>{' '}
-              {String(mision.datosAdicionales?.justificacionRechazo)}
-            </p>
-          )}
-        </div>
+        <MisionRechazoBanner
+          titulo="Misión Rechazada por Patrulla Verificadora"
+          justificacion={
+            mision.datosAdicionales?.justificacionRechazo
+              ? String(mision.datosAdicionales.justificacionRechazo)
+              : null
+          }
+        />
       )}
 
       <MisionDetalleHeaderCard
@@ -597,6 +594,14 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             })()}
           </div>
         </section>
+      )}
+
+      {Array.isArray(mision.bitacoraTiempos) && mision.bitacoraTiempos.length > 0 && (
+        <MisionBitacoraTimeline
+          bitacora={mision.bitacoraTiempos}
+          tipoUnidad="PATRULLA"
+          responsableFallback={usuario?.nombre}
+        />
       )}
 
       {esSoloLectura && <MisionSoloLecturaNotice />}

@@ -1,17 +1,26 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
   MapPin,
+  MapPinCheck,
   Map,
   Calendar,
+  Clock,
   CheckCircle,
   CheckCircle2,
   WifiOff,
   Archive,
   XCircle,
+  History,
+  Send,
+  FileCheck,
+  AlertTriangle,
+  UserCheck,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
@@ -24,7 +33,7 @@ import {
   formatearFechaHora24h,
   formatearTipologia,
 } from '@/lib/utils/formatters';
-import type { MisionLocal } from '@/types/offline';
+import type { MisionBitacoraHitoLocal, MisionLocal } from '@/types/offline';
 import styles from './MisionDetailLayout.module.css';
 
 export interface MisionDetalleTopBarProps {
@@ -375,5 +384,291 @@ export function MisionSoloLecturaNotice() {
         <span>Solo lectura</span>
       </div>
     </div>
+  );
+}
+
+export interface MisionRechazoBannerProps {
+  titulo: string;
+  justificacion?: string | null;
+}
+
+/**
+ * Banner estandarizado de rechazo motivado compartido entre Patrulla Verificadora y Cuadrilla.
+ */
+export function MisionRechazoBanner({
+  titulo,
+  justificacion,
+}: MisionRechazoBannerProps) {
+  return (
+    <div className={styles.rejectedBanner} role="status">
+      <div className={styles.rejectedHeader}>
+        <XCircle size={18} aria-hidden="true" />
+        <span>{titulo}</span>
+      </div>
+      {justificacion && (
+        <p className={styles.rejectedReason}>
+          <strong>Motivo documentado:</strong> {justificacion}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export type TipoUnidadMision = 'PATRULLA' | 'CUADRILLA';
+
+interface ConfigHitoTerreno {
+  titulo: string;
+  categoria: 'despacho' | 'aceptacion' | 'llegada' | 'evaluacion' | 'cierre' | 'rechazo' | 'neutro';
+  destacar: boolean;
+  mostrarResponsableFallback: boolean;
+}
+
+function resolverConfigHitoTerreno(
+  hito: MisionBitacoraHitoLocal,
+  tipoUnidad: TipoUnidadMision
+): ConfigHitoTerreno {
+  const codigo = (hito.codigoHito || hito.hito || '').trim().toUpperCase();
+
+  if (codigo === 'DESPACHADA' || codigo === 'MISION_DESPACHADA') {
+    return {
+      titulo:
+        tipoUnidad === 'PATRULLA'
+          ? 'Patrulla Verificadora Despachada'
+          : 'Cuadrilla Despachada',
+      categoria: 'despacho',
+      destacar: false,
+      mostrarResponsableFallback: false,
+    };
+  }
+  if (codigo === 'PATRULLA_DESPACHADA') {
+    return {
+      titulo: 'Patrulla Verificadora Despachada',
+      categoria: 'despacho',
+      destacar: false,
+      mostrarResponsableFallback: false,
+    };
+  }
+  if (codigo === 'CUADRILLA_DESPACHADA') {
+    return {
+      titulo: 'Cuadrilla Despachada',
+      categoria: 'despacho',
+      destacar: false,
+      mostrarResponsableFallback: false,
+    };
+  }
+  if (codigo === 'MISION_ACEPTADA' || codigo === 'ACEPTACION_MISION') {
+    return {
+      titulo: 'Misión Aceptada por Unidad',
+      categoria: 'aceptacion',
+      destacar: false,
+      mostrarResponsableFallback: true,
+    };
+  }
+  if (codigo === 'LLEGADA_TERRENO') {
+    return {
+      titulo: 'Llegada a Terreno',
+      categoria: 'llegada',
+      destacar: true,
+      mostrarResponsableFallback: true,
+    };
+  }
+  if (codigo === 'TIPOLOGIA_RECLASIFICADA') {
+    const desc = (hito.descripcion || '').toLowerCase();
+    const sinCambios = desc.includes('sin modificaciones') || desc.includes('sin variaciones');
+    return {
+      titulo: sinCambios
+        ? 'Tipología constatada en terreno (sin cambios)'
+        : 'Tipología reclasificada en terreno',
+      categoria: 'evaluacion',
+      destacar: false,
+      mostrarResponsableFallback: true,
+    };
+  }
+  if (codigo === 'PRIORIDAD_ASIGNADA') {
+    return {
+      titulo: 'Prioridad evaluada y asignada en terreno',
+      categoria: 'evaluacion',
+      destacar: false,
+      mostrarResponsableFallback: true,
+    };
+  }
+  if (codigo === 'VERIFICACION_COMPLETADA' || codigo === 'VERIFICACION_FINALIZADA') {
+    return {
+      titulo: 'Verificación completada',
+      categoria: 'cierre',
+      destacar: true,
+      mostrarResponsableFallback: true,
+    };
+  }
+  if (codigo === 'MISION_RECHAZADA' || codigo === 'RECHAZO_MISION' || codigo === 'RECHAZADA') {
+    return {
+      titulo: 'Misión Rechazada en Terreno',
+      categoria: 'rechazo',
+      destacar: false,
+      mostrarResponsableFallback: true,
+    };
+  }
+  if (codigo === 'REPORTE_TERRENO') {
+    return {
+      titulo: 'Reporte Técnico Emitido',
+      categoria: 'evaluacion',
+      destacar: false,
+      mostrarResponsableFallback: true,
+    };
+  }
+
+  return {
+    titulo: hito.hito || 'Evento Operativo',
+    categoria: 'neutro',
+    destacar: false,
+    mostrarResponsableFallback: false,
+  };
+}
+
+export interface MisionBitacoraTimelineProps {
+  bitacora?: MisionBitacoraHitoLocal[];
+  tipoUnidad: TipoUnidadMision;
+  responsableFallback?: string | null;
+  abiertoPorDefecto?: boolean;
+}
+
+/**
+ * Bitácora cronológica de operaciones (línea de tiempo) estandarizada y compartida
+ * entre Patrulla Verificadora y Cuadrilla en la app de terreno.
+ */
+export function MisionBitacoraTimeline({
+  bitacora = [],
+  tipoUnidad,
+  responsableFallback,
+  abiertoPorDefecto = true,
+}: MisionBitacoraTimelineProps) {
+  const [abierto, setAbierto] = useState(abiertoPorDefecto);
+
+  return (
+    <section
+      className={styles.bitacoraCard}
+      aria-label="Bitácora cronológica de operaciones"
+    >
+      <div className={styles.bitacoraHeader}>
+        <div className={styles.bitacoraTitleRow}>
+          <History
+            size={18}
+            color="var(--color-primary-teal)"
+            aria-hidden="true"
+          />
+          <h2 className={styles.bitacoraTitle}>
+            Bitácora Cronológica ({bitacora.length})
+          </h2>
+        </div>
+
+        <button
+          type="button"
+          className={styles.bitacoraToggleBtn}
+          onClick={() => setAbierto((prev) => !prev)}
+          aria-expanded={abierto}
+        >
+          <span>{abierto ? 'Ocultar' : 'Ver historial'}</span>
+          {abierto ? (
+            <ChevronUp size={14} aria-hidden="true" />
+          ) : (
+            <ChevronDown size={14} aria-hidden="true" />
+          )}
+        </button>
+      </div>
+
+      {abierto && (
+        <div className={styles.bitacoraBody}>
+          {bitacora.length === 0 ? (
+            <p className={styles.bitacoraEmpty}>
+              No se registran eventos en la bitácora de esta misión aún.
+            </p>
+          ) : (
+            <div className={styles.timelineList}>
+              {bitacora.map((hito, index) => {
+                const cfg = resolverConfigHitoTerreno(hito, tipoUnidad);
+                const responsable =
+                  hito.registradoPorNombre ||
+                  (cfg.mostrarResponsableFallback ? responsableFallback : null);
+                const fechaTexto = hito.timestamp
+                  ? formatearFechaHora24h(hito.timestamp)
+                  : `${hito.fecha} ${hito.hora}`.trim();
+                const tieneCoordenadas =
+                  typeof hito.latitud === 'number' &&
+                  typeof hito.longitud === 'number' &&
+                  Number.isFinite(hito.latitud) &&
+                  Number.isFinite(hito.longitud);
+
+                return (
+                  <div
+                    key={`${hito.id || hito.timestamp || hito.hito}-${index}`}
+                    className={`${styles.timelineItem} ${
+                      cfg.destacar ? styles.timelineItemHighlight : ''
+                    }`}
+                  >
+                    {cfg.categoria === 'llegada' ? (
+                      <div className={styles.timelineDotIcon} aria-hidden="true">
+                        <MapPinCheck size={12} />
+                      </div>
+                    ) : cfg.categoria === 'aceptacion' ? (
+                      <div className={styles.timelineDotIcon} aria-hidden="true">
+                        <CheckCircle2 size={12} />
+                      </div>
+                    ) : cfg.categoria === 'rechazo' ? (
+                      <div
+                        className={`${styles.timelineDotIcon} ${styles.timelineDotRechazo}`}
+                        aria-hidden="true"
+                      >
+                        <AlertTriangle size={12} />
+                      </div>
+                    ) : cfg.categoria === 'evaluacion' || cfg.categoria === 'cierre' ? (
+                      <div className={styles.timelineDotIcon} aria-hidden="true">
+                        <FileCheck size={12} />
+                      </div>
+                    ) : cfg.categoria === 'despacho' ? (
+                      <div className={styles.timelineDotIcon} aria-hidden="true">
+                        <Send size={11} />
+                      </div>
+                    ) : (
+                      <div className={styles.timelineDot} />
+                    )}
+
+                    <div className={styles.timelineHeader}>
+                      <span className={styles.timelineHito}>{cfg.titulo}</span>
+                      <span className={styles.timelineDate}>
+                        <Clock size={12} aria-hidden="true" />
+                        <span>{fechaTexto}</span>
+                      </span>
+                    </div>
+
+                    {hito.descripcion && (
+                      <p className={styles.timelineDesc}>{hito.descripcion}</p>
+                    )}
+
+                    {(responsable || tieneCoordenadas) && (
+                      <div className={styles.timelineMetaRow}>
+                        {responsable && (
+                          <span className={styles.timelineMetaItem}>
+                            <UserCheck size={12} aria-hidden="true" />
+                            <span>Reportado por: {responsable}</span>
+                          </span>
+                        )}
+                        {tieneCoordenadas && (
+                          <span className={styles.timelineMetaItem}>
+                            <MapPin size={12} aria-hidden="true" />
+                            <span className={styles.timelineCoords}>
+                              {hito.latitud!.toFixed(5)}, {hito.longitud!.toFixed(5)}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

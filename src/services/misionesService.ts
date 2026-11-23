@@ -865,6 +865,33 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
           mantenerOptimista && previaLocal ? previaLocal.fechaInicio : d.fechaInicio || null,
         fechaLlegada: fechaLlegadaResuelta,
         sincronizacionPendiente: mantenerOptimista,
+        bitacoraTiempos: bitacoraRemota.map((h) => {
+          const hExtra = h as {
+            id?: string;
+            codigoHito?: string;
+            latitud?: number | null;
+            longitud?: number | null;
+            registradoPorNombre?: string | null;
+            registradoPor?: { nombre?: string | null } | null;
+          };
+          return {
+            ...(hExtra.id ? { id: hExtra.id } : {}),
+            hito: h.hito,
+            ...(hExtra.codigoHito ? { codigoHito: hExtra.codigoHito } : {}),
+            ...(h.descripcion ? { descripcion: h.descripcion } : {}),
+            fecha: h.fecha,
+            hora: h.hora,
+            ...(h.timestamp ? { timestamp: h.timestamp } : {}),
+            ...(typeof hExtra.latitud === 'number' ? { latitud: hExtra.latitud } : {}),
+            ...(typeof hExtra.longitud === 'number' ? { longitud: hExtra.longitud } : {}),
+            ...(hExtra.registradoPorNombre || hExtra.registradoPor?.nombre
+              ? {
+                  registradoPorNombre:
+                    hExtra.registradoPorNombre ?? hExtra.registradoPor?.nombre ?? null,
+                }
+              : {}),
+          };
+        }),
         datosAdicionales:
           mantenerOptimista && previaLocal?.datosAdicionales
             ? { ...datosBaseMision, ...previaLocal.datosAdicionales }

@@ -9,6 +9,8 @@ import {
   MisionEstadoActivoCard,
   MisionNoEncontradaCard,
   MisionSoloLecturaNotice,
+  MisionRechazoBanner,
+  MisionBitacoraTimeline,
 } from '../MisionDetalleShared';
 import type { MisionLocal } from '@/types/offline';
 
@@ -146,5 +148,79 @@ describe('MisionDetalleShared — Componentes compartidos de detalle', () => {
       '/patrulla/misiones'
     );
     expect(screen.getByText('Solo lectura')).toBeInTheDocument();
+  });
+
+  it('renderiza MisionRechazoBanner de forma estandarizada', () => {
+    render(
+      <MisionRechazoBanner
+        titulo="Misión Rechazada por Patrulla Verificadora"
+        justificacion="Camino cortado por socavón."
+      />
+    );
+
+    expect(
+      screen.getByText('Misión Rechazada por Patrulla Verificadora')
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Camino cortado por socavón\./)).toBeInTheDocument();
+  });
+
+  it('renderiza MisionBitacoraTimeline estandarizada para Patrulla y Cuadrilla', () => {
+    const { rerender } = render(
+      <MisionBitacoraTimeline
+        tipoUnidad="PATRULLA"
+        responsableFallback="Laura Gómez"
+        bitacora={[
+          {
+            id: 'h-1',
+            hito: 'DESPACHADA',
+            descripcion: 'Misión de verificación asignada a Patrulla Sur.',
+            fecha: '22-11-2026',
+            hora: '13:16:55',
+          },
+          {
+            id: 'h-2',
+            hito: 'MISION_ACEPTADA',
+            descripcion: 'Misión Aceptada por Patrulla',
+            fecha: '22-11-2026',
+            hora: '13:17:31',
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('Bitácora Cronológica (2)')).toBeInTheDocument();
+    expect(screen.getByText('Patrulla Verificadora Despachada')).toBeInTheDocument();
+    expect(screen.getByText('Misión Aceptada por Unidad')).toBeInTheDocument();
+    expect(screen.getByText('Reportado por: Laura Gómez')).toBeInTheDocument();
+
+    rerender(
+      <MisionBitacoraTimeline
+        tipoUnidad="CUADRILLA"
+        responsableFallback="Sandra Huequeman"
+        bitacora={[
+          {
+            id: 'h-3',
+            hito: 'CUADRILLA_DESPACHADA',
+            descripcion: 'Cuadrilla despachada a terreno.',
+            fecha: '22-11-2026',
+            hora: '13:39:28',
+          },
+          {
+            id: 'h-4',
+            hito: 'LLEGADA_TERRENO',
+            descripcion: 'Llegada a terreno reportada.',
+            fecha: '22-11-2026',
+            hora: '23:51:41',
+            latitud: -39.8142,
+            longitud: -73.2459,
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('Cuadrilla Despachada')).toBeInTheDocument();
+    expect(screen.getByText('Llegada a Terreno')).toBeInTheDocument();
+    expect(screen.getByText('Reportado por: Sandra Huequeman')).toBeInTheDocument();
+    expect(screen.getByText('-39.81420, -73.24590')).toBeInTheDocument();
   });
 });
