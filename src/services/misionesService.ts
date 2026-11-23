@@ -108,10 +108,55 @@ export function validarPayloadLlegadaMision(
   return validado;
 }
 
+function solicitarPosicion(options: PositionOptions): Promise<CoordenadasGps> {
+  return new Promise<CoordenadasGps>((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve({
+          latitud: pos.coords.latitude,
+          longitud: pos.coords.longitude,
+        });
+      },
+      (error) => {
+        reject(error);
+      },
+      options
+    );
+  });
+}
+
+function mapearErrorGeolocalizacion(error: unknown): GeolocationError {
+  const geoErr = error as Partial<GeolocationPositionError> | null | undefined;
+  switch (geoErr?.code) {
+    case 1: // PERMISSION_DENIED
+      return new GeolocationError(
+        'PERMISO_DENEGADO',
+        'Permiso de ubicación denegado. Active los permisos de GPS en su navegador.'
+      );
+    case 2: // POSITION_UNAVAILABLE
+      return new GeolocationError(
+        'POSICION_NO_DISPONIBLE',
+        'Señal satelital no disponible. Verifique que la ubicación de su dispositivo esté activada.'
+      );
+    case 3: // TIMEOUT
+      return new GeolocationError(
+        'TIMEOUT',
+        'Tiempo de espera agotado al obtener señal GPS. Intente a cielo abierto o use la ubicación de la misión.'
+      );
+    default:
+      return new GeolocationError(
+        'DESCONOCIDO',
+        'No fue posible obtener las coordenadas GPS del dispositivo.'
+      );
+  }
+}
+
 /**
- * Solicita las coordenadas GPS de alta precisión mediante la Geolocation API del navegador.
+ * Solicita las coordenadas GPS mediante la Geolocation API del navegador.
+ * Intenta primero alta precisión (con caché reciente de hasta 15s) y, ante TIMEOUT o
+ * POSITION_UNAVAILABLE en arranque en frío, realiza fallback automático a precisión estándar (red/Wi-Fi).
  */
-export async function obtenerCoordenadasGps(timeoutMs = 10000): Promise<CoordenadasGps> {
+export async function obtenerCoordenadasGps(timeoutMs = 8000): Promise<CoordenadasGps> {
   if (
     typeof window === 'undefined' ||
     typeof navigator === 'undefined' ||
@@ -124,57 +169,28 @@ export async function obtenerCoordenadasGps(timeoutMs = 10000): Promise<Coordena
     );
   }
 
-  return new Promise<CoordenadasGps>((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        resolve({
-          latitud: pos.coords.latitude,
-          longitud: pos.coords.longitude,
+  try {
+    return await solicitarPosicion({
+      enableHighAccuracy: true,
+      timeout: timeoutMs,
+      maximumAge: 15000,
+    });
+  } catch (error) {
+    const geoErr = error as Partial<GeolocationPositionError> | null | undefined;
+    // Solo hacer fallback si falló por TIMEOUT (3) o POSITION_UNAVAILABLE (2); nunca si el usuario denegó permiso (1)
+    if (geoErr?.code === 2 || geoErr?.code === 3) {
+      try {
+        return await solicitarPosicion({
+          enableHighAccuracy: false,
+          timeout: 6000,
+          maximumAge: 60000,
         });
-      },
-      (error) => {
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            reject(
-              new GeolocationError(
-                'PERMISO_DENEGADO',
-                'Permiso de ubicación denegado. Active los permisos de GPS en su navegador.'
-              )
-            );
-            break;
-          case error.POSITION_UNAVAILABLE:
-            reject(
-              new GeolocationError(
-                'POSICION_NO_DISPONIBLE',
-                'Señal satelital no disponible. Verifique que la ubicación de su dispositivo esté activada.'
-              )
-            );
-            break;
-          case error.TIMEOUT:
-            reject(
-              new GeolocationError(
-                'TIMEOUT',
-                'Tiempo de espera agotado al obtener señal GPS. Intente a cielo abierto o use la ubicación de la misión.'
-              )
-            );
-            break;
-          default:
-            reject(
-              new GeolocationError(
-                'DESCONOCIDO',
-                'No fue posible obtener las coordenadas GPS del dispositivo.'
-              )
-            );
-            break;
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: timeoutMs,
-        maximumAge: 0,
+      } catch (fallbackError) {
+        throw mapearErrorGeolocalizacion(fallbackError);
       }
-    );
-  });
+    }
+    throw mapearErrorGeolocalizacion(error);
+  }
 }
 
 /**
