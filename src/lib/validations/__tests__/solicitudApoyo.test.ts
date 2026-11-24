@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   DETALLE_APOYO_MIN,
+  TEXTAREA_MAX,
   VALORES_INICIALES_SOLICITUD_APOYO,
   solicitudApoyoSchema,
   validarPayloadSolicitudApoyo,
@@ -39,10 +40,28 @@ describe('solicitudApoyo (HU-44 Zod validations)', () => {
 
     expect(payload).toEqual({
       requiereApoyoAdicional: true,
+      requiereCuadrillaAdicional: false,
       detalleApoyoRequerido:
         'Se solicita motoniveladora y cuadrilla adicional de despeje',
       resumenTecnico: 'Árbol caído obstruye dos pistas',
     });
+  });
+
+  it('acepta requiereCuadrillaAdicional=true y alinea TEXTAREA_MAX a 1000 caracteres', () => {
+    expect(TEXTAREA_MAX).toBe(1000);
+    const payload = validarPayloadSolicitudApoyo({
+      requiereApoyoAdicional: true,
+      requiereCuadrillaAdicional: true,
+      detalleApoyoRequerido: 'Se requiere segunda cuadrilla forestal',
+    });
+    expect(payload.requiereCuadrillaAdicional).toBe(true);
+
+    const excedido = solicitudApoyoSchema.safeParse({
+      requiereApoyoAdicional: true,
+      requiereCuadrillaAdicional: true,
+      detalleApoyoRequerido: 'a'.repeat(1001),
+    });
+    expect(excedido.success).toBe(false);
   });
 
   it('lanza error en validarPayloadSolicitudApoyo si la casilla no está marcada', () => {

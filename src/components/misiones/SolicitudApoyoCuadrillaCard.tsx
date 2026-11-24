@@ -47,6 +47,7 @@ export function SolicitudApoyoCuadrillaCard({
   onApoyoSolicitado,
 }: SolicitudApoyoCuadrillaCardProps) {
   const checkboxId = useId();
+  const cuadrillaCheckboxId = useId();
   const detalleId = useId();
   const resumenId = useId();
   const observacionesId = useId();
@@ -70,6 +71,7 @@ export function SolicitudApoyoCuadrillaCard({
     setForm((prev) => ({
       ...prev,
       requiereApoyoAdicional: checked,
+      requiereCuadrillaAdicional: checked ? prev.requiereCuadrillaAdicional : false,
     }));
     setErrorValidacion(null);
     if (checked) {
@@ -202,6 +204,43 @@ export function SolicitudApoyoCuadrillaCard({
                 className={styles.conditionalPanel}
                 data-testid="panel-detalle-apoyo"
               >
+                <label
+                  htmlFor={cuadrillaCheckboxId}
+                  className={`${styles.checkboxCuadrillaCard} ${
+                    form.requiereCuadrillaAdicional ? styles.checkboxCuadrillaCardActive : ''
+                  } ${deshabilitado || enviando ? styles.checkboxHighlightDisabled : ''}`}
+                >
+                  <span className={styles.checkboxControlRow}>
+                    <input
+                      id={cuadrillaCheckboxId}
+                      type="checkbox"
+                      checked={form.requiereCuadrillaAdicional}
+                      disabled={deshabilitado || enviando}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          requiereCuadrillaAdicional: e.target.checked,
+                        }))
+                      }
+                      className={styles.checkboxCuadrillaInput}
+                    />
+                    <span className={styles.checkboxTextGroup}>
+                      <span className={styles.checkboxTitle}>
+                        Requiere cuadrilla adicional
+                      </span>
+                      <span className={styles.checkboxSubtitle}>
+                        Habilita y destaca en el Centro de Mando el despacho de una segunda cuadrilla con una misión distinta.
+                      </span>
+                    </span>
+                  </span>
+                  <Chip
+                    variant={form.requiereCuadrillaAdicional ? 'danger' : 'neutral'}
+                    size="sm"
+                  >
+                    {form.requiereCuadrillaAdicional ? 'Sí' : 'Opcional'}
+                  </Chip>
+                </label>
+
                 <div className={styles.fieldGroup}>
                   <label htmlFor={detalleId} className={styles.fieldLabel}>
                     Detalle de apoyo requerido{' '}
@@ -322,19 +361,30 @@ export function SolicitudApoyoCuadrillaCard({
                 registradoPor={autor}
                 deshabilitado
                 chip={
-                  item.sincronizado ? (
-                    <Chip variant="warning" size="sm">
-                      Apoyo Solicitado
-                    </Chip>
-                  ) : (
-                    <Chip
-                      variant="warning"
-                      size="sm"
-                      icon={<Clock size={12} />}
-                    >
-                      Pendiente de sincronizar
-                    </Chip>
-                  )
+                  <span className={styles.historyChipsGroup}>
+                    {item.requiereCuadrillaAdicional && (
+                      <Chip
+                        variant="danger"
+                        size="sm"
+                        data-testid={`badge-cuadrilla-adicional-hist-${idx}`}
+                      >
+                        Cuadrilla adicional solicitada
+                      </Chip>
+                    )}
+                    {item.sincronizado ? (
+                      <Chip variant="warning" size="sm">
+                        Apoyo Solicitado
+                      </Chip>
+                    ) : (
+                      <Chip
+                        variant="warning"
+                        size="sm"
+                        icon={<Clock size={12} />}
+                      >
+                        Pendiente de sincronizar
+                      </Chip>
+                    )}
+                  </span>
                 }
               >
                 <CampoResumenReporte

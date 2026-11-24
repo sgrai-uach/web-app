@@ -323,6 +323,9 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   );
   const solicitudesApoyo = obtenerSolicitudesApoyoMision(mision);
   const apoyoPendienteSync = solicitudesApoyo.some((s) => !s.sincronizado);
+  const apoyoRequiereCuadrilla = solicitudesApoyo.some(
+    (s) => Boolean(s.requiereCuadrillaAdicional)
+  );
   const mostrarSeccionApoyo =
     puedeSolicitarApoyo || solicitudesApoyo.length > 0;
 
@@ -679,11 +682,18 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
                 onToggle={setSeccionApoyoAbierta}
                 indicador={
                   solicitudesApoyo.length > 0 ? (
-                    <Chip variant="warning" size="sm">
-                      {apoyoPendienteSync
-                        ? `Pendiente sync (${solicitudesApoyo.length})`
-                        : `Apoyo solicitado (${solicitudesApoyo.length})`}
-                    </Chip>
+                    <span style={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {apoyoRequiereCuadrilla && (
+                        <Chip variant="danger" size="sm">
+                          Cuadrilla adicional solicitada
+                        </Chip>
+                      )}
+                      <Chip variant="warning" size="sm">
+                        {apoyoPendienteSync
+                          ? `Pendiente sync (${solicitudesApoyo.length})`
+                          : `Apoyo solicitado (${solicitudesApoyo.length})`}
+                      </Chip>
+                    </span>
                   ) : null
                 }
               >
@@ -744,11 +754,18 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
             onToggle={setSeccionApoyoAbierta}
             indicador={
               solicitudesApoyo.length > 0 ? (
-                <Chip variant="warning" size="sm">
-                  {apoyoPendienteSync
-                    ? `Pendiente sync (${solicitudesApoyo.length})`
-                    : `Apoyo solicitado (${solicitudesApoyo.length})`}
-                </Chip>
+                <span style={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {apoyoRequiereCuadrilla && (
+                    <Chip variant="danger" size="sm">
+                      Cuadrilla adicional solicitada
+                    </Chip>
+                  )}
+                  <Chip variant="warning" size="sm">
+                    {apoyoPendienteSync
+                      ? `Pendiente sync (${solicitudesApoyo.length})`
+                      : `Apoyo solicitado (${solicitudesApoyo.length})`}
+                  </Chip>
+                </span>
               ) : null
             }
           >

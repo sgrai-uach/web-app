@@ -412,7 +412,7 @@ describe('useConnectivity hook', () => {
         status: 201,
         clone: () => ({
           json: async () => ({
-            data: { reporteTerreno: { id: 'rep-remoto-44' } },
+            data: { reporteId: 'rep-remoto-44' },
           }),
         }),
       })

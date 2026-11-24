@@ -439,15 +439,16 @@ Esto notifica de inmediato al Encargado del Centro de Mando en `sgrai-web` para 
 ```json
 {
   "requiereApoyoAdicional": true,
+  "requiereCuadrillaAdicional": true,
   "detalleApoyoRequerido": "Se solicita motoniveladora y cuadrilla adicional de despeje",
   "resumenTecnico": "Árbol de gran envergadura bloqueando ambas pistas",
   "observaciones": "Acceso habilitado por calle lateral sur"
 }
 ```
-> El backend tolera además los alias `requiere_apoyo_adicional` y `detalle_apoyo_requerido`. Si `requiereApoyoAdicional` es verdadero, exige `detalleApoyoRequerido` con mínimo 5 caracteres (de lo contrario responde `400 Bad Request`).
+> El backend tolera además los alias `requiere_apoyo_adicional`, `requiere_cuadrilla_adicional` y `detalle_apoyo_requerido`. Si `requiereApoyoAdicional` es verdadero, exige `detalleApoyoRequerido` entre 5 y 1000 caracteres (de lo contrario responde `400 Bad Request`). Si `requiereApoyoAdicional` es `false`, `requiereCuadrillaAdicional` se normaliza automáticamente a `false`.
 
 #### Respuesta Exitosa (`200 OK` / `201 Created`)
-- Persiste en `reporte_terreno` los campos `requiere_apoyo_adicional = true` y `detalle_apoyo_requerido`.
+- Persiste en `reporte_terreno` los campos `requiere_apoyo_adicional = true`, `requiere_cuadrilla_adicional` y `detalle_apoyo_requerido`, devolviendo `data.reporteId` y `data.requiereCuadrillaAdicional`.
 - Emite alerta visual prioritaria en tiempo real hacia la sala `encargado` del Centro de Mando y habilita el indicador **Apoyo Solicitado** en la tarjeta Kanban del incidente sin cerrar la misión (`EN_CURSO`).
 
 #### Comportamiento Offline

@@ -86,6 +86,7 @@ describe('SolicitudApoyoCuadrillaCard (HU-44)', () => {
         id: 'rep-apoyo-1',
         misionId: misionEnCurso.id,
         requiereApoyoAdicional: true,
+        requiereCuadrillaAdicional: true,
         detalleApoyoRequerido:
           'Se solicita motoniveladora y cuadrilla adicional de despeje',
         resumenTecnico: 'Calzada obstruida',
@@ -101,6 +102,7 @@ describe('SolicitudApoyoCuadrillaCard (HU-44)', () => {
               id: 'rep-apoyo-1',
               misionId: misionEnCurso.id,
               requiereApoyoAdicional: true,
+              requiereCuadrillaAdicional: true,
               detalleApoyoRequerido:
                 'Se solicita motoniveladora y cuadrilla adicional de despeje',
               resumenTecnico: 'Calzada obstruida',
@@ -128,6 +130,9 @@ describe('SolicitudApoyoCuadrillaCard (HU-44)', () => {
     fireEvent.click(
       screen.getByRole('checkbox', { name: /Requiere apoyo adicional/i })
     );
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /Requiere cuadrilla adicional/i })
+    );
 
     fireEvent.change(screen.getByLabelText(/Detalle de apoyo requerido/i), {
       target: {
@@ -149,6 +154,7 @@ describe('SolicitudApoyoCuadrillaCard (HU-44)', () => {
         misionEnCurso.id,
         {
           requiereApoyoAdicional: true,
+          requiereCuadrillaAdicional: true,
           detalleApoyoRequerido:
             'Se solicita motoniveladora y cuadrilla adicional de despeje',
           resumenTecnico: 'Calzada obstruida',
@@ -174,6 +180,7 @@ describe('SolicitudApoyoCuadrillaCard (HU-44)', () => {
           {
             id: 'rep-apoyo-hist-1',
             requiereApoyoAdicional: true,
+            requiereCuadrillaAdicional: true,
             detalleApoyoRequerido: 'Camión aljibe 10.000 L',
             creadoEn: '2026-11-23T18:20:00.000Z',
             evaluador: {
@@ -200,5 +207,32 @@ describe('SolicitudApoyoCuadrillaCard (HU-44)', () => {
     expect(screen.getByText('Solicitud de Apoyo #1')).toBeInTheDocument();
     expect(screen.getByText('Camión aljibe 10.000 L')).toBeInTheDocument();
     expect(screen.getByText('Apoyo Solicitado')).toBeInTheDocument();
+    expect(screen.getByText('Cuadrilla adicional solicitada')).toBeInTheDocument();
+  });
+
+  it('limpia requiereCuadrillaAdicional al desmarcar "Requiere apoyo adicional"', () => {
+    render(
+      <ToastProvider>
+        <SolicitudApoyoCuadrillaCard misionActual={misionEnCurso} />
+      </ToastProvider>
+    );
+
+    const checkApoyo = screen.getByRole('checkbox', {
+      name: /Requiere apoyo adicional/i,
+    });
+    fireEvent.click(checkApoyo);
+
+    const checkCuadrilla = screen.getByRole('checkbox', {
+      name: /Requiere cuadrilla adicional/i,
+    });
+    fireEvent.click(checkCuadrilla);
+    expect(checkCuadrilla).toBeChecked();
+
+    // Desmarcar y volver a marcar "Requiere apoyo adicional" -> "Requiere cuadrilla adicional" debe haberse limpiado
+    fireEvent.click(checkApoyo);
+    fireEvent.click(checkApoyo);
+    expect(
+      screen.getByRole('checkbox', { name: /Requiere cuadrilla adicional/i })
+    ).not.toBeChecked();
   });
 });

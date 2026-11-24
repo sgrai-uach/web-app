@@ -2,10 +2,11 @@ import { z } from 'zod';
 import type { SolicitarApoyoPayload, SolicitudApoyoCuadrillaForm } from '@/types/offline';
 
 export const DETALLE_APOYO_MIN = 5;
-export const TEXTAREA_MAX = 2000;
+export const TEXTAREA_MAX = 1000;
 
 export const VALORES_INICIALES_SOLICITUD_APOYO: SolicitudApoyoCuadrillaForm = {
   requiereApoyoAdicional: false,
+  requiereCuadrillaAdicional: false,
   detalleApoyoRequerido: '',
   resumenTecnico: '',
   observaciones: '',
@@ -16,6 +17,7 @@ export const solicitudApoyoSchema = z
     requiereApoyoAdicional: z.boolean({
       message: 'Debe indicar si requiere apoyo adicional.',
     }),
+    requiereCuadrillaAdicional: z.boolean().optional().default(false),
     detalleApoyoRequerido: z
       .string({
         message: 'El detalle de apoyo requerido debe ser texto.',
@@ -76,6 +78,7 @@ export function validarPayloadSolicitudApoyo(
 
   return {
     requiereApoyoAdicional: true,
+    requiereCuadrillaAdicional: Boolean(parsed.requiereCuadrillaAdicional),
     detalleApoyoRequerido: detalleLimpio,
     ...(resumenLimpio ? { resumenTecnico: resumenLimpio } : {}),
     ...(observacionesLimpias ? { observaciones: observacionesLimpias } : {}),

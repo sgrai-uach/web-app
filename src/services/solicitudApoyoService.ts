@@ -75,6 +75,9 @@ function normalizarSolicitudDesdeRegistro(
   const requiere = Boolean(
     raw.requiereApoyoAdicional ?? raw.requiere_apoyo_adicional ?? false
   );
+  const requiereCuadrilla = Boolean(
+    raw.requiereCuadrillaAdicional ?? raw.requiere_cuadrilla_adicional ?? false
+  );
   const detalle = String(
     raw.detalleApoyoRequerido ?? raw.detalle_apoyo_requerido ?? ''
   ).trim();
@@ -100,6 +103,7 @@ function normalizarSolicitudDesdeRegistro(
     ...(localId ? { localId } : {}),
     misionId,
     requiereApoyoAdicional: true,
+    requiereCuadrillaAdicional: requiereCuadrilla,
     detalleApoyoRequerido: detalle,
     resumenTecnico: resumen,
     observaciones,
@@ -244,6 +248,7 @@ export async function solicitarApoyoAdicional(
       datosAdicionales: {
         ...(base.datosAdicionales || {}),
         requiereApoyoAdicional: true,
+        requiereCuadrillaAdicional: Boolean(solicitud.requiereCuadrillaAdicional),
         ultimoDetalleApoyoRequerido: solicitud.detalleApoyoRequerido,
         solicitudesApoyoLocales: actualizadas,
       },
@@ -267,12 +272,22 @@ export async function solicitarApoyoAdicional(
         const reporteRemoto =
           data?.data?.reporteTerreno ?? data?.data?.reporte ?? undefined;
         const evaluadorRemoto = extraerEvaluadorDeObjeto(reporteRemoto?.evaluador);
+        const reporteIdRemoto =
+          data?.data?.reporteId ?? reporteRemoto?.id ?? undefined;
+        const requiereCuadrillaRemoto = Boolean(
+          data?.data?.requiereCuadrillaAdicional ??
+            reporteRemoto?.requiereCuadrillaAdicional ??
+            reporteRemoto?.requiere_cuadrilla_adicional ??
+            payloadValidado.requiereCuadrillaAdicional
+        );
         const solicitud: SolicitudApoyoLocal = {
-          id: reporteRemoto?.id || `apoyo-${Date.now()}`,
+          id: reporteIdRemoto || `apoyo-${Date.now()}`,
           misionId,
           requiereApoyoAdicional: true,
+          requiereCuadrillaAdicional: requiereCuadrillaRemoto,
           detalleApoyoRequerido:
-            (reporteRemoto?.detalleApoyoRequerido ??
+            (data?.data?.detalleApoyoRequerido ??
+              reporteRemoto?.detalleApoyoRequerido ??
               reporteRemoto?.detalle_apoyo_requerido ??
               payloadValidado.detalleApoyoRequerido) ||
             '',
@@ -287,7 +302,7 @@ export async function solicitarApoyoAdicional(
           ...(evaluadorRemoto || evaluadorSesion
             ? { evaluador: evaluadorRemoto ?? evaluadorSesion }
             : {}),
-          creadoEn: reporteRemoto?.creadoEn || ahoraIso,
+          creadoEn: data?.data?.creadoEn || reporteRemoto?.creadoEn || ahoraIso,
           sincronizado: true,
         };
 
@@ -330,6 +345,7 @@ export async function solicitarApoyoAdicional(
     localId,
     misionId,
     requiereApoyoAdicional: true,
+    requiereCuadrillaAdicional: Boolean(payloadValidado.requiereCuadrillaAdicional),
     detalleApoyoRequerido: payloadValidado.detalleApoyoRequerido || '',
     resumenTecnico: payloadValidado.resumenTecnico || '',
     observaciones: payloadValidado.observaciones || '',

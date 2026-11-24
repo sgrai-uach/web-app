@@ -16857,12 +16857,19 @@ export interface components {
              */
             requiereApoyoAdicional?: boolean;
             /**
+             * @description Indica si el apoyo adicional requiere el despacho de una cuadrilla adicional
+             * @example true
+             */
+            requiereCuadrillaAdicional?: boolean;
+            /**
              * @description Especificación de los recursos materiales o humanos requeridos (mínimo 5 caracteres cuando requiereApoyoAdicional es true)
              * @example Se solicita motoniveladora y cuadrilla adicional de despeje
              */
             detalleApoyoRequerido?: string;
             /** @description Alias snake_case tolerado por el backend */
             requiere_apoyo_adicional?: boolean;
+            /** @description Alias snake_case tolerado por el backend */
+            requiere_cuadrilla_adicional?: boolean;
             /** @description Alias snake_case tolerado por el backend */
             detalle_apoyo_requerido?: string;
             /** @description Contexto breve opcional de la faena en curso */
@@ -16874,6 +16881,19 @@ export interface components {
             /** @example Solicitud de apoyo adicional registrada y notificada al Centro de Mando. */
             message: string;
             data: {
+                /** Format: uuid */
+                reporteId?: string;
+                /** Format: uuid */
+                misionId?: string;
+                misionCodigo?: string;
+                /** Format: uuid */
+                incidenteId?: string | null;
+                requiereApoyoAdicional?: boolean;
+                requiereCuadrillaAdicional?: boolean;
+                detalleApoyoRequerido?: string | null;
+                alertaEmitida?: boolean;
+                /** Format: date-time */
+                creadoEn?: string;
                 reporteTerreno?: {
                     /** Format: uuid */
                     id: string;
@@ -16882,6 +16902,8 @@ export interface components {
                     tipoReporte?: string;
                     requiereApoyoAdicional?: boolean;
                     requiere_apoyo_adicional?: boolean;
+                    requiereCuadrillaAdicional?: boolean;
+                    requiere_cuadrilla_adicional?: boolean;
                     detalleApoyoRequerido?: string | null;
                     detalle_apoyo_requerido?: string | null;
                     resumenTecnico?: string | null;
@@ -16904,6 +16926,8 @@ export interface components {
                     tipoReporte?: string;
                     requiereApoyoAdicional?: boolean;
                     requiere_apoyo_adicional?: boolean;
+                    requiereCuadrillaAdicional?: boolean;
+                    requiere_cuadrilla_adicional?: boolean;
                     detalleApoyoRequerido?: string | null;
                     detalle_apoyo_requerido?: string | null;
                     resumenTecnico?: string | null;
@@ -16923,6 +16947,7 @@ export interface components {
                     id: string;
                     codigo?: string;
                     requiereApoyoAdicional?: boolean;
+                    requiereCuadrillaAdicional?: boolean;
                 } | null;
             };
         };

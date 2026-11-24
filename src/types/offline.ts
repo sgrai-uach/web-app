@@ -318,6 +318,7 @@ export type SolicitarApoyoResponseData =
 
 export interface SolicitudApoyoCuadrillaForm {
   requiereApoyoAdicional: boolean;
+  requiereCuadrillaAdicional: boolean;
   detalleApoyoRequerido: string;
   resumenTecnico: string;
   observaciones: string;

@@ -22,13 +22,14 @@ Este manual describe el protocolo operativo mediante el cual el **Delegado de Cu
 2. **Marcar el requerimiento de apoyo adicional:**
    - Active la casilla de verificación destacada **Requiere apoyo adicional**.
    - Automáticamente se desplegará el formulario condicional para especificar las necesidades de refuerzo.
+   - Si el refuerzo exige desplegar una segunda unidad en terreno con una misión distinta, active también la casilla **Requiere cuadrilla adicional** (esto destacará en rojo la opción de despacho en el Centro de Mando). Si desmarca **Requiere apoyo adicional**, esta casilla se limpiará automáticamente.
 3. **Detallar las necesidades de apoyo:**
-   - **Detalle de apoyo requerido (obligatorio, mínimo 5 caracteres):** Especifique con claridad los recursos materiales o humanos requeridos (por ejemplo: *"Se solicita motoniveladora y cuadrilla adicional de despeje"*).
+   - **Detalle de apoyo requerido (obligatorio, mínimo 5 y máximo 1000 caracteres):** Especifique con claridad los recursos materiales o humanos requeridos (por ejemplo: *"Se solicita motoniveladora y cuadrilla adicional de despeje"*).
    - **Contexto breve de la faena (opcional):** Agregue antecedentes operativos breves si ayudan a priorizar el despacho.
    - **Observaciones adicionales (opcional):** Indique rutas de acceso, restricciones viales o consideraciones de seguridad para los refuerzos.
 4. **Enviar la solicitud:**
    - Pulse **Enviar Solicitud de Apoyo**.
-   - El sistema mostrará la confirmación de que la central logística y de operaciones fue alertada, desplegará el indicador **Apoyo Solicitado** en el historial de la misión y emitirá una alerta prioritaria en tiempo real hacia el Centro de Mando.
+   - El sistema mostrará la confirmación de que la central logística y de operaciones fue alertada, desplegará el indicador **Apoyo Solicitado** (junto con **Cuadrilla adicional solicitada** si corresponde) en el historial de la misión y emitirá una alerta prioritaria en tiempo real hacia el Centro de Mando.
    - La misión permanecerá en estado **En curso** para que la cuadrilla continúe trabajando sin interrupciones mientras llegan los refuerzos.
 
 ---

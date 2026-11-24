@@ -113,6 +113,7 @@ describe('CuadrillaMisionDetailPage — Solicitud de Apoyo Adicional (HU-44)', (
             id: 'rep-apoyo-1',
             misionId: misionEnCurso.id,
             requiereApoyoAdicional: true,
+            requiereCuadrillaAdicional: true,
             detalleApoyoRequerido: 'Se solicita motoniveladora y cuadrilla adicional',
             resumenTecnico: '',
             observaciones: '',
@@ -128,6 +129,7 @@ describe('CuadrillaMisionDetailPage — Solicitud de Apoyo Adicional (HU-44)', (
         id: 'rep-apoyo-1',
         misionId: misionEnCurso.id,
         requiereApoyoAdicional: true,
+        requiereCuadrillaAdicional: true,
         detalleApoyoRequerido: 'Se solicita motoniveladora y cuadrilla adicional',
         resumenTecnico: '',
         observaciones: '',
@@ -156,6 +158,9 @@ describe('CuadrillaMisionDetailPage — Solicitud de Apoyo Adicional (HU-44)', (
       name: /Requiere apoyo adicional/i,
     });
     fireEvent.click(checkbox);
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /Requiere cuadrilla adicional/i })
+    );
 
     fireEvent.change(screen.getByLabelText(/Detalle de apoyo requerido/i), {
       target: { value: 'Se solicita motoniveladora y cuadrilla adicional' },
@@ -169,6 +174,9 @@ describe('CuadrillaMisionDetailPage — Solicitud de Apoyo Adicional (HU-44)', (
       expect(solicitarApoyoAdicional).toHaveBeenCalled();
       expect(actualizarPendientesMock).toHaveBeenCalled();
       expect(screen.getByText('Apoyo solicitado (1)')).toBeInTheDocument();
+      expect(
+        screen.getAllByText('Cuadrilla adicional solicitada').length
+      ).toBeGreaterThanOrEqual(1);
     });
   });
 

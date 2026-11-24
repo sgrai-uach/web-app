@@ -494,8 +494,9 @@ export function useConnectivity() {
                     const bodyJson = await res.clone().json();
                     const rep =
                       bodyJson?.data?.reporteTerreno ?? bodyJson?.data?.reporte;
-                    if (typeof rep?.id === 'string') {
-                      idServidor = rep.id;
+                    const idExtraido = bodyJson?.data?.reporteId ?? rep?.id;
+                    if (typeof idExtraido === 'string' && idExtraido.trim()) {
+                      idServidor = idExtraido;
                     }
                   } catch {
                     // Ignorar si no hay JSON

@@ -74,6 +74,7 @@ describe('solicitudApoyoService (HU-44)', () => {
       misionBase.id,
       {
         requiereApoyoAdicional: true,
+        requiereCuadrillaAdicional: true,
         detalleApoyoRequerido: 'Se solicita motoniveladora y cuadrilla adicional de despeje',
         resumenTecnico: 'Corte total de calzada',
         observaciones: '',
@@ -85,12 +86,14 @@ describe('solicitudApoyoService (HU-44)', () => {
       params: { path: { id: misionBase.id } },
       body: {
         requiereApoyoAdicional: true,
+        requiereCuadrillaAdicional: true,
         detalleApoyoRequerido: 'Se solicita motoniveladora y cuadrilla adicional de despeje',
         resumenTecnico: 'Corte total de calzada',
       },
     });
     expect(resultado.enColaOffline).toBe(false);
     expect(resultado.solicitud.sincronizado).toBe(true);
+    expect(resultado.solicitud.requiereCuadrillaAdicional).toBe(true);
     expect(resultado.solicitud.id).toBe('rep-apoyo-1');
     expect(resultado.mensaje).toMatch(/central logística y de operaciones ha sido alertada/i);
     expect(offlineQueue.guardarMisionLocal).toHaveBeenCalled();
