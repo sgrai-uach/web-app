@@ -8,12 +8,14 @@ import {
   Calendar,
   Archive,
   Map,
-  XCircle,
+  Tag,
   CheckCircle,
-  AlertCircle,
+  CheckCircle2,
+  XCircle,
   Navigation,
   ClipboardCheck,
   WifiOff,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
@@ -23,25 +25,24 @@ import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
+import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
+import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
 import { RechazoMisionModal, type CoordenadasGPS } from '@/components/misiones/RechazoMisionModal';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
   rechazarMision,
 } from '@/services/misionesService';
-import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
+import { formatearPrioridad, formatearFechaHora24h, formatearTipologia } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaDetailPage.module.css';
 
 interface PageProps {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default function PatrullaMisionDetailPage({ params }: PageProps) {
-  const resolvedParams =
-    params && typeof (params as { then?: unknown }).then === 'function'
-      ? use(params as Promise<{ id: string }>)
-      : (params as { id: string });
+  const resolvedParams = use(params);
   const misionId = resolvedParams?.id;
   const {
     usuario,
@@ -58,6 +59,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
   const [errorAceptacion, setErrorAceptacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
+  const [seccionCategorizacionAbierta, setSeccionCategorizacionAbierta] = useState<boolean>(true);
   const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
   const [feedbackMensaje, setFeedbackMensaje] = useState<{
     tipo: 'success' | 'offline';
@@ -68,6 +70,9 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     setCargando(true);
     try {
       const encontrada = await obtenerDetalleMision(misionId);
+      if (encontrada?.datosAdicionales?.tipologiaEvaluada) {
+        setSeccionCategorizacionAbierta(false);
+      }
       setMision(encontrada || null);
     } finally {
       setCargando(false);
@@ -323,6 +328,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
           <div className={styles.codeArea}>
+            <AlertCircle
+              size={20}
+              color="var(--color-primary-teal, #1B6F7D)"
+              aria-hidden="true"
+            />
             <span className={styles.code}>{mision.codigoIncidente}</span>
             <span className={`${styles.priorityChip} ${prioridadClase}`}>
               {formatearPrioridad(mision.prioridad)}
@@ -336,7 +346,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Tipo</span>
             <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
-              {mision.tipologia}
+              {formatearTipologia(mision.tipologia)}
             </span>
           </div>
 
@@ -447,7 +457,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               <div className={styles.enTrayectoTitleRow}>
                 <Navigation
                   size={20}
-                  color="var(--color-primary-teal)"
+                  color="var(--color-primary-teal, #1B6F7D)"
                   aria-hidden="true"
                 />
                 <h2 className={styles.enTrayectoTitle}>
@@ -457,35 +467,37 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               <span className={styles.activeStatusChip}>Misión activa</span>
             </div>
 
-            {mision.sincronizacionPendiente ? (
-              <div className={styles.offlineQueueBanner} role="status">
-                <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
-                <span>
-                  Pendiente de sincronizar: La aceptación fue guardada en la cola
-                  local del dispositivo y se enviará automáticamente al recuperar
-                  conexión.
-                </span>
-              </div>
-            ) : (
-              mensajeConfirmacion && (
-                <div className={styles.SyncedBanner} role="status">
-                  {mensajeConfirmacion}
+            <div className={styles.enTrayectoContent}>
+              {mision.sincronizacionPendiente ? (
+                <div className={styles.offlineQueueBanner} role="status">
+                  <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+                  <span>
+                    Pendiente de sincronizar: Los cambios de esta misión fueron guardados
+                    en la cola local del dispositivo y se enviarán automáticamente al
+                    recuperar conexión.
+                  </span>
                 </div>
-              )
-            )}
+              ) : (
+                mensajeConfirmacion && (
+                  <div className={styles.SyncedBanner} role="status">
+                    {mensajeConfirmacion}
+                  </div>
+                )
+              )}
 
-            <div className={styles.canonicalStatesGrid}>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Misión</span>
-                <span className={styles.canonicalStateValue}>En curso</span>
-              </div>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Patrulla</span>
-                <span className={styles.canonicalStateValue}>En verificación</span>
-              </div>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Incidente</span>
-                <span className={styles.canonicalStateValue}>Verificando</span>
+              <div className={styles.canonicalStatesGrid}>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Misión</span>
+                  <span className={styles.canonicalStateValue}>En curso</span>
+                </div>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Patrulla</span>
+                  <span className={styles.canonicalStateValue}>En verificación</span>
+                </div>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Incidente</span>
+                  <span className={styles.canonicalStateValue}>Verificando</span>
+                </div>
               </div>
             </div>
           </section>
@@ -498,19 +510,59 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             <div className={styles.evaluationHeader}>
               <h3 className={styles.evaluationTitle}>
                 <ClipboardCheck
-                  size={18}
-                  color="var(--color-primary-teal)"
+                  size={20}
+                  color="var(--color-primary-teal, #1B6F7D)"
                   aria-hidden="true"
                 />
                 <span>Formularios de Reporte Técnico</span>
               </h3>
-              <span className={styles.activeStatusChip}>Habilitado</span>
             </div>
-            <p className={styles.evaluationBody}>
-              La unidad se encuentra en trayecto / evaluación. Los formularios
-              operativos para categorizar el incidente, ajustar la prioridad y
-              enviar el reporte de situación están habilitados.
-            </p>
+
+            <div className={styles.evaluationContent}>
+              <SeccionDesplegable
+                titulo="Categorización del incidente"
+                icono={<Tag size={18} />}
+                abierto={seccionCategorizacionAbierta}
+                onToggle={(abierto) => setSeccionCategorizacionAbierta(abierto)}
+                indicador={
+                  mision.datosAdicionales?.tipologiaEvaluada ? (
+                    <span className={styles.badgeCompletado}>
+                      <CheckCircle2 size={14} aria-hidden="true" />
+                      <span>Completado</span>
+                    </span>
+                  ) : mision.sincronizacionPendiente ? (
+                    <span className={styles.syncPendingBadge}>Pendiente</span>
+                  ) : null
+                }
+              >
+                {(!tienePermisoVerificar ||
+                  !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                    mision.incidenteId || ''
+                  )) && (
+                  <div className={styles.permissionWarning} role="note" style={{ marginBottom: '12px' }}>
+                    {!tienePermisoVerificar
+                      ? 'Su perfil no cuenta con el permiso misiones:terreno:verificar para categorizar incidentes.'
+                      : 'No se dispone de un identificador de incidente válido para registrar la categorización.'}
+                  </div>
+                )}
+                <EvaluacionTipologiaCard
+                  incidenteId={mision.incidenteId}
+                  misionActual={mision}
+                  deshabilitado={
+                    !tienePermisoVerificar ||
+                    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                      mision.incidenteId || ''
+                    )
+                  }
+                  onTipologiaActualizada={(resultado) => {
+                    if (resultado.mision) {
+                      setMision(resultado.mision);
+                    }
+                    setSeccionCategorizacionAbierta(false);
+                  }}
+                />
+              </SeccionDesplegable>
+            </div>
           </section>
         </>
       )}

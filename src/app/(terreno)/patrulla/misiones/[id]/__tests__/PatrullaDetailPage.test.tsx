@@ -14,6 +14,16 @@ vi.mock('@/components/maps/MapaModal', () => ({
   MapaModal: () => <div data-testid="mapa-modal-mock" />,
 }));
 
+const renderPage = async (params: { id: string }) => {
+  await act(async () => {
+    render(
+      <Suspense fallback={<div>Cargando...</div>}>
+        <PatrullaMisionDetailPage params={Promise.resolve(params)} />
+      </Suspense>
+    );
+  });
+};
+
 const misionDespachadaMock: MisionLocal = {
   id: '60000000-0000-4000-8000-000000000001',
   incidenteId: 'a0000000-0000-4000-8000-000000000001',
@@ -409,7 +419,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
   });
 
   it('muestra el botón "Rechazar Misión" y el recuadro unificado de acciones de despacho cuando la misión está DESPACHADA', async () => {
-    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' }} />);
+    await renderPage({ id: 'mis-desp-1' });
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-00100')).toBeInTheDocument();
@@ -436,7 +446,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
       },
     });
 
-    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' }} />);
+    await renderPage({ id: 'mis-desp-1' });
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-00100')).toBeInTheDocument();
@@ -505,7 +515,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
       recargarSesion: vi.fn(),
     });
 
-    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' }} />);
+    await renderPage({ id: 'mis-desp-1' });
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-00100')).toBeInTheDocument();
@@ -525,7 +535,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
     };
     vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(misionRechazada);
 
-    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' }} />);
+    await renderPage({ id: 'mis-desp-1' });
 
     await waitFor(() => {
       expect(screen.getByText(/Misión Rechazada por Patrulla Verificadora/i)).toBeInTheDocument();
@@ -566,7 +576,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
       recargarSesion: vi.fn(),
     });
 
-    render(<PatrullaMisionDetailPage params={{ id: 'mis-desp-1' }} />);
+    await renderPage({ id: 'mis-desp-1' });
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-00100')).toBeInTheDocument();
@@ -578,7 +588,7 @@ describe('PatrullaMisionDetailPage (H69 — Rechazo Motivado de Misión)', () =>
   it('muestra la tarjeta de misión no encontrada cuando la misión no existe en local ni remoto', async () => {
     vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(null);
 
-    render(<PatrullaMisionDetailPage params={{ id: 'mis-inexistente' }} />);
+    await renderPage({ id: 'mis-inexistente' });
 
     await waitFor(() => {
       expect(screen.getByText('Misión no encontrada')).toBeInTheDocument();

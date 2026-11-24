@@ -24,12 +24,14 @@ vi.mock('@/services/offlineQueue', () => ({
   guardarMisionLocal: vi.fn(),
   obtenerMisionesLocales: vi.fn(),
   obtenerMisionLocalPorId: vi.fn(),
+  obtenerAccionesOutbox: vi.fn(),
   encolarAccionOutbox: vi.fn(),
 }));
 
 describe('misionesService — Sincronización remota y persistencia IndexedDB (Offline-First)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(offlineQueue.obtenerAccionesOutbox).mockResolvedValue([]);
     Object.defineProperty(navigator, 'onLine', {
       value: true,
       configurable: true,
@@ -112,6 +114,88 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
       expect(offlineQueue.obtenerMisionesLocales).toHaveBeenCalled();
       expect(offlineQueue.guardarMisionesLocales).not.toHaveBeenCalled();
     });
+
+    it('preserva tipología reclasificada offline en misión EN_CURSO sin limpiar IndexedDB cuando existe ACTUALIZAR_TIPOLOGIA en outbox (BUG-H37-PWA-03)', async () => {
+      const misionLocalPendiente = {
+        id: '60000000-0000-4000-8000-000000000099',
+        incidenteId: 'a0000000-0000-4000-8000-000000000099',
+        codigoIncidente: 'INC-2026-00999',
+        tipologia: 'Inundación',
+        direccion: 'Av. Ramón Picarte 2000',
+        prioridad: 'ALTA',
+        estado: 'EN_CURSO',
+        fechaDespacho: '2026-10-30T04:00:00Z',
+        fechaInicio: '2026-10-30T04:10:00Z',
+        sincronizacionPendiente: true,
+        datosAdicionales: {
+          tipologiaEvaluada: true,
+          tipoIncidenteId: '40000000-0000-4000-8000-000000000001',
+          justificacionTipologia: 'Desborde de cauce verificado en terreno',
+        },
+        actualizadoEn: '2026-10-30T04:15:00Z',
+      };
+
+      vi.mocked(offlineQueue.obtenerMisionesLocales)
+        .mockResolvedValueOnce([misionLocalPendiente])
+        .mockResolvedValueOnce([misionLocalPendiente]);
+      vi.mocked(offlineQueue.obtenerAccionesOutbox).mockResolvedValueOnce([
+        {
+          id: 'outbox-tip-1',
+          tipo: 'ACTUALIZAR_TIPOLOGIA',
+          url: '/api/incidentes/a0000000-0000-4000-8000-000000000099/tipologia',
+          metodo: 'PATCH',
+          payload: {
+            misionId: '60000000-0000-4000-8000-000000000099',
+            tipoIncidenteId: '40000000-0000-4000-8000-000000000001',
+            justificacion: 'Desborde de cauce verificado en terreno',
+          },
+          timestamp: '2026-10-30T04:15:00Z',
+          intentos: 0,
+        },
+      ]);
+
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: [
+            {
+              id: '60000000-0000-4000-8000-000000000099',
+              codigo: 'MIS-2026-00999',
+              titulo: 'Caída de árbol',
+              descripcion: 'Av. Ramón Picarte 2000',
+              tipoMision: 'VERIFICACION',
+              estado: 'EN_CURSO',
+              prioridad: 'ALTA',
+              incidenteId: 'a0000000-0000-4000-8000-000000000099',
+              incidenteCodigo: 'INC-2026-00999',
+              fechaInicio: '2026-10-30T04:10:00Z',
+              creadoEn: '2026-10-30T04:00:00Z',
+              actualizadoEn: '2026-10-30T04:10:00Z',
+            },
+          ],
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const resultado = await sincronizarMisiones({ tipoMision: 'VERIFICACION' });
+
+      expect(offlineQueue.limpiarMisionesLocales).not.toHaveBeenCalled();
+      expect(offlineQueue.guardarMisionesLocales).toHaveBeenCalledWith([
+        expect.objectContaining({
+          id: '60000000-0000-4000-8000-000000000099',
+          tipologia: 'Inundación',
+          estado: 'EN_CURSO',
+          sincronizacionPendiente: true,
+          datosAdicionales: expect.objectContaining({
+            tipologiaEvaluada: true,
+          }),
+        }),
+      ]);
+      expect(resultado[0].tipologia).toBe('Inundación');
+      expect(resultado[0].sincronizacionPendiente).toBe(true);
+      expect(resultado[0].datosAdicionales?.tipologiaEvaluada).toBe(true);
+    });
   });
 
   describe('obtenerDetalleMision', () => {
@@ -190,6 +274,100 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
 
       expect(detalle).toEqual(mockLocal);
       expect(offlineQueue.obtenerMisionLocalPorId).toHaveBeenCalledWith('mis-fallback');
+    });
+
+    it('preserva tipología reclasificada offline en obtenerDetalleMision cuando la misión ya está EN_CURSO y hay ACTUALIZAR_TIPOLOGIA en outbox (BUG-H37-PWA-03)', async () => {
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValueOnce({
+        id: '60000000-0000-4000-8000-000000000088',
+        incidenteId: 'a0000000-0000-4000-8000-000000000088',
+        codigoIncidente: 'INC-2026-00888',
+        tipologia: 'Inundación',
+        direccion: 'Costanera 420',
+        prioridad: 'ALTA',
+        estado: 'EN_CURSO',
+        fechaDespacho: '2026-10-30T04:00:00Z',
+        fechaInicio: '2026-10-30T04:05:00Z',
+        sincronizacionPendiente: true,
+        datosAdicionales: {
+          tipologiaEvaluada: true,
+          tipoIncidenteId: '40000000-0000-4000-8000-000000000001',
+          justificacionTipologia: 'Anegamiento mayor constatado',
+        },
+        actualizadoEn: '2026-10-30T04:20:00Z',
+      });
+
+      vi.mocked(offlineQueue.obtenerAccionesOutbox).mockResolvedValueOnce([
+        {
+          id: 'outbox-tip-detalle',
+          tipo: 'ACTUALIZAR_TIPOLOGIA',
+          url: '/api/incidentes/a0000000-0000-4000-8000-000000000088/tipologia',
+          metodo: 'PATCH',
+          payload: {
+            misionId: '60000000-0000-4000-8000-000000000088',
+            tipoIncidenteId: '40000000-0000-4000-8000-000000000001',
+            justificacion: 'Anegamiento mayor constatado',
+          },
+          timestamp: '2026-10-30T04:20:00Z',
+          intentos: 0,
+        },
+      ]);
+
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: {
+            id: '60000000-0000-4000-8000-000000000088',
+            codigo: 'MIS-2026-00888',
+            titulo: 'Caída de árbol',
+            descripcion: 'Verificar emergencia',
+            tipoMision: 'VERIFICACION',
+            estado: 'EN_CURSO',
+            prioridad: 'ALTA',
+            justificacionRechazo: null,
+            fechaInicio: '2026-10-30T04:05:00Z',
+            fechaCierre: null,
+            creadoEn: '2026-10-30T04:00:00Z',
+            actualizadoEn: '2026-10-30T04:05:00Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: {
+              id: 'a0000000-0000-4000-8000-000000000088',
+              codigo: 'INC-2026-00888',
+              codigoSeguimiento: 'SEG-888',
+              tipoAfectacion: 'CAIDA_ARBOL',
+              descripcion: 'Árbol en vía pública',
+              direccion: 'Costanera 420',
+              latitud: -39.8123,
+              longitud: -73.2467,
+              estado: 'VERIFICANDO',
+              prioridad: 'ALTA',
+              requiereAsistenciaSocial: false,
+              delegacionNombre: 'Norte',
+            },
+            prevencion: null,
+            cuadrilla: null,
+            patrulla: null,
+            bitacoraTiempos: [],
+            reportesTerreno: [],
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle = await obtenerDetalleMision('60000000-0000-4000-8000-000000000088');
+
+      expect(detalle?.estado).toBe('EN_CURSO');
+      expect(detalle?.tipologia).toBe('Inundación');
+      expect(detalle?.sincronizacionPendiente).toBe(true);
+      expect(detalle?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: '60000000-0000-4000-8000-000000000088',
+          tipologia: 'Inundación',
+          sincronizacionPendiente: true,
+        })
+      );
     });
   });
 
