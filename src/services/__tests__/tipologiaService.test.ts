@@ -5,12 +5,21 @@ import {
   CATALOGO_TIPOS_PREDETERMINADO,
 } from '../tipologiaService';
 import * as offlineQueue from '../offlineQueue';
+import apiClient from '@/lib/api/client';
 import type { MisionLocal } from '@/types/offline';
 
+vi.mock('@/lib/api/client', () => ({
+  default: {
+    GET: vi.fn(),
+    PATCH: vi.fn(),
+  },
+}));
+
 describe('tipologiaService (H37)', () => {
+  const incidenteUuid = '50000000-0000-4000-8000-000000000001';
   const misionMock: MisionLocal = {
     id: '60000000-0000-4000-8000-000000000001',
-    incidenteId: 'inc-001',
+    incidenteId: incidenteUuid,
     codigoIncidente: 'INC-2026-001',
     tipologia: 'Anegamiento de calzada',
     direccion: 'Av. Alemania 600',
@@ -23,13 +32,13 @@ describe('tipologiaService (H37)', () => {
   const tipoNuevoId = '40000000-0000-4000-8000-000000000001';
 
   beforeEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
     vi.spyOn(offlineQueue, 'guardarCatalogoLocal').mockResolvedValue();
     vi.spyOn(offlineQueue, 'obtenerCatalogoLocal').mockResolvedValue(null);
     vi.spyOn(offlineQueue, 'encolarAccionOutbox').mockResolvedValue({
       id: 'outbox-1',
       tipo: 'ACTUALIZAR_TIPOLOGIA',
-      url: '/api/incidentes/inc-001/tipologia',
+      url: `/api/incidentes/${incidenteUuid}/tipologia`,
       metodo: 'PATCH',
       payload: {},
       timestamp: new Date().toISOString(),
@@ -42,21 +51,39 @@ describe('tipologiaService (H37)', () => {
     vi.unstubAllGlobals();
   });
 
+  describe('CATALOGO_TIPOS_PREDETERMINADO', () => {
+    it('contiene exactamente los 11 registros oficiales de tipo_incidente con sus UUIDs', () => {
+      expect(CATALOGO_TIPOS_PREDETERMINADO).toHaveLength(11);
+      const porId = new Map(CATALOGO_TIPOS_PREDETERMINADO.map((t) => [t.id, t.nombre]));
+      expect(porId.get('40000000-0000-4000-8000-000000000002')).toBe('Deslizamiento de tierra');
+      expect(porId.get('40000000-0000-4000-8000-000000000004')).toBe('Anegamiento de calzada');
+      expect(porId.get('40000000-0000-4000-8000-000000000005')).toBe(
+        'Incendio estructural / forestal'
+      );
+      expect(porId.get('40000000-0000-4000-8000-000000000006')).toBe('Otro');
+      expect(porId.has('40000000-0000-4000-8000-000000000007')).toBe(false);
+      expect(porId.get('a0000000-0000-4000-8000-000000000006')).toBe('Corte de agua potable');
+    });
+  });
+
   describe('obtenerCatalogoTiposIncidente', () => {
-    it('obtiene el catálogo de la API cuando hay conexión y lo guarda en IndexedDB', async () => {
+    it('obtiene el catálogo de la API vía apiClient cuando hay conexión y lo guarda en IndexedDB', async () => {
       vi.stubGlobal('navigator', { onLine: true });
       const mockTipos = [
         { id: tipoNuevoId, nombre: 'Inundación', descripcion: 'Desborde', activo: true },
-        { id: '40000000-0000-4000-8000-000000000099', nombre: 'Inactivo', descripcion: null, activo: false },
+        {
+          id: '40000000-0000-4000-8000-000000000099',
+          nombre: 'Inactivo',
+          descripcion: null,
+          activo: false,
+        },
       ];
 
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({ data: mockTipos }),
-        })
-      );
+      vi.mocked(apiClient.GET).mockResolvedValue({
+        data: { message: 'OK', data: mockTipos },
+        error: undefined,
+        response: new Response(),
+      } as never);
 
       const resultado = await obtenerCatalogoTiposIncidente();
       expect(resultado).toHaveLength(1);
@@ -88,43 +115,72 @@ describe('tipologiaService (H37)', () => {
   });
 
   describe('reclasificarTipologiaEnTerreno', () => {
-    it('falla si la justificación tiene menos de 5 caracteres', async () => {
+    it('rechaza incidenteId que no sea un UUID válido', async () => {
       await expect(
         reclasificarTipologiaEnTerreno('inc-001', {
+          tipoIncidenteId: tipoNuevoId,
+          justificacion: 'Evaluación presencial válida.',
+        })
+      ).rejects.toThrow('UUID válido');
+    });
+
+    it('falla si la justificación tiene menos de 5 caracteres', async () => {
+      await expect(
+        reclasificarTipologiaEnTerreno(incidenteUuid, {
           tipoIncidenteId: tipoNuevoId,
           justificacion: 'abc',
         })
       ).rejects.toThrow('al menos 5 caracteres');
     });
 
-    it('envía petición PATCH online exitosa y actualiza la misión local', async () => {
-      vi.stubGlobal('navigator', { onLine: true });
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({
-            message: 'Tipología reclasificada exitosamente en terreno.',
-            data: {
-              incidente: {
-                id: 'inc-001',
-                tipoAfectacion: 'Inundación',
-                actualizadoEn: '2026-11-10T01:30:00Z',
-              },
-              hito: {
-                id: 'hito-1',
-                descripcion: 'Tipología reclasificada en terreno a: Inundación.',
-              },
-            },
-          }),
-        })
-      );
+    it('sanea misionId no-UUID antes de validar el esquema Zod', async () => {
+      vi.stubGlobal('navigator', { onLine: false });
 
       const resultado = await reclasificarTipologiaEnTerreno(
-        'inc-001',
+        incidenteUuid,
         {
           tipoIncidenteId: tipoNuevoId,
-          justificacion: 'Evaluación presencial constata anegamiento severo con ingreso a casas.',
+          justificacion: 'Evaluación presencial válida.',
+          misionId: 'mision-no-uuid',
+        },
+        { ...misionMock, id: 'mision-no-uuid' }
+      );
+
+      expect(resultado.ok).toBe(true);
+      expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.not.objectContaining({ misionId: 'mision-no-uuid' }),
+        })
+      );
+    });
+
+    it('envía petición PATCH online exitosa vía apiClient y actualiza la misión local', async () => {
+      vi.stubGlobal('navigator', { onLine: true });
+      vi.mocked(apiClient.PATCH).mockResolvedValue({
+        data: {
+          message: 'Tipología reclasificada exitosamente en terreno.',
+          data: {
+            incidente: {
+              id: incidenteUuid,
+              tipoAfectacion: 'Inundación',
+              actualizadoEn: '2026-11-10T01:30:00Z',
+            },
+            hito: {
+              id: 'hito-1',
+              descripcion: 'Tipología reclasificada en terreno a: Inundación.',
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
+
+      const resultado = await reclasificarTipologiaEnTerreno(
+        incidenteUuid,
+        {
+          tipoIncidenteId: tipoNuevoId,
+          justificacion:
+            'Evaluación presencial constata anegamiento severo con ingreso a casas.',
           misionId: misionMock.id,
         },
         misionMock
@@ -141,7 +197,7 @@ describe('tipologiaService (H37)', () => {
       vi.stubGlobal('navigator', { onLine: false });
 
       const resultado = await reclasificarTipologiaEnTerreno(
-        'inc-001',
+        incidenteUuid,
         {
           tipoIncidenteId: tipoNuevoId,
           justificacion: 'Constatado sin señal celular en sector rural.',
@@ -155,7 +211,7 @@ describe('tipologiaService (H37)', () => {
       expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith(
         expect.objectContaining({
           tipo: 'ACTUALIZAR_TIPOLOGIA',
-          url: '/api/incidentes/inc-001/tipologia',
+          url: `/api/incidentes/${incidenteUuid}/tipologia`,
           metodo: 'PATCH',
         })
       );
@@ -164,20 +220,15 @@ describe('tipologiaService (H37)', () => {
 
     it('maneja error 409 Conflict si la misión aún no ha sido aceptada', async () => {
       vi.stubGlobal('navigator', { onLine: true });
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: false,
-          status: 409,
-          json: async () => ({
-            message: 'La patrulla debe haber aceptado la misión previamente.',
-          }),
-        })
-      );
+      vi.mocked(apiClient.PATCH).mockResolvedValue({
+        data: undefined,
+        error: { message: 'La patrulla debe haber aceptado la misión previamente.' },
+        response: new Response(null, { status: 409 }),
+      } as never);
 
       await expect(
         reclasificarTipologiaEnTerreno(
-          'inc-001',
+          incidenteUuid,
           {
             tipoIncidenteId: tipoNuevoId,
             justificacion: 'Evaluación presencial válida.',
@@ -187,15 +238,12 @@ describe('tipologiaService (H37)', () => {
       ).rejects.toThrow('La patrulla debe haber aceptado la misión previamente.');
     });
 
-    it('hace fallback a outbox si la petición fetch falla por error de red', async () => {
+    it('hace fallback a outbox si la petición de red falla con TypeError', async () => {
       vi.stubGlobal('navigator', { onLine: true });
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
-      );
+      vi.mocked(apiClient.PATCH).mockRejectedValue(new TypeError('Failed to fetch'));
 
       const resultado = await reclasificarTipologiaEnTerreno(
-        'inc-001',
+        incidenteUuid,
         {
           tipoIncidenteId: tipoNuevoId,
           justificacion: 'Error intermitente de red en ruta.',

@@ -4,12 +4,15 @@ import type { AceptarMisionPayload, MisionLocal } from '@/types/offline';
 import {
   guardarMisionesLocales,
   guardarMisionLocal,
-  limpiarMisionesLocales,
   obtenerMisionesLocales,
   obtenerMisionLocalPorId,
+  obtenerAccionesOutbox,
   encolarAccionOutbox,
 } from '@/services/offlineQueue';
 import { limpiarTituloMision, formatearTipologia } from '@/lib/utils/formatters';
+import { obtenerCatalogoTiposIncidente } from '@/services/tipologiaService';
+import { getAuthCookie } from '@/lib/utils/cookieUtils';
+import { rechazoMisionSchema, type RechazoMisionInput } from '@/lib/validations/misiones';
 
 type TipoMisionFiltro =
   | 'VERIFICACION'
@@ -136,12 +139,61 @@ export async function obtenerCoordenadasOpcionales(
 }
 
 /**
+ * Identifica las misiones e incidentes que mantienen mutaciones pendientes
+ * (`ACEPTAR_MISION` o `ACTUALIZAR_TIPOLOGIA`) en la cola local `outbox` para
+ * evitar sobreescribir su estado optimista al refrescar desde la API.
+ */
+async function obtenerReferenciasOutboxPendientes(): Promise<{
+  misionesConOutbox: Set<string>;
+  incidentesConOutbox: Set<string>;
+}> {
+  const misionesConOutbox = new Set<string>();
+  const incidentesConOutbox = new Set<string>();
+
+  try {
+    if (typeof obtenerAccionesOutbox !== 'function') {
+      return { misionesConOutbox, incidentesConOutbox };
+    }
+
+    const acciones = (await obtenerAccionesOutbox()) || [];
+    for (const accion of acciones) {
+      if (
+        accion.tipo !== 'ACEPTAR_MISION' &&
+        accion.tipo !== 'ACTUALIZAR_TIPOLOGIA'
+      ) {
+        continue;
+      }
+
+      const payloadMisionId = accion.payload?.misionId;
+      if (typeof payloadMisionId === 'string' && payloadMisionId) {
+        misionesConOutbox.add(payloadMisionId);
+      }
+
+      const matchMision = accion.url.match(/\/api\/misiones\/([^/]+)/);
+      if (matchMision?.[1]) {
+        misionesConOutbox.add(matchMision[1]);
+      }
+
+      const matchIncidente = accion.url.match(/\/api\/incidentes\/([^/]+)/);
+      if (matchIncidente?.[1]) {
+        incidentesConOutbox.add(matchIncidente[1]);
+      }
+    }
+  } catch {
+    // Ignorar fallos de lectura de outbox en entornos sin IndexedDB
+  }
+
+  return { misionesConOutbox, incidentesConOutbox };
+}
+
+/**
  * Consulta y sincroniza el listado de misiones asignadas desde el backend SGRAI.
  * Si hay conectividad, actualiza el almacenamiento local IndexedDB (Offline-First).
  * Si ocurre una falla de red o se está offline, devuelve las misiones persistidas localmente.
  */
 export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<MisionLocal[]> {
   try {
+    const token = typeof window !== 'undefined' ? getAuthCookie() : null;
     const { data, error } = await apiClient.GET('/api/misiones', {
       params: {
         query: {
@@ -152,24 +204,32 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
           orden: 'desc',
         },
         header: {
-          authorization: '',
+          authorization: token ? (token.startsWith('Bearer ') ? token : `Bearer ${token}`) : '',
         },
       },
     });
 
     if (!error && data && Array.isArray(data.data)) {
-      let localesPreviasMap = new Map<string, MisionLocal>();
-      try {
-        const previas = (await obtenerMisionesLocales()) || [];
-        localesPreviasMap = new Map(previas.map((m) => [m.id, m]));
-      } catch {
-        // Ignorar si IndexedDB no está disponible
-      }
+      const [localesPreviasRaw, { misionesConOutbox, incidentesConOutbox }] =
+        await Promise.all([
+          obtenerMisionesLocales(),
+          obtenerReferenciasOutboxPendientes(),
+        ]);
+      const localesPrevias = localesPreviasRaw || [];
+      const mapaLocales = new Map(localesPrevias.map((m) => [m.id, m]));
 
       const remotas: MisionLocal[] = data.data.map((item: MisionApiItem) => {
-        const previa = localesPreviasMap.get(item.id);
+        const previa = mapaLocales.get(item.id);
+        const incidenteId = item.incidenteId || '';
+        const tieneOutboxPendiente =
+          misionesConOutbox.has(item.id) ||
+          (Boolean(incidenteId) && incidentesConOutbox.has(incidenteId));
+        const estadoPermiteOptimista =
+          item.estado === 'DESPACHADA' || item.estado === 'EN_CURSO';
         const mantenerOptimista = Boolean(
-          previa?.sincronizacionPendiente && item.estado === 'DESPACHADA'
+          previa &&
+            (previa.sincronizacionPendiente || tieneOutboxPendiente) &&
+            estadoPermiteOptimista
         );
         const tipoAfectacionRemoto = (
           item as { incidenteTipoAfectacion?: string | null }
@@ -198,10 +258,12 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
             item.descripcion ||
             (item.delegacionNombre ? `Sector ${item.delegacionNombre}` : 'Valdivia'),
           prioridad: item.prioridad,
-          estado: mantenerOptimista && previa ? previa.estado : item.estado,
+          estado: mantenerOptimista && previa?.estado ? previa.estado : item.estado,
           fechaDespacho: item.fechaInicio || item.creadoEn,
           fechaInicio:
-            mantenerOptimista && previa ? previa.fechaInicio : item.fechaInicio || null,
+            mantenerOptimista && previa
+              ? (previa.fechaInicio ?? item.fechaInicio ?? null)
+              : item.fechaInicio || null,
           sincronizacionPendiente: mantenerOptimista,
           datosAdicionales:
             mantenerOptimista && previa?.datosAdicionales
@@ -211,9 +273,17 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
         };
       });
 
-      await limpiarMisionesLocales();
       if (remotas.length > 0) {
         await guardarMisionesLocales(remotas);
+        void obtenerCatalogoTiposIncidente().catch(() => {
+          // Precarga silenciosa del catálogo oficial para uso offline
+        });
+        const locales = await obtenerMisionesLocales();
+        if (Array.isArray(locales) && locales.length > 0) {
+          const localesPorId = new Map(locales.map((m) => [m.id, m]));
+          return remotas.map((r) => localesPorId.get(r.id) ?? r);
+        }
+        return remotas;
       }
       return remotas;
     }
@@ -239,15 +309,23 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
 
     if (!error && data && data.data) {
       const d: MisionDetalleApi = data.data;
-      let previaLocal: MisionLocal | undefined;
-      try {
-        previaLocal = await obtenerMisionLocalPorId(id);
-      } catch {
-        previaLocal = undefined;
-      }
-      const previa = previaLocal;
+      const [previa, { misionesConOutbox, incidentesConOutbox }] =
+        await Promise.all([
+          obtenerMisionLocalPorId(d.id),
+          obtenerReferenciasOutboxPendientes(),
+        ]);
+      const incidenteIdRemoto = d.incidente?.id || previa?.incidenteId || '';
+      const tieneOutboxPendiente =
+        misionesConOutbox.has(d.id) ||
+        (Boolean(incidenteIdRemoto) && incidentesConOutbox.has(incidenteIdRemoto));
+      const estadoPermiteOptimista =
+        d.estado === 'DESPACHADA' || d.estado === 'EN_CURSO';
+      const previaLocal = previa ?? undefined;
+
       const mantenerOptimista = Boolean(
-        previa?.sincronizacionPendiente && d.estado === 'DESPACHADA'
+        previa &&
+          (previa.sincronizacionPendiente || tieneOutboxPendiente) &&
+          estadoPermiteOptimista
       );
 
       const reportesRemotos = Array.isArray(d.reportesTerreno) ? d.reportesTerreno : [];
@@ -323,21 +401,26 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
 
       const misionLocal: MisionLocal = {
         id: d.id,
-        incidenteId: d.incidente?.id || '',
+        incidenteId: incidenteIdRemoto,
         codigoIncidente: d.incidente?.codigo || d.codigo,
-        tipologia: d.incidente?.tipoAfectacion
-          ? formatearTipologia(d.incidente.tipoAfectacion)
-          : limpiarTituloMision(d.titulo),
+        tipologia:
+          mantenerOptimista && previa?.tipologia
+            ? previa.tipologia
+            : d.incidente?.tipoAfectacion
+              ? formatearTipologia(d.incidente.tipoAfectacion)
+              : limpiarTituloMision(d.titulo),
         direccion: d.incidente?.direccion || d.descripcion || 'Valdivia',
         coordenadas:
           d.incidente?.latitud && d.incidente?.longitud
             ? { lat: d.incidente.latitud, lng: d.incidente.longitud }
             : undefined,
         prioridad: d.prioridad,
-        estado: mantenerOptimista && previa ? previa.estado : d.estado,
+        estado: mantenerOptimista && previa?.estado ? previa.estado : d.estado,
         fechaDespacho: d.fechaInicio || d.creadoEn,
         fechaInicio:
-          mantenerOptimista && previa ? previa.fechaInicio : d.fechaInicio || null,
+          mantenerOptimista && previa
+            ? (previa.fechaInicio ?? d.fechaInicio ?? null)
+            : d.fechaInicio || null,
         sincronizacionPendiente: mantenerOptimista,
         datosAdicionales:
           mantenerOptimista && previa?.datosAdicionales
@@ -359,6 +442,157 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
 
   const local = await obtenerMisionLocalPorId(id);
   return local || null;
+}
+
+export interface RechazoMisionResultado {
+  exito: boolean;
+  mensaje: string;
+  modoOffline?: boolean;
+  mision?: {
+    id: string;
+    codigo: string;
+    estado: string;
+    justificacionRechazo: string;
+    actualizadoEn?: string;
+  };
+}
+
+/**
+ * Registra el rechazo motivado de una misión táctica (H41, H69).
+ * Cumple con la Regla de Negocio Crítica §3.3 (justificación obligatoria >= 5 caracteres).
+ * Si hay conectividad, consume POST /api/misiones/{id}/rechazar.
+ * Si no hay conexión o falla la red, valida localmente con Zod, encola en IndexedDB outbox
+ * y actualiza optimísticamente el estado local a 'RECHAZADA' (Offline-First).
+ */
+export async function rechazarMision(
+  id: string,
+  datos: RechazoMisionInput
+): Promise<RechazoMisionResultado> {
+  const datosValidados = rechazoMisionSchema.parse(datos);
+
+  const payloadApi = {
+    justificacion_rechazo: datosValidados.justificacion_rechazo,
+    latitud: datosValidados.latitud,
+    longitud: datosValidados.longitud,
+  };
+
+  const estaOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+  if (estaOffline) {
+    await encolarAccionOutbox({
+      tipo: 'RECHAZAR_MISION',
+      url: `/api/misiones/${id}/rechazar`,
+      metodo: 'POST',
+      payload: payloadApi,
+    });
+
+    const local = await obtenerMisionLocalPorId(id);
+    if (local) {
+      await guardarMisionLocal({
+        ...local,
+        estado: 'RECHAZADA',
+        sincronizacionPendiente: true,
+        actualizadoEn: new Date().toISOString(),
+        datosAdicionales: {
+          ...local.datosAdicionales,
+          justificacionRechazo: datosValidados.justificacion_rechazo,
+        },
+      });
+    }
+
+    return {
+      exito: true,
+      mensaje: 'Rechazo registrado localmente. Se sincronizará automáticamente al recuperar la conexión.',
+      modoOffline: true,
+      mision: {
+        id,
+        codigo: local?.codigoIncidente || id,
+        estado: 'RECHAZADA',
+        justificacionRechazo: datosValidados.justificacion_rechazo,
+      },
+    };
+  }
+
+  try {
+    const { data, error, response } = await apiClient.POST('/api/misiones/{id}/rechazar', {
+      params: {
+        path: { id },
+      },
+      body: payloadApi,
+    });
+
+    if (error || !response.ok) {
+      const status = response?.status ?? 500;
+      const errorMsg =
+        (error as unknown as { message?: string })?.message ||
+        (status === 403
+          ? 'No cuenta con permisos para rechazar esta misión.'
+          : status === 404
+            ? 'La misión solicitada no fue encontrada.'
+            : status === 409
+              ? 'La misión ya no se encuentra en un estado que permita su rechazo.'
+              : `Error al rechazar la misión (${status}).`);
+      throw new MisionServiceError(status, errorMsg);
+    }
+
+    const local = await obtenerMisionLocalPorId(id);
+    if (local) {
+      await guardarMisionLocal({
+        ...local,
+        estado: 'RECHAZADA',
+        sincronizacionPendiente: false,
+        actualizadoEn: data?.data?.mision?.actualizadoEn || new Date().toISOString(),
+        datosAdicionales: {
+          ...local.datosAdicionales,
+          justificacionRechazo: datosValidados.justificacion_rechazo,
+        },
+      });
+    }
+
+    return {
+      exito: true,
+      mensaje: data?.message || 'Misión rechazada exitosamente.',
+      mision: data?.data?.mision,
+    };
+  } catch (err) {
+    if (err instanceof MisionServiceError) {
+      throw err;
+    }
+
+    // Falla de red, corte de conexión o error de transporte (WebKit/Fetch/AbortError)
+    await encolarAccionOutbox({
+      tipo: 'RECHAZAR_MISION',
+      url: `/api/misiones/${id}/rechazar`,
+      metodo: 'POST',
+      payload: payloadApi,
+    });
+
+    const local = await obtenerMisionLocalPorId(id);
+    if (local) {
+      await guardarMisionLocal({
+        ...local,
+        estado: 'RECHAZADA',
+        sincronizacionPendiente: true,
+        actualizadoEn: new Date().toISOString(),
+        datosAdicionales: {
+          ...local.datosAdicionales,
+          justificacionRechazo: datosValidados.justificacion_rechazo,
+        },
+      });
+    }
+
+    return {
+      exito: true,
+      mensaje: 'Sin conexión estable. Rechazo guardado localmente para envío diferido.',
+      modoOffline: true,
+      mision: {
+        id,
+        codigo: local?.codigoIncidente || id,
+        estado: 'RECHAZADA',
+        justificacionRechazo: datosValidados.justificacion_rechazo,
+      },
+    };
+  }
 }
 
 /**

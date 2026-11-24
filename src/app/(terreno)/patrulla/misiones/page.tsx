@@ -16,6 +16,8 @@ import {
   type ConteoFiltros,
 } from '@/components/misiones/MisionFiltrosChips';
 import { MisionCard } from '@/components/misiones/MisionCard';
+import { NuevaMisionBanner } from '@/components/misiones/NuevaMisionBanner';
+import { useMisionesSocket } from '@/hooks/useMisionesSocket';
 import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaMisionesPage.module.css';
 
@@ -58,7 +60,29 @@ function PatrullaMisionesContenido() {
 
   useEffect(() => {
     cargarMisiones();
+
+    const handleActualizar = () => {
+      void cargarMisiones();
+    };
+
+    window.addEventListener('sgrai:mision_actualizada', handleActualizar);
+    window.addEventListener('sgrai:outbox-synced', handleActualizar);
+
+    return () => {
+      window.removeEventListener('sgrai:mision_actualizada', handleActualizar);
+      window.removeEventListener('sgrai:outbox-synced', handleActualizar);
+    };
   }, [cargarMisiones]);
+
+  const { ultimaMisionAsignada, descartarUltimaMision } = useMisionesSocket({
+    onNuevaMision: () => {
+      void cargarMisiones();
+    },
+    onMisionActualizada: () => {
+      void cargarMisiones();
+    },
+    habilitado: Boolean(unidadActiva),
+  });
 
   const cambiarFiltro = (nuevoFiltro: FiltroEstado) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -122,6 +146,15 @@ function PatrullaMisionesContenido() {
 
   return (
     <div className={styles.container}>
+      {ultimaMisionAsignada && (
+        <NuevaMisionBanner
+          codigoMision={ultimaMisionAsignada.codigo}
+          misionId={ultimaMisionAsignada.misionId}
+          urlDetalle={`/patrulla/misiones/${ultimaMisionAsignada.misionId}`}
+          alCerrar={descartarUltimaMision}
+        />
+      )}
+
       {!tieneUnidadAsignada ? (
         <SinUnidadBanner
           tipoUnidad="patrulla"

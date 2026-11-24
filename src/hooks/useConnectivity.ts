@@ -7,10 +7,17 @@ import {
   obtenerMisionLocalPorId,
   obtenerMisionesLocales,
   guardarMisionLocal,
+  eliminarAccionOutbox,
 } from '@/services/offlineQueue';
 import { obtenerDetalleMision } from '@/services/misionesService';
 import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
+import {
+  DEV_PATRULLA_TOKEN,
+  DEV_PATRULLA_USER_ID,
+  extractUserIdFromJwt,
+  handleUnauthorizedSession,
+} from '@/lib/api/client';
 
 export function useConnectivity() {
   const [online, setOnline] = useState<boolean>(() => {
@@ -51,9 +58,16 @@ export function useConnectivity() {
           : process.env.NEXT_PUBLIC_API_URL || '';
 
       await sincronizarColaOutbox(async (accion) => {
-        const authHeaders: Record<string, string> = token
-          ? { Authorization: `Bearer ${token}` }
-          : {};
+        const authHeaders: Record<string, string> = {};
+        if (token === DEV_PATRULLA_TOKEN) {
+          authHeaders['x-user-id'] = DEV_PATRULLA_USER_ID;
+        } else if (token) {
+          authHeaders['Authorization'] = `Bearer ${token}`;
+          const userId = extractUserIdFromJwt(token);
+          if (userId) {
+            authHeaders['x-user-id'] = userId;
+          }
+        }
 
         const res = await fetch(`${apiUrl}${accion.url}`, {
           method: accion.metodo,
@@ -63,6 +77,11 @@ export function useConnectivity() {
           },
           body: JSON.stringify(accion.payload),
         });
+
+        if (res.status === 401) {
+          handleUnauthorizedSession();
+          return false;
+        }
 
         const esExito = res.ok;
         let esIdempotenteEnCurso = false;
@@ -95,25 +114,63 @@ export function useConnectivity() {
         const procesada =
           esExito || esIdempotenteEnCurso || esConflictoTerminal || esErrorIrrecuperable;
 
-        if (esExito && accion.tipo === 'ACTUALIZAR_TIPOLOGIA') {
+        if (accion.tipo === 'ACTUALIZAR_TIPOLOGIA') {
           const match = accion.url.match(/\/api\/incidentes\/([^/]+)\/tipologia/);
           const incidenteId = match?.[1];
-          const misionId = accion.payload?.misionId as string | undefined;
-          try {
-            let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
-            if (!local && incidenteId) {
-              const todas = await obtenerMisionesLocales();
-              local = todas.find((m) => m.incidenteId === incidenteId);
+          const misionId =
+            typeof accion.payload?.misionId === 'string' && accion.payload.misionId
+              ? accion.payload.misionId
+              : undefined;
+
+          if (esExito) {
+            try {
+              let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+              if (!local && incidenteId) {
+                const todas = (await obtenerMisionesLocales()) || [];
+                local = todas.find((m) => m.incidenteId === incidenteId);
+              }
+              if (local) {
+                await guardarMisionLocal({
+                  ...local,
+                  sincronizacionPendiente: false,
+                  actualizadoEn: new Date().toISOString(),
+                });
+              }
+            } catch {
+              // Ignorar fallos de persistencia secundaria
             }
-            if (local) {
-              await guardarMisionLocal({
-                ...local,
-                sincronizacionPendiente: false,
-                actualizadoEn: new Date().toISOString(),
-              });
+          } else if (esConflictoTerminal || esErrorIrrecuperable) {
+            try {
+              let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+              if (!local && incidenteId) {
+                const todas = (await obtenerMisionesLocales()) || [];
+                local = todas.find((m) => m.incidenteId === incidenteId);
+              }
+              const targetMisionId = local?.id || misionId;
+              if (local) {
+                const datosRestaurados = { ...(local.datosAdicionales || {}) };
+                delete datosRestaurados.tipologiaEvaluada;
+                delete datosRestaurados.tipoIncidenteId;
+                delete datosRestaurados.justificacionTipologia;
+                delete datosRestaurados.fechaEvaluacionTipologia;
+                delete datosRestaurados.esReclasificacion;
+
+                await guardarMisionLocal({
+                  ...local,
+                  sincronizacionPendiente: false,
+                  datosAdicionales: datosRestaurados,
+                  actualizadoEn: new Date().toISOString(),
+                });
+              }
+              if (typeof eliminarAccionOutbox === 'function') {
+                await eliminarAccionOutbox(accion.id);
+              }
+              if (targetMisionId) {
+                await obtenerDetalleMision(targetMisionId);
+              }
+            } catch {
+              // Ignorar fallos al refrescar estado real
             }
-          } catch {
-            // Ignorar fallos de persistencia secundaria
           }
         }
 
@@ -209,10 +266,44 @@ export function useConnectivity() {
                     actualizadoEn: new Date().toISOString(),
                   });
                 }
+                if (typeof eliminarAccionOutbox === 'function') {
+                  await eliminarAccionOutbox(accion.id);
+                }
                 await obtenerDetalleMision(misionId);
               } catch {
                 // Ignorar fallos al refrescar estado real
               }
+            }
+          }
+        }
+
+        if (procesada && accion.tipo === 'RECHAZAR_MISION') {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/rechazar/);
+          const misionId = match?.[1];
+          if (misionId) {
+            try {
+              const local = await obtenerMisionLocalPorId(misionId);
+              if (local) {
+                let actualizadoServidor = local.actualizadoEn || new Date().toISOString();
+                if (res.ok) {
+                  try {
+                    const bodyJson = await res.clone().json();
+                    if (bodyJson?.data?.mision?.actualizadoEn) {
+                      actualizadoServidor = bodyJson.data.mision.actualizadoEn;
+                    }
+                  } catch {
+                    // Ignorar si la respuesta no contiene JSON
+                  }
+                }
+                await guardarMisionLocal({
+                  ...local,
+                  estado: res.status === 422 ? local.estado : 'RECHAZADA',
+                  sincronizacionPendiente: false,
+                  actualizadoEn: actualizadoServidor,
+                });
+              }
+            } catch {
+              // Ignorar fallos de lectura/escritura secundaria en IndexedDB
             }
           }
         }
@@ -222,6 +313,7 @@ export function useConnectivity() {
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('sgrai:outbox-synced'));
+        window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
       }
     } catch (err) {
       console.warn('[OfflineQueue] Error durante la sincronización:', err);

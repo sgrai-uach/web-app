@@ -1,4 +1,4 @@
-import type { paths } from '@/types/api-generated';
+import type { components, paths } from '@/types/api-generated';
 
 /**
  * Tipos para persistencia local e IndexedDB (Offline-First)
@@ -59,18 +59,11 @@ export interface CatalogoLocal {
   actualizadoEn: string;
 }
 
-export interface TipoIncidenteCatalogoItem {
-  id: string;
-  nombre: string;
-  descripcion: string | null;
-  activo: boolean;
-}
+export type TipoIncidenteCatalogoItem = components['schemas']['TipoIncidenteCatalogoItem'];
 
-export interface ReclasificarTipologiaPayload {
-  tipoIncidenteId: string;
-  justificacion: string;
-  misionId?: string;
-}
+export type ReclasificarTipologiaPayload = NonNullable<
+  paths['/api/incidentes/{id}/tipologia']['patch']['requestBody']
+>['content']['application/json'];
 
 export type PrioridadIncidente = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA';
 

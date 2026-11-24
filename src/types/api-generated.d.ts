@@ -907,7 +907,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        tipoAfectacion: "Anegamiento" | "Inundación" | "Caída de árbol" | "Corte de energía" | "Deslizamiento" | "Deslizamiento de tierra" | "Daño estructural" | "Corte de agua potable" | "Anegamiento de calzada" | "Incendio estructural / forestal" | "Incendio" | "Otro";
+                        tipoAfectacion: "Anegamiento" | "Inundación" | "Caída de árbol" | "Corte de energía" | "Deslizamiento" | "Deslizamiento de tierra" | "Daño estructural" | "Corte de agua potable" | "Anegamiento de calzada" | "Incendio estructural / forestal" | "Otro";
                         direccion: string;
                         descripcion?: string;
                         informanteNombre: string;
@@ -1254,7 +1254,7 @@ export interface paths {
                          * @description Tipo de afectación catalogada
                          * @enum {string}
                          */
-                        tipoAfectacion: "Anegamiento" | "Inundación" | "Caída de árbol" | "Corte de energía" | "Deslizamiento" | "Deslizamiento de tierra" | "Daño estructural" | "Corte de agua potable" | "Anegamiento de calzada" | "Incendio estructural / forestal" | "Incendio" | "Otro";
+                        tipoAfectacion: "Anegamiento" | "Inundación" | "Caída de árbol" | "Corte de energía" | "Deslizamiento" | "Deslizamiento de tierra" | "Daño estructural" | "Corte de agua potable" | "Anegamiento de calzada" | "Incendio estructural / forestal" | "Otro";
                         descripcion: string;
                         direccion: string;
                         latitud?: number;
@@ -1404,7 +1404,7 @@ export interface paths {
                          * @description Tipo de afectación a comparar
                          * @enum {string}
                          */
-                        tipoAfectacion: "Anegamiento" | "Inundación" | "Caída de árbol" | "Corte de energía" | "Deslizamiento" | "Deslizamiento de tierra" | "Daño estructural" | "Corte de agua potable" | "Anegamiento de calzada" | "Incendio estructural / forestal" | "Incendio" | "Otro";
+                        tipoAfectacion: "Anegamiento" | "Inundación" | "Caída de árbol" | "Corte de energía" | "Deslizamiento" | "Deslizamiento de tierra" | "Daño estructural" | "Corte de agua potable" | "Anegamiento de calzada" | "Incendio estructural / forestal" | "Otro";
                         direccion: string;
                         latitud?: number;
                         longitud?: number;
@@ -1583,18 +1583,23 @@ export interface paths {
         };
         /**
          * Obtener catálogo de tipos de afectación
-         * @description Retorna el listado de opciones de afectación válidas para poblar los botones de respuesta rápida en el chatbot.
+         * @description Retorna el listado de opciones de afectación válidas para poblar los botones de respuesta rápida en el chatbot, o el catálogo detallado de la tabla tipo_incidente si se envía ?catalogo=true o ?detallado=true.
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Si es 'true', retorna los registros completos de la tabla tipo_incidente */
+                    catalogo?: "true" | "false";
+                    /** @description Alias de catalogo=true; retorna los registros completos de tipo_incidente */
+                    detallado?: "true" | "false";
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description Listado de tipos de afectación */
+                /** @description Listado de tipos de afectación o catálogo detallado de tipos de incidente */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1603,8 +1608,15 @@ export interface paths {
                         "application/json": {
                             message: string;
                             data: string[];
-                        };
+                        } | components["schemas"]["ListarTiposIncidenteResponse"];
                     };
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
             };
         };
@@ -2103,12 +2115,7 @@ export interface paths {
         patch: {
             parameters: {
                 query?: never;
-                header?: {
-                    /** @description Token Bearer JWT de la patrulla verificadora */
-                    authorization?: string;
-                    /** @description ID de usuario para entornos de prueba */
-                    "x-user-id"?: string;
-                };
+                header?: never;
                 path: {
                     /** @description Identificador UUID del incidente */
                     id: string;
@@ -5038,7 +5045,155 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Listar eventos de recuperación territorial para el mapa operativo
+         * @description Consulta todos los eventos de recuperación comunales registrados con sus misiones tácticas desplegadas, patrullas asignadas y recursos para su renderizado táctico georreferenciado en el mapa operativo.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Token JWT en formato 'Bearer <token>' */
+                    authorization: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Listado de eventos de recuperación obtenido exitosamente */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Eventos de recuperación obtenidos exitosamente. */
+                            message: string;
+                            /** @example 4 */
+                            total: number;
+                            data: {
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador único UUID del evento de recuperación
+                                 */
+                                id: string;
+                                /**
+                                 * @description Código oficial único del evento (ej. REC-2026-0001)
+                                 * @example REC-2026-0001
+                                 */
+                                codigo: string;
+                                /** @example Entrega de frazadas y techumbre en Sector Collico */
+                                nombre: string;
+                                /** @example Familias afectadas por temporal de viento */
+                                descripcion: string | null;
+                                /** @example Collico */
+                                sector: string;
+                                /** @example Calle Balmaceda 1245 con Las Palmeras */
+                                direccionTexto: string | null;
+                                /**
+                                 * @example ALTA
+                                 * @enum {string}
+                                 */
+                                prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+                                /** @example Juan Pérez (Presidente JJVV) */
+                                contactoNombre: string | null;
+                                /** @example +56912345678 */
+                                contactoTelefono: string | null;
+                                /** @example -39.8142 */
+                                latitud: number;
+                                /** @example -73.2459 */
+                                longitud: number;
+                                /**
+                                 * @example PLANIFICADA
+                                 * @enum {string}
+                                 */
+                                estado: "PLANIFICADA" | "EN_EJECUCION" | "COMPLETADA" | "CANCELADA";
+                                /** @example 4 */
+                                familiasAfectadas: number;
+                                /** @description Delegación territorial asignada */
+                                delegacion: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    codigo: string;
+                                    nombre: string;
+                                } | null;
+                                /** @description Misión táctica despachada a terreno */
+                                mision: {
+                                    /**
+                                     * Format: uuid
+                                     * @example 60000000-0000-4000-8000-000000000001
+                                     */
+                                    id: string;
+                                    /** @example MIS-2026-0042 */
+                                    codigo: string;
+                                    /** @example Entrega de frazadas y techumbre en Sector Collico */
+                                    titulo: string;
+                                    /** @example DESPACHADA */
+                                    estado: string;
+                                    /** @example RECUPERACION */
+                                    tipoMision: string;
+                                };
+                                /** @description Patrulla asignada a la operación */
+                                patrulla: {
+                                    /**
+                                     * Format: uuid
+                                     * @example 50000000-0000-4000-8000-000000000001
+                                     */
+                                    id: string;
+                                    /** @example Patrulla Verificadora Alfa */
+                                    nombre: string;
+                                    /** @example EN_RECUPERACION */
+                                    estado: string;
+                                };
+                                /** @description Recursos reservados o descontados para la entrega */
+                                recursos: {
+                                    /**
+                                     * Format: uuid
+                                     * @example 00000000-0000-4000-8000-000000000001
+                                     */
+                                    recursoId: string;
+                                    /** @example Sacos de Arena 25kg */
+                                    nombre: string;
+                                    /** @example 10 */
+                                    cantidadAsignada: number;
+                                }[];
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador del Encargado que creó el evento
+                                 */
+                                creadoPorId: string;
+                                /** @description Fecha de registro ISO 8601 */
+                                creadoEn: string;
+                                /** @description Fecha de actualización ISO 8601 */
+                                actualizadoEn: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description No autenticado o token inválido */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'misiones:leer', 'recuperacion:crear' o 'misiones:asignar' */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         put?: never;
         /**
          * Crear evento de recuperación y despachar patrulla con recursos logísticos (HU-29)
@@ -5278,6 +5433,347 @@ export interface paths {
                     content?: never;
                 };
                 /** @description Conflicto operativo: Patrulla no disponible o stock insuficiente en bodega */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/eventos-atp/recuperacion/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obtener detalle completo de un evento de recuperación comunal (HU-32)
+         * @description Permite consultar la información integral de un evento de recuperación territorial, incluyendo su localización, misiones tácticas desplegadas y el listado de insumos y recursos asignados.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID del evento de recuperación */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Detalle del evento de recuperación obtenido exitosamente */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Detalle del evento de recuperación obtenido exitosamente. */
+                            message: string;
+                            data: {
+                                /**
+                                 * Format: uuid
+                                 * @example 70000000-0000-4000-8000-000000000001
+                                 */
+                                id: string;
+                                /** @example REC-2026-0001 */
+                                codigo: string;
+                                /** @example Entrega de frazadas y techumbre en Sector Collico */
+                                nombre: string;
+                                /** @example Familias afectadas por temporal de viento */
+                                descripcion: string | null;
+                                /** @example Collico */
+                                sector: string;
+                                /** @example Calle Balmaceda 1245 con Las Palmeras */
+                                direccionTexto: string | null;
+                                /**
+                                 * @example ALTA
+                                 * @enum {string}
+                                 */
+                                prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+                                /** @example Juan Pérez (Presidente JJVV) */
+                                contactoNombre: string | null;
+                                /** @example +56912345678 */
+                                contactoTelefono: string | null;
+                                /** @example -39.8142 */
+                                latitud: number;
+                                /** @example -73.2459 */
+                                longitud: number;
+                                /**
+                                 * @example PLANIFICADA
+                                 * @enum {string}
+                                 */
+                                estado: "PLANIFICADA" | "EN_EJECUCION" | "COMPLETADA" | "CANCELADA";
+                                /** @example 4 */
+                                familiasAfectadas: number;
+                                /** @description Delegación territorial asignada */
+                                delegacion: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    codigo: string;
+                                    nombre: string;
+                                } | null;
+                                /** @description Misiones tácticas vinculadas al evento */
+                                misiones: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    codigo: string;
+                                    titulo: string;
+                                    estado: string;
+                                    tipoMision: string;
+                                    patrulla?: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        nombre: string;
+                                        estado: string;
+                                    } | null;
+                                    creadoEn: string;
+                                }[];
+                                /** @description Historial de insumos y herramientas asignados */
+                                recursosAsignados: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** Format: uuid */
+                                    recursoId: string;
+                                    nombre: string;
+                                    esIndividual: boolean;
+                                    cantidadAsignada: number;
+                                    /** Format: uuid */
+                                    misionId?: string | null;
+                                    creadoEn: string;
+                                }[];
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador del creador
+                                 */
+                                creadoPorId: string;
+                                /** @description Fecha de registro ISO 8601 */
+                                creadoEn: string;
+                                /** @description Fecha de última actualización ISO 8601 */
+                                actualizadoEn: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Identificador de evento inválido */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Evento de recuperación no encontrado */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/eventos-atp/recuperacion/{id}/asignar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Asignar patrulla y recursos logísticos a evento de recuperación (HU-32)
+         * @description Permite al Encargado asignar una patrulla verificadora disponible y recursos de bodega con control transaccional estricto FOR UPDATE (§3.6), creando una misión táctica de recuperación y transicionando la patrulla a EN_RECUPERACION.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID del evento de recuperación */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Patrulla verificadora a despachar y listado de recursos logísticos solicitados */
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: uuid
+                         * @description Identificador de la patrulla verificadora disponible a asignar
+                         * @example 50000000-0000-4000-8000-000000000001
+                         */
+                        patrullaId: string;
+                        /** @description Listado de insumos y recursos logísticos a entregar */
+                        recursos: {
+                            /**
+                             * Format: uuid
+                             * @description UUID del recurso logístico en inventario
+                             * @example 00000000-0000-4000-8000-000000000001
+                             */
+                            recursoId: string;
+                            /**
+                             * @description Cantidad de unidades requeridas para entrega en el evento
+                             * @example 10
+                             */
+                            cantidad: number;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Patrulla y recursos logísticos asignados exitosamente al evento de recuperación */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Patrulla y recursos logísticos asignados exitosamente al evento de recuperación. */
+                            message: string;
+                            data: {
+                                evento: {
+                                    /**
+                                     * Format: uuid
+                                     * @example 70000000-0000-4000-8000-000000000001
+                                     */
+                                    id: string;
+                                    /** @example REC-2026-0001 */
+                                    codigo: string;
+                                    /** @example Entrega de frazadas y techumbre en Sector Collico */
+                                    nombre: string;
+                                    /**
+                                     * @example PLANIFICADA
+                                     * @enum {string}
+                                     */
+                                    estado: "PLANIFICADA" | "EN_EJECUCION" | "COMPLETADA" | "CANCELADA";
+                                };
+                                /** @description Misión táctica despachada a terreno */
+                                mision: {
+                                    /**
+                                     * Format: uuid
+                                     * @example 60000000-0000-4000-8000-000000000001
+                                     */
+                                    id: string;
+                                    /** @example MIS-2026-0042 */
+                                    codigo: string;
+                                    /** @example Entrega de frazadas y techumbre en Sector Collico */
+                                    titulo: string;
+                                    /** @example DESPACHADA */
+                                    estado: string;
+                                    /** @example RECUPERACION */
+                                    tipoMision: string;
+                                };
+                                /** @description Patrulla transicionada a EN_RECUPERACION */
+                                patrulla: {
+                                    /**
+                                     * Format: uuid
+                                     * @example 50000000-0000-4000-8000-000000000001
+                                     */
+                                    id: string;
+                                    /** @example Patrulla Verificadora Alfa */
+                                    nombre: string;
+                                    /** @example EN_RECUPERACION */
+                                    estado: string;
+                                };
+                                /** @description Recursos asignados con stock en uso actualizado */
+                                recursos: {
+                                    /**
+                                     * Format: uuid
+                                     * @example 00000000-0000-4000-8000-000000000001
+                                     */
+                                    recursoId: string;
+                                    /** @example Sacos de Arena 25kg */
+                                    nombre: string;
+                                    /** @example false */
+                                    esIndividual: boolean;
+                                    /** @example 10 */
+                                    cantidadAsignada: number;
+                                    /** @example 10 */
+                                    cantidadEnUso: number;
+                                    /** @example DISPONIBLE */
+                                    estadoRecurso: string;
+                                }[];
+                                /** @description Fecha de asignación ISO 8601 */
+                                asignadoEn: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Datos de entrada inválidos o activo individual con cantidad distinta de 1 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'misiones:asignar' */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Evento de recuperación, patrulla o recurso no encontrado */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto operativo: Patrulla no disponible, activo individual en mantención/asignado, o sobregiro de stock a granel */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -8829,6 +9325,360 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/misiones/{id}/rechazar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rechazar misión de verificación por patrulla en terreno (HU-69)
+         * @description Permite a una patrulla verificadora rechazar una misión asignada ingresando una justificación obligatoria (mínimo 5 caracteres según Regla Crítica §3.3). Ejecuta una transacción atómica que: (1) actualiza la misión a estado RECHAZADA y persiste la justificación, (2) transiciona la patrulla a DISPONIBLE, (3) revierte el incidente a REPORTADO para su inmediata reasignación, y (4) registra el hito en mision_hito. Emite la notificación WebSocket mision:rechazada hacia la sala encargado.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identificador único UUID de la misión */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Motivo obligatorio del rechazo de la misión (mínimo 5 caracteres según Regla Crítica §3.3)
+                         * @example Desperfecto mecánico en el neumático delantero del vehículo institucional.
+                         */
+                        justificacion_rechazo: string;
+                        /**
+                         * @description Latitud WGS84 de la patrulla (-90 a 90)
+                         * @example -39.81422
+                         */
+                        latitud?: number;
+                        /**
+                         * @description Longitud WGS84 de la patrulla (-180 a 180)
+                         * @example -73.24589
+                         */
+                        longitud?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Misión rechazada exitosamente y devuelta a estado REPORTADO para reasignación */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Misión rechazada exitosamente. El incidente ha vuelto a estado REPORTADO para su reasignación. */
+                            message: string;
+                            data: {
+                                mision: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    codigo: string;
+                                    estado: string;
+                                    justificacionRechazo: string;
+                                    actualizadoEn: string;
+                                };
+                                patrulla: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    nombre: string;
+                                    estado: string;
+                                };
+                                incidente: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    codigo: string;
+                                    estado: string;
+                                    prioridad?: string;
+                                };
+                                hito: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    hito: string;
+                                    descripcion: string;
+                                    creadoEn: string;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description Datos de entrada inválidos, justificación menor a 5 caracteres o coordenadas geográficas fuera de rango WGS84 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado, token ausente o usuario inactivo */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere pertenecer a la patrulla asignada o rol Administrador */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Misión no encontrada */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto: la misión ya fue rechazada, no se encuentra en estado DESPACHADA, o no es de tipo VERIFICACION / no tiene patrulla asignada */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor al procesar el rechazo de la misión */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/eventos-atp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Crear Evento de Alerta Temprana Preventiva (ATP)
+         * @description Registra el marco oficial de un Evento ATP, persiste su alcance territorial en evento_atp_delegacion dentro de una sola transacción PostgreSQL y emite el evento WebSocket evento_atp:creado a las salas administrativas, operativas y del mapa. Requiere rol Administrador o el permiso eventos_atp:crear.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Datos requeridos para crear el Evento ATP */
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Código identificador único. Si se omite (o se envía vacío), se genera automáticamente con formato ATP-YYYY-####
+                         * @example ATP-2026-0001
+                         */
+                        codigo?: string | null;
+                        /**
+                         * @description Nombre descriptivo del fenómeno o evento
+                         * @example Sistema Frontal Mayo 2026
+                         */
+                        nombre: string;
+                        /**
+                         * @description Descripción detallada del fenómeno y su impacto esperado
+                         * @example Sistema frontal con precipitaciones intensas y vientos moderados a fuertes durante 48 horas.
+                         */
+                        descripcion: string;
+                        /**
+                         * @description Clasificación principal de la amenaza
+                         * @example METEOROLOGICA
+                         * @enum {string}
+                         */
+                        tipoAmenaza: "METEOROLOGICA" | "MAREJADAS" | "REMOCION_EN_MASA" | "INUNDACION" | "INCENDIO_FORESTAL" | "SISMICA" | "OTRO";
+                        /**
+                         * @description Nivel oficial de alerta comunal
+                         * @example AMARILLA
+                         * @enum {string}
+                         */
+                        nivelAlerta: "VERDE" | "AMARILLA" | "ROJA";
+                        /**
+                         * Format: date-time
+                         * @description Fecha y hora de inicio del evento
+                         * @example 2026-05-01T10:00
+                         */
+                        fechaInicio: string;
+                        /**
+                         * Format: date-time
+                         * @description Fecha y hora estimada de término del evento
+                         * @example 2026-05-03T18:00
+                         */
+                        fechaTermino: string;
+                        /**
+                         * @description Delegaciones municipales afectadas. Arreglo vacío u omitido representa alcance comunal centralizado
+                         * @default []
+                         * @example [
+                         *       "30000000-0000-4000-8000-000000000001"
+                         *     ]
+                         */
+                        delegacionIds?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Evento ATP creado exitosamente */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Evento ATP registrado exitosamente. */
+                            message: string;
+                            data: {
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador único del Evento ATP
+                                 * @example 50000000-0000-4000-8000-000000000001
+                                 */
+                                id: string;
+                                /**
+                                 * @description Código único del Evento ATP
+                                 * @example ATP-2026-0001
+                                 */
+                                codigo: string;
+                                /**
+                                 * @description Nombre del evento
+                                 * @example Sistema Frontal Mayo 2026
+                                 */
+                                nombre: string;
+                                /** @description Descripción detallada del evento */
+                                descripcion: string;
+                                /**
+                                 * @description Tipo de amenaza del evento
+                                 * @example METEOROLOGICA
+                                 * @enum {string}
+                                 */
+                                tipoAmenaza: "METEOROLOGICA" | "MAREJADAS" | "REMOCION_EN_MASA" | "INUNDACION" | "INCENDIO_FORESTAL" | "SISMICA" | "OTRO";
+                                /**
+                                 * @description Nivel de alerta comunal
+                                 * @example AMARILLA
+                                 * @enum {string}
+                                 */
+                                nivelAlerta: "VERDE" | "AMARILLA" | "ROJA";
+                                /**
+                                 * Format: date-time
+                                 * @description Fecha y hora de inicio en formato ISO-8601
+                                 * @example 2026-05-01T10:00:00.000Z
+                                 */
+                                fechaInicio: string;
+                                /**
+                                 * Format: date-time
+                                 * @description Fecha y hora de término estimada en formato ISO-8601
+                                 * @example 2026-05-03T18:00:00.000Z
+                                 */
+                                fechaTermino: string;
+                                /**
+                                 * @description Estado actual del Evento ATP
+                                 * @example ACTIVO
+                                 * @enum {string}
+                                 */
+                                estado: "ACTIVO" | "CERRADO" | "CANCELADO";
+                                /** @description Delegaciones municipales afectadas. Arreglo vacío indica alcance comunal centralizado */
+                                delegaciones: {
+                                    /**
+                                     * Format: uuid
+                                     * @description Identificador único de la delegación municipal
+                                     * @example 30000000-0000-4000-8000-000000000001
+                                     */
+                                    id: string;
+                                    /**
+                                     * @description Código institucional de la delegación
+                                     * @example DEL_NORTE
+                                     */
+                                    codigo: string;
+                                    /**
+                                     * @description Nombre legible de la delegación
+                                     * @example Delegación Municipal Norte
+                                     */
+                                    nombre: string;
+                                }[];
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador del usuario que registró el evento
+                                 * @example 00000000-0000-4000-8000-000000000001
+                                 */
+                                creadoPorId: string | null;
+                                /**
+                                 * Format: date-time
+                                 * @description Fecha y hora de creación en formato ISO-8601
+                                 * @example 2026-05-01T09:55:00.000Z
+                                 */
+                                creadoEn: string;
+                                /**
+                                 * Format: date-time
+                                 * @description Fecha y hora de última actualización en formato ISO-8601
+                                 * @example 2026-05-01T09:55:00.000Z
+                                 */
+                                actualizadoEn: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Datos inválidos, fechas inconsistentes o delegaciones inexistentes */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado. Se requiere cabecera Authorization válida */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere rol Administrador o permiso eventos_atp:crear */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto por código de Evento ATP duplicado */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor al procesar la solicitud */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/incidentes/{id}/prioridad/calcular": {
         parameters: {
             query?: never;
@@ -11220,7 +12070,7 @@ export interface components {
         };
         CrearAvisoIncidenteInput: {
             /** @enum {string} */
-            tipoAfectacion: "Anegamiento" | "Inundación" | "Caída de árbol" | "Corte de energía" | "Deslizamiento" | "Deslizamiento de tierra" | "Daño estructural" | "Corte de agua potable" | "Anegamiento de calzada" | "Incendio estructural / forestal" | "Incendio" | "Otro";
+            tipoAfectacion: "Anegamiento" | "Inundación" | "Caída de árbol" | "Corte de energía" | "Deslizamiento" | "Deslizamiento de tierra" | "Daño estructural" | "Corte de agua potable" | "Anegamiento de calzada" | "Incendio estructural / forestal" | "Otro";
             direccion: string;
             descripcion?: string;
             informanteNombre: string;
@@ -11587,7 +12437,7 @@ export interface components {
              * @description Tipo de afectación catalogada
              * @enum {string}
              */
-            tipoAfectacion: "Anegamiento" | "Inundación" | "Caída de árbol" | "Corte de energía" | "Deslizamiento" | "Deslizamiento de tierra" | "Daño estructural" | "Corte de agua potable" | "Anegamiento de calzada" | "Incendio estructural / forestal" | "Incendio" | "Otro";
+            tipoAfectacion: "Anegamiento" | "Inundación" | "Caída de árbol" | "Corte de energía" | "Deslizamiento" | "Deslizamiento de tierra" | "Daño estructural" | "Corte de agua potable" | "Anegamiento de calzada" | "Incendio estructural / forestal" | "Otro";
             descripcion: string;
             direccion: string;
             latitud?: number;
@@ -11660,7 +12510,7 @@ export interface components {
              * @description Tipo de afectación a comparar
              * @enum {string}
              */
-            tipoAfectacion: "Anegamiento" | "Inundación" | "Caída de árbol" | "Corte de energía" | "Deslizamiento" | "Deslizamiento de tierra" | "Daño estructural" | "Corte de agua potable" | "Anegamiento de calzada" | "Incendio estructural / forestal" | "Incendio" | "Otro";
+            tipoAfectacion: "Anegamiento" | "Inundación" | "Caída de árbol" | "Corte de energía" | "Deslizamiento" | "Deslizamiento de tierra" | "Daño estructural" | "Corte de agua potable" | "Anegamiento de calzada" | "Incendio estructural / forestal" | "Otro";
             direccion: string;
             latitud?: number;
             longitud?: number;
@@ -11904,17 +12754,13 @@ export interface components {
             requiere_asistencia_social?: boolean;
         };
         RiesgosActivosEvaluacion: {
-            /** @default false */
-            riesgoElectrico: boolean;
+            riesgoElectrico?: boolean;
             riesgo_electrico?: boolean;
-            /** @default false */
-            riesgoEstructural: boolean;
+            riesgoEstructural?: boolean;
             riesgo_estructural?: boolean;
-            /** @default false */
-            riesgoQuimicoSanitario: boolean;
+            riesgoQuimicoSanitario?: boolean;
             riesgo_quimico_sanitario?: boolean;
-            /** @default false */
-            aislamientoVial: boolean;
+            aislamientoVial?: boolean;
             aislamiento_vial?: boolean;
         };
         CalcularPrioridadInput: components["schemas"]["EvaluacionTerrenoInput"] & {
@@ -11934,6 +12780,19 @@ export interface components {
                 factoresGatillantes: string[];
                 requiereAsistenciaSocialSugerido: boolean;
                 evaluacionNormalizada: {
+                    familias?: {
+                        id?: string;
+                        referencia?: string;
+                        nucleoFamiliarTotal: number;
+                        cantidadNinos: number;
+                        cantidadAdultosMayores: number;
+                        personasDiscapacitadas: number;
+                        personasElectrodependientes: number;
+                        mascotasAfectadas: number;
+                        /** @enum {string} */
+                        nivelCompromisoVivienda: "SIN_DANO" | "LEVE" | "MODERADO" | "GRAVE_INHABITABLE";
+                        requiereAsistenciaSocial: boolean;
+                    }[];
                     nucleoFamiliarTotal: number;
                     familiasAfectadas: number;
                     cantidadNinos: number;
@@ -12703,6 +13562,233 @@ export interface components {
             /** @example 1 */
             totalPaginas: number;
         };
+        CrearEventoAtpInput: {
+            /**
+             * @description Código identificador único. Si se omite (o se envía vacío), se genera automáticamente con formato ATP-YYYY-####
+             * @example ATP-2026-0001
+             */
+            codigo?: string | null;
+            /**
+             * @description Nombre descriptivo del fenómeno o evento
+             * @example Sistema Frontal Mayo 2026
+             */
+            nombre: string;
+            /**
+             * @description Descripción detallada del fenómeno y su impacto esperado
+             * @example Sistema frontal con precipitaciones intensas y vientos moderados a fuertes durante 48 horas.
+             */
+            descripcion: string;
+            /**
+             * @description Clasificación principal de la amenaza
+             * @example METEOROLOGICA
+             * @enum {string}
+             */
+            tipoAmenaza: "METEOROLOGICA" | "MAREJADAS" | "REMOCION_EN_MASA" | "INUNDACION" | "INCENDIO_FORESTAL" | "SISMICA" | "OTRO";
+            /**
+             * @description Nivel oficial de alerta comunal
+             * @example AMARILLA
+             * @enum {string}
+             */
+            nivelAlerta: "VERDE" | "AMARILLA" | "ROJA";
+            /**
+             * Format: date-time
+             * @description Fecha y hora de inicio del evento
+             * @example 2026-05-01T10:00
+             */
+            fechaInicio: string;
+            /**
+             * Format: date-time
+             * @description Fecha y hora estimada de término del evento
+             * @example 2026-05-03T18:00
+             */
+            fechaTermino: string;
+            /**
+             * @description Delegaciones municipales afectadas. Arreglo vacío u omitido representa alcance comunal centralizado
+             * @default []
+             * @example [
+             *       "30000000-0000-4000-8000-000000000001"
+             *     ]
+             */
+            delegacionIds: string[];
+        };
+        EventoAtpResponse: {
+            /**
+             * Format: uuid
+             * @description Identificador único del Evento ATP
+             * @example 50000000-0000-4000-8000-000000000001
+             */
+            id: string;
+            /**
+             * @description Código único del Evento ATP
+             * @example ATP-2026-0001
+             */
+            codigo: string;
+            /**
+             * @description Nombre del evento
+             * @example Sistema Frontal Mayo 2026
+             */
+            nombre: string;
+            /** @description Descripción detallada del evento */
+            descripcion: string;
+            /**
+             * @description Tipo de amenaza del evento
+             * @example METEOROLOGICA
+             * @enum {string}
+             */
+            tipoAmenaza: "METEOROLOGICA" | "MAREJADAS" | "REMOCION_EN_MASA" | "INUNDACION" | "INCENDIO_FORESTAL" | "SISMICA" | "OTRO";
+            /**
+             * @description Nivel de alerta comunal
+             * @example AMARILLA
+             * @enum {string}
+             */
+            nivelAlerta: "VERDE" | "AMARILLA" | "ROJA";
+            /**
+             * Format: date-time
+             * @description Fecha y hora de inicio en formato ISO-8601
+             * @example 2026-05-01T10:00:00.000Z
+             */
+            fechaInicio: string;
+            /**
+             * Format: date-time
+             * @description Fecha y hora de término estimada en formato ISO-8601
+             * @example 2026-05-03T18:00:00.000Z
+             */
+            fechaTermino: string;
+            /**
+             * @description Estado actual del Evento ATP
+             * @example ACTIVO
+             * @enum {string}
+             */
+            estado: "ACTIVO" | "CERRADO" | "CANCELADO";
+            /** @description Delegaciones municipales afectadas. Arreglo vacío indica alcance comunal centralizado */
+            delegaciones: {
+                /**
+                 * Format: uuid
+                 * @description Identificador único de la delegación municipal
+                 * @example 30000000-0000-4000-8000-000000000001
+                 */
+                id: string;
+                /**
+                 * @description Código institucional de la delegación
+                 * @example DEL_NORTE
+                 */
+                codigo: string;
+                /**
+                 * @description Nombre legible de la delegación
+                 * @example Delegación Municipal Norte
+                 */
+                nombre: string;
+            }[];
+            /**
+             * Format: uuid
+             * @description Identificador del usuario que registró el evento
+             * @example 00000000-0000-4000-8000-000000000001
+             */
+            creadoPorId: string | null;
+            /**
+             * Format: date-time
+             * @description Fecha y hora de creación en formato ISO-8601
+             * @example 2026-05-01T09:55:00.000Z
+             */
+            creadoEn: string;
+            /**
+             * Format: date-time
+             * @description Fecha y hora de última actualización en formato ISO-8601
+             * @example 2026-05-01T09:55:00.000Z
+             */
+            actualizadoEn: string;
+        };
+        CrearEventoAtpResponse: {
+            /** @example Evento ATP registrado exitosamente. */
+            message: string;
+            data: {
+                /**
+                 * Format: uuid
+                 * @description Identificador único del Evento ATP
+                 * @example 50000000-0000-4000-8000-000000000001
+                 */
+                id: string;
+                /**
+                 * @description Código único del Evento ATP
+                 * @example ATP-2026-0001
+                 */
+                codigo: string;
+                /**
+                 * @description Nombre del evento
+                 * @example Sistema Frontal Mayo 2026
+                 */
+                nombre: string;
+                /** @description Descripción detallada del evento */
+                descripcion: string;
+                /**
+                 * @description Tipo de amenaza del evento
+                 * @example METEOROLOGICA
+                 * @enum {string}
+                 */
+                tipoAmenaza: "METEOROLOGICA" | "MAREJADAS" | "REMOCION_EN_MASA" | "INUNDACION" | "INCENDIO_FORESTAL" | "SISMICA" | "OTRO";
+                /**
+                 * @description Nivel de alerta comunal
+                 * @example AMARILLA
+                 * @enum {string}
+                 */
+                nivelAlerta: "VERDE" | "AMARILLA" | "ROJA";
+                /**
+                 * Format: date-time
+                 * @description Fecha y hora de inicio en formato ISO-8601
+                 * @example 2026-05-01T10:00:00.000Z
+                 */
+                fechaInicio: string;
+                /**
+                 * Format: date-time
+                 * @description Fecha y hora de término estimada en formato ISO-8601
+                 * @example 2026-05-03T18:00:00.000Z
+                 */
+                fechaTermino: string;
+                /**
+                 * @description Estado actual del Evento ATP
+                 * @example ACTIVO
+                 * @enum {string}
+                 */
+                estado: "ACTIVO" | "CERRADO" | "CANCELADO";
+                /** @description Delegaciones municipales afectadas. Arreglo vacío indica alcance comunal centralizado */
+                delegaciones: {
+                    /**
+                     * Format: uuid
+                     * @description Identificador único de la delegación municipal
+                     * @example 30000000-0000-4000-8000-000000000001
+                     */
+                    id: string;
+                    /**
+                     * @description Código institucional de la delegación
+                     * @example DEL_NORTE
+                     */
+                    codigo: string;
+                    /**
+                     * @description Nombre legible de la delegación
+                     * @example Delegación Municipal Norte
+                     */
+                    nombre: string;
+                }[];
+                /**
+                 * Format: uuid
+                 * @description Identificador del usuario que registró el evento
+                 * @example 00000000-0000-4000-8000-000000000001
+                 */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha y hora de creación en formato ISO-8601
+                 * @example 2026-05-01T09:55:00.000Z
+                 */
+                creadoEn: string;
+                /**
+                 * Format: date-time
+                 * @description Fecha y hora de última actualización en formato ISO-8601
+                 * @example 2026-05-01T09:55:00.000Z
+                 */
+                actualizadoEn: string;
+            };
+        };
         CrearMisionVerificacionInput: {
             /**
              * Format: uuid
@@ -13063,6 +14149,57 @@ export interface components {
             data: {
                 incidente: components["schemas"]["IncidenteReclasificadoResumen"];
                 hito: components["schemas"]["MisionHitoTipologia"];
+            };
+        };
+        RechazarMisionBody: {
+            /**
+             * @description Motivo obligatorio del rechazo de la misión (mínimo 5 caracteres según Regla Crítica §3.3)
+             * @example Desperfecto mecánico en el neumático delantero del vehículo institucional.
+             */
+            justificacion_rechazo: string;
+            /**
+             * @description Latitud WGS84 de la patrulla (-90 a 90)
+             * @example -39.81422
+             */
+            latitud?: number;
+            /**
+             * @description Longitud WGS84 de la patrulla (-180 a 180)
+             * @example -73.24589
+             */
+            longitud?: number;
+        };
+        RechazarMisionResponse: {
+            /** @example Misión rechazada exitosamente. El incidente ha vuelto a estado REPORTADO para su reasignación. */
+            message: string;
+            data: {
+                mision: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    estado: string;
+                    justificacionRechazo: string;
+                    actualizadoEn: string;
+                };
+                patrulla: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    estado: string;
+                };
+                incidente: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    estado: string;
+                    prioridad?: string;
+                };
+                hito: {
+                    /** Format: uuid */
+                    id: string;
+                    hito: string;
+                    descripcion: string;
+                    creadoEn: string;
+                };
             };
         };
         AceptarMisionInput: {
@@ -13506,6 +14643,286 @@ export interface components {
                 creadoEn: string;
                 /** @description Fecha de actualización ISO 8601 */
                 actualizadoEn: string;
+            };
+        };
+        ListarEventosRecuperacionResponse: {
+            /** @example Eventos de recuperación obtenidos exitosamente. */
+            message: string;
+            /** @example 4 */
+            total: number;
+            data: {
+                /**
+                 * Format: uuid
+                 * @description Identificador único UUID del evento de recuperación
+                 */
+                id: string;
+                /**
+                 * @description Código oficial único del evento (ej. REC-2026-0001)
+                 * @example REC-2026-0001
+                 */
+                codigo: string;
+                /** @example Entrega de frazadas y techumbre en Sector Collico */
+                nombre: string;
+                /** @example Familias afectadas por temporal de viento */
+                descripcion: string | null;
+                /** @example Collico */
+                sector: string;
+                /** @example Calle Balmaceda 1245 con Las Palmeras */
+                direccionTexto: string | null;
+                /**
+                 * @example ALTA
+                 * @enum {string}
+                 */
+                prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+                /** @example Juan Pérez (Presidente JJVV) */
+                contactoNombre: string | null;
+                /** @example +56912345678 */
+                contactoTelefono: string | null;
+                /** @example -39.8142 */
+                latitud: number;
+                /** @example -73.2459 */
+                longitud: number;
+                /**
+                 * @example PLANIFICADA
+                 * @enum {string}
+                 */
+                estado: "PLANIFICADA" | "EN_EJECUCION" | "COMPLETADA" | "CANCELADA";
+                /** @example 4 */
+                familiasAfectadas: number;
+                /** @description Delegación territorial asignada */
+                delegacion: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    nombre: string;
+                } | null;
+                /** @description Misión táctica despachada a terreno */
+                mision: {
+                    /**
+                     * Format: uuid
+                     * @example 60000000-0000-4000-8000-000000000001
+                     */
+                    id: string;
+                    /** @example MIS-2026-0042 */
+                    codigo: string;
+                    /** @example Entrega de frazadas y techumbre en Sector Collico */
+                    titulo: string;
+                    /** @example DESPACHADA */
+                    estado: string;
+                    /** @example RECUPERACION */
+                    tipoMision: string;
+                };
+                /** @description Patrulla asignada a la operación */
+                patrulla: {
+                    /**
+                     * Format: uuid
+                     * @example 50000000-0000-4000-8000-000000000001
+                     */
+                    id: string;
+                    /** @example Patrulla Verificadora Alfa */
+                    nombre: string;
+                    /** @example EN_RECUPERACION */
+                    estado: string;
+                };
+                /** @description Recursos reservados o descontados para la entrega */
+                recursos: {
+                    /**
+                     * Format: uuid
+                     * @example 00000000-0000-4000-8000-000000000001
+                     */
+                    recursoId: string;
+                    /** @example Sacos de Arena 25kg */
+                    nombre: string;
+                    /** @example 10 */
+                    cantidadAsignada: number;
+                }[];
+                /**
+                 * Format: uuid
+                 * @description Identificador del Encargado que creó el evento
+                 */
+                creadoPorId: string;
+                /** @description Fecha de registro ISO 8601 */
+                creadoEn: string;
+                /** @description Fecha de actualización ISO 8601 */
+                actualizadoEn: string;
+            }[];
+        };
+        RecuperacionDetalleResponse: {
+            /** @example Detalle del evento de recuperación obtenido exitosamente. */
+            message: string;
+            data: {
+                /**
+                 * Format: uuid
+                 * @example 70000000-0000-4000-8000-000000000001
+                 */
+                id: string;
+                /** @example REC-2026-0001 */
+                codigo: string;
+                /** @example Entrega de frazadas y techumbre en Sector Collico */
+                nombre: string;
+                /** @example Familias afectadas por temporal de viento */
+                descripcion: string | null;
+                /** @example Collico */
+                sector: string;
+                /** @example Calle Balmaceda 1245 con Las Palmeras */
+                direccionTexto: string | null;
+                /**
+                 * @example ALTA
+                 * @enum {string}
+                 */
+                prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+                /** @example Juan Pérez (Presidente JJVV) */
+                contactoNombre: string | null;
+                /** @example +56912345678 */
+                contactoTelefono: string | null;
+                /** @example -39.8142 */
+                latitud: number;
+                /** @example -73.2459 */
+                longitud: number;
+                /**
+                 * @example PLANIFICADA
+                 * @enum {string}
+                 */
+                estado: "PLANIFICADA" | "EN_EJECUCION" | "COMPLETADA" | "CANCELADA";
+                /** @example 4 */
+                familiasAfectadas: number;
+                /** @description Delegación territorial asignada */
+                delegacion: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    nombre: string;
+                } | null;
+                /** @description Misiones tácticas vinculadas al evento */
+                misiones: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    titulo: string;
+                    estado: string;
+                    tipoMision: string;
+                    patrulla?: {
+                        /** Format: uuid */
+                        id: string;
+                        nombre: string;
+                        estado: string;
+                    } | null;
+                    creadoEn: string;
+                }[];
+                /** @description Historial de insumos y herramientas asignados */
+                recursosAsignados: {
+                    /** Format: uuid */
+                    id: string;
+                    /** Format: uuid */
+                    recursoId: string;
+                    nombre: string;
+                    esIndividual: boolean;
+                    cantidadAsignada: number;
+                    /** Format: uuid */
+                    misionId?: string | null;
+                    creadoEn: string;
+                }[];
+                /**
+                 * Format: uuid
+                 * @description Identificador del creador
+                 */
+                creadoPorId: string;
+                /** @description Fecha de registro ISO 8601 */
+                creadoEn: string;
+                /** @description Fecha de última actualización ISO 8601 */
+                actualizadoEn: string;
+            };
+        };
+        AsignarRecursosRecuperacionInput: {
+            /**
+             * Format: uuid
+             * @description Identificador de la patrulla verificadora disponible a asignar
+             * @example 50000000-0000-4000-8000-000000000001
+             */
+            patrullaId: string;
+            /** @description Listado de insumos y recursos logísticos a entregar */
+            recursos: {
+                /**
+                 * Format: uuid
+                 * @description UUID del recurso logístico en inventario
+                 * @example 00000000-0000-4000-8000-000000000001
+                 */
+                recursoId: string;
+                /**
+                 * @description Cantidad de unidades requeridas para entrega en el evento
+                 * @example 10
+                 */
+                cantidad: number;
+            }[];
+        };
+        AsignarRecursosRecuperacionResponse: {
+            /** @example Patrulla y recursos logísticos asignados exitosamente al evento de recuperación. */
+            message: string;
+            data: {
+                evento: {
+                    /**
+                     * Format: uuid
+                     * @example 70000000-0000-4000-8000-000000000001
+                     */
+                    id: string;
+                    /** @example REC-2026-0001 */
+                    codigo: string;
+                    /** @example Entrega de frazadas y techumbre en Sector Collico */
+                    nombre: string;
+                    /**
+                     * @example PLANIFICADA
+                     * @enum {string}
+                     */
+                    estado: "PLANIFICADA" | "EN_EJECUCION" | "COMPLETADA" | "CANCELADA";
+                };
+                /** @description Misión táctica despachada a terreno */
+                mision: {
+                    /**
+                     * Format: uuid
+                     * @example 60000000-0000-4000-8000-000000000001
+                     */
+                    id: string;
+                    /** @example MIS-2026-0042 */
+                    codigo: string;
+                    /** @example Entrega de frazadas y techumbre en Sector Collico */
+                    titulo: string;
+                    /** @example DESPACHADA */
+                    estado: string;
+                    /** @example RECUPERACION */
+                    tipoMision: string;
+                };
+                /** @description Patrulla transicionada a EN_RECUPERACION */
+                patrulla: {
+                    /**
+                     * Format: uuid
+                     * @example 50000000-0000-4000-8000-000000000001
+                     */
+                    id: string;
+                    /** @example Patrulla Verificadora Alfa */
+                    nombre: string;
+                    /** @example EN_RECUPERACION */
+                    estado: string;
+                };
+                /** @description Recursos asignados con stock en uso actualizado */
+                recursos: {
+                    /**
+                     * Format: uuid
+                     * @example 00000000-0000-4000-8000-000000000001
+                     */
+                    recursoId: string;
+                    /** @example Sacos de Arena 25kg */
+                    nombre: string;
+                    /** @example false */
+                    esIndividual: boolean;
+                    /** @example 10 */
+                    cantidadAsignada: number;
+                    /** @example 10 */
+                    cantidadEnUso: number;
+                    /** @example DISPONIBLE */
+                    estadoRecurso: string;
+                }[];
+                /** @description Fecha de asignación ISO 8601 */
+                asignadoEn: string;
             };
         };
         CrearEventoPrevencionInput: {

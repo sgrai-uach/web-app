@@ -64,7 +64,14 @@ export function EvaluacionTipologiaCard({
   const yaEvaluada = Boolean(misionActual?.datosAdicionales?.tipologiaEvaluada);
   const mostrarResumen = yaEvaluada && !modoEdicion;
 
-  // Carga inicial del catálogo de tipos (con fallback offline y protección de desmontaje)
+  const tipologiaOriginalRef = useRef(tipologiaOriginal);
+  const prevTipologiaSincronizadaRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    tipologiaOriginalRef.current = tipologiaOriginal;
+  }, [tipologiaOriginal]);
+
+  // Carga inicial única del catálogo de tipos al montar
   useEffect(() => {
     let isMounted = true;
 
@@ -74,21 +81,16 @@ export function EvaluacionTipologiaCard({
         const tipos = await obtenerCatalogoTiposIncidente();
         if (!isMounted) return;
         const listaTipos = Array.isArray(tipos) ? tipos : [];
+        const actual = tipologiaOriginalRef.current;
+        const actualLower = actual.toLowerCase();
+        const coincidencia = actualLower
+          ? listaTipos.find(
+              (t) => t?.nombre && t.nombre.toLowerCase().trim() === actualLower
+            )
+          : undefined;
+        prevTipologiaSincronizadaRef.current = actual;
         setCatalogo(listaTipos);
-
-        if (listaTipos.length > 0) {
-          const actualLower = tipologiaOriginal.toLowerCase();
-          const coincidencia = actualLower
-            ? listaTipos.find(
-                (t) => t?.nombre && t.nombre.toLowerCase().trim() === actualLower
-              )
-            : undefined;
-          if (coincidencia) {
-            setTipoSeleccionadoId(coincidencia.id);
-          } else if (listaTipos[0]?.id) {
-            setTipoSeleccionadoId(listaTipos[0].id);
-          }
-        }
+        setTipoSeleccionadoId(coincidencia ? coincidencia.id : '');
       } catch {
         // En caso de error, el servicio provee fallback
       } finally {
@@ -101,7 +103,21 @@ export function EvaluacionTipologiaCard({
     return () => {
       isMounted = false;
     };
-  }, [tipologiaOriginal]);
+  }, []);
+
+  // Sincronizar la selección solo si la prop tipologiaOriginal cambia posteriormente
+  useEffect(() => {
+    if (catalogo.length === 0) return;
+    if (prevTipologiaSincronizadaRef.current === tipologiaOriginal) return;
+    prevTipologiaSincronizadaRef.current = tipologiaOriginal;
+    const actualLower = tipologiaOriginal.toLowerCase();
+    const coincidencia = actualLower
+      ? catalogo.find(
+          (t) => t?.nombre && t.nombre.toLowerCase().trim() === actualLower
+        )
+      : undefined;
+    setTipoSeleccionadoId(coincidencia ? coincidencia.id : '');
+  }, [catalogo, tipologiaOriginal]);
 
   // Ajuste automático de altura del campo de justificación
   useLayoutEffect(() => {
@@ -298,13 +314,18 @@ export function EvaluacionTipologiaCard({
             }}
             disabled={deshabilitado || guardando || cargandoCatalogo}
             helperText={tipoActualSeleccionado?.descripcion || undefined}
-            options={catalogo.map((t) => ({
-              value: t.id,
-              label: t.nombre,
-            }))}
+            options={[
+              ...(!tipoSeleccionadoId
+                ? [{ value: '', label: 'Seleccione un tipo de incidente...' }]
+                : []),
+              ...catalogo.map((t) => ({
+                value: t.id,
+                label: t.nombre,
+              })),
+            ]}
           />
 
-          {!esCambio ? (
+          {!tipoSeleccionadoId ? null : !esCambio ? (
             <div className={styles.ratificacionNotice} role="note">
               <CheckCircle2 size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
               <span>
