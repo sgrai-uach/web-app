@@ -570,8 +570,14 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
 
       const remotas: MisionLocal[] = data.data.map((item: MisionApiItem) => {
         const previa = localesPreviasMap.get(item.id);
+        const estadoItemStr = String(item.estado);
         const mantenerOptimista = Boolean(
-          previa?.sincronizacionPendiente && item.estado === 'DESPACHADA'
+          previa?.sincronizacionPendiente &&
+            (estadoItemStr === 'DESPACHADA' ||
+              (previa.estado === 'COMPLETADA' &&
+                (estadoItemStr === 'EN_CURSO' ||
+                  estadoItemStr === 'EN_TERRENO' ||
+                  estadoItemStr === 'DESPACHADA')))
         );
         const cachePrevia = leerCacheEvaluacionSegura(item.id);
         const datosPrevios: Record<string, unknown> = {
@@ -676,15 +682,21 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
 
     if (!error && data && data.data) {
       const d: MisionDetalleApi = data.data;
+      const estadoRemotoStr = String(d.estado);
       const mantenerOptimista = Boolean(
-        previaLocal?.sincronizacionPendiente && d.estado === 'DESPACHADA'
+        previaLocal?.sincronizacionPendiente &&
+          (estadoRemotoStr === 'DESPACHADA' ||
+            (previaLocal.estado === 'COMPLETADA' &&
+              (estadoRemotoStr === 'EN_CURSO' ||
+                estadoRemotoStr === 'EN_TERRENO' ||
+                estadoRemotoStr === 'DESPACHADA')))
       );
 
       const hitoLlegadaRemoto = Array.isArray(d.bitacoraTiempos)
         ? d.bitacoraTiempos.find((h) => h.hito === 'LLEGADA_TERRENO')
         : undefined;
 
-      const adjuntosRemotos: AdjuntoLocal[] = Array.isArray(d.reportesTerreno)
+      const adjuntosEnReportes: AdjuntoLocal[] = Array.isArray(d.reportesTerreno)
         ? d.reportesTerreno.flatMap((rep) =>
             Array.isArray(rep.adjuntos)
               ? rep.adjuntos.map((adj) => ({
@@ -699,6 +711,40 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
               : []
           )
         : [];
+
+      const adjuntosRaizMision: AdjuntoLocal[] = Array.isArray(
+        (d as { adjuntos?: unknown }).adjuntos
+      )
+        ? (
+            (d as {
+              adjuntos: Array<{
+                id: string;
+                nombreArchivo: string;
+                url: string;
+                tipoMime: string;
+                tamanoBytes: number;
+                creadoEn: string;
+              }>;
+            }).adjuntos || []
+          ).map((adj) => ({
+            id: adj.id,
+            nombreArchivo: adj.nombreArchivo,
+            url: adj.url,
+            tipoMime: adj.tipoMime,
+            tamanoBytes: adj.tamanoBytes,
+            creadoEn: adj.creadoEn,
+            sincronizacionPendiente: false,
+          }))
+        : [];
+
+      const idsAdjuntosRemotos = new Set<string>();
+      const adjuntosRemotos: AdjuntoLocal[] = [];
+      for (const adj of [...adjuntosEnReportes, ...adjuntosRaizMision]) {
+        if (adj.id && !idsAdjuntosRemotos.has(adj.id)) {
+          idsAdjuntosRemotos.add(adj.id);
+          adjuntosRemotos.push(adj);
+        }
+      }
 
       const adjuntosPrevios = Array.isArray(previaLocal?.datosAdicionales?.adjuntos)
         ? (previaLocal.datosAdicionales.adjuntos as AdjuntoLocal[])
@@ -802,6 +848,29 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         reportesCierreRemotos.length > 0 ||
         Boolean(datosPrevios.reporteVerificacionEnviado);
 
+      const reportesCuadrillaRemotos = reportesRemotos.filter(
+        (r) => r.tipoReporte === 'REPORTE_CUADRILLA'
+      );
+      const ultimoReporteCuadrillaRemoto =
+        reportesCuadrillaRemotos[reportesCuadrillaRemotos.length - 1];
+      const reporteCuadrillaEnviado =
+        Boolean(evalRemota?.reporteCuadrillaEnviado) ||
+        reportesCuadrillaRemotos.length > 0 ||
+        Boolean(datosPrevios.reporteCuadrillaEnviado);
+
+      const cuadrillaRecursosMapeados = Array.isArray(d.cuadrilla?.recursos)
+        ? d.cuadrilla.recursos.map((r) => ({
+            id: r.id,
+            nombre: r.nombre,
+            tipo: r.tipo,
+            cantidadAsignada: Number(r.cantidadAsignada ?? 0),
+            ...(r.esIndividual !== undefined ? { esIndividual: Boolean(r.esIndividual) } : {}),
+            ...(r.unidad !== undefined ? { unidad: r.unidad ?? null } : {}),
+          }))
+        : Array.isArray(datosPrevios.cuadrillaRecursos)
+          ? datosPrevios.cuadrillaRecursos
+          : undefined;
+
       const datosBaseMision = {
         ...datosPrevios,
         trabajo:
@@ -816,6 +885,13 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
             ? { estadoPatrulla: d.patrulla.estado }
             : {}),
         ...(d.cuadrilla?.estado ? { estadoCuadrilla: d.cuadrilla.estado } : {}),
+        ...(cuadrillaRecursosMapeados !== undefined
+          ? { cuadrillaRecursos: cuadrillaRecursosMapeados }
+          : {}),
+        fechaCierre:
+          d.fechaCierre ??
+          (datosPrevios.fechaCierre as string | null | undefined) ??
+          null,
         estadoIncidente:
           d.incidente?.estado ||
           (d.cuadrilla || d.tipoMision === 'ATENCION_CUADRILLA'
@@ -823,7 +899,9 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
             : 'VERIFICANDO'),
         ...(hitoLlegadaRemoto ? { hitoLlegada: hitoLlegadaRemoto.descripcion } : {}),
         reporteTerrenoId:
-          reportesRemotos.length > 0 ? reportesRemotos[0].id : undefined,
+          ultimoReporteCuadrillaRemoto?.id ??
+          ultimoReporteCierreRemoto?.id ??
+          (reportesRemotos.length > 0 ? reportesRemotos[0].id : undefined),
         adjuntos: adjuntosCombinados,
         reportesTerreno: reportesRemotos,
         ...(reportesPrioridadRemotos.length > 0
@@ -855,6 +933,12 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
           evalRemota?.dictamenVerificacion ??
           ultimoReporteCierreRemoto?.dictamen ??
           (datosPrevios.dictamenVerificacion as string | null | undefined) ??
+          null,
+        reporteCuadrillaEnviado,
+        reporteCuadrillaEnviadoEn:
+          evalRemota?.reporteCuadrillaEnviadoEn ??
+          ultimoReporteCuadrillaRemoto?.creadoEn ??
+          (datosPrevios.reporteCuadrillaEnviadoEn as string | null | undefined) ??
           null,
       };
 
@@ -1144,7 +1228,8 @@ export async function aceptarMision(
         : {
             estadoPatrulla: 'EN_VERIFICACION',
             estadoIncidente: 'VERIFICANDO',
-            hitoAceptacion: 'Misión Aceptada por Patrulla (Pendiente de sincronizar)',
+            hitoAceptacion:
+              'Misión Aceptada por Patrulla (Pendiente de sincronizar)',
           }),
     },
     actualizadoEn: ahoraOffline,
@@ -1168,9 +1253,17 @@ export async function aceptarMision(
 }
 
 /**
- * Alias retrocompatible para la aceptación de misiones de Patrulla Verificadora (H36).
+ * Alias retrocompatible para la confirmación de salida de Patrulla Verificadora (H36).
  */
-export const aceptarMisionPatrulla = aceptarMision;
+export async function aceptarMisionPatrulla(
+  misionId: string,
+  opciones?: OpcionesAceptarMision
+): Promise<ResultadoAceptarMision> {
+  return aceptarMision(misionId, {
+    ...opciones,
+    tipoUnidad: opciones?.tipoUnidad ?? 'patrulla',
+  });
+}
 
 type RechazarMisionApiData =
   paths['/api/misiones/{id}/rechazar']['post']['responses'][200]['content']['application/json'];

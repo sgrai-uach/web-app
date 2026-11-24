@@ -9,6 +9,7 @@ export interface SelectOption {
 
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
+  placeholder?: string;
   error?: string;
   helperText?: string;
   requiredIndicator?: boolean;
@@ -16,7 +17,7 @@ export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElemen
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, helperText, requiredIndicator, id, className = '', options, children, style, ...props }, ref) => {
+  ({ label, placeholder, error, helperText, requiredIndicator, id, className = '', options, children, style, ...props }, ref) => {
     const selectId = id || (label ? `select-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : undefined);
 
     return (
@@ -34,6 +35,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           aria-describedby={error && selectId ? `${selectId}-error` : undefined}
           {...props}
         >
+          {placeholder && (
+            <option value="" disabled>
+              {placeholder}
+            </option>
+          )}
           {options
             ? options.map((opt) => (
                 <option key={opt.value} value={opt.value} disabled={opt.disabled}>

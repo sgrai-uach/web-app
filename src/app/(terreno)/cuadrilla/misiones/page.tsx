@@ -19,7 +19,7 @@ import { MisionCard } from '@/components/misiones/MisionCard';
 import { NuevaMisionBanner } from '@/components/misiones/NuevaMisionBanner';
 import { useMisionesSocket } from '@/hooks/useMisionesSocket';
 import type { MisionLocal } from '@/types/offline';
-import styles from './CuadrillaMisionesPage.module.css';
+import styles from '@/components/misiones/MisionesBandeja.module.css';
 
 function CuadrillaMisionesContenido() {
   const { usuario, unidadActiva, tieneUnidadAsignada, estadoAsignacion } = useAuth();
@@ -78,9 +78,11 @@ function CuadrillaMisionesContenido() {
     };
     window.addEventListener('sgrai:outbox-synced', refrescar);
     window.addEventListener('sgrai:mision-rechazada', refrescar);
+    window.addEventListener('sgrai:mision-sincronizada', refrescar);
     return () => {
       window.removeEventListener('sgrai:outbox-synced', refrescar);
       window.removeEventListener('sgrai:mision-rechazada', refrescar);
+      window.removeEventListener('sgrai:mision-sincronizada', refrescar);
     };
   }, [cargarMisiones]);
 

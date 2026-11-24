@@ -85,6 +85,7 @@ export const ETIQUETAS_ESTADO_TERRENO: Record<string, string> = {
   INACCESIBLE: 'Inaccesible',
   CONTROLADO: 'Controlado',
   FINALIZADO: 'Finalizado',
+  REQUIERE_SEGUIMIENTO: 'Requiere seguimiento',
 };
 
 /**

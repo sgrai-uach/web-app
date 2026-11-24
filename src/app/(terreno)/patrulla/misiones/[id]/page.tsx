@@ -42,8 +42,7 @@ import {
 import { obtenerReportesPrioridadMision } from '@/services/prioridadService';
 import { obtenerReporteVerificacionMision } from '@/services/reporteVerificacionService';
 import type { MisionLocal } from '@/types/offline';
-import sharedStyles from '@/components/misiones/MisionDetailLayout.module.css';
-import styles from './PatrullaDetailPage.module.css';
+import styles from '@/components/misiones/MisionDetailLayout.module.css';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -206,7 +205,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         status={status}
         pendingCount={pendientes}
         onRetry={sincronizar}
+<<<<<<< HEAD
         descripcion="La misión solicitada no existe o no se encuentra asignada a su unidad operativa, o no está disponible en caché local."
+=======
+        descripcion="La misión solicitada no existe, fue removida o no se encuentra disponible en caché local."
+>>>>>>> origin/feature/h40-cuadrilla-aceptar-asignacion
       />
     );
   }
@@ -316,7 +319,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   };
 
   return (
-    <div className={sharedStyles.container}>
+    <div className={styles.container}>
       <MisionDetalleTopBar
         backHref="/patrulla/misiones"
         backLabel={estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Misiones'}
@@ -401,7 +404,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           icono={
             <Navigation
               size={20}
-              color="var(--color-primary-teal)"
+              color="var(--color-primary-teal, #1B6F7D)"
               aria-hidden="true"
             />
           }

@@ -38,6 +38,11 @@ const CLAVES_EVALUACION_CACHEABLES = [
   'reporteVerificacionEnviado',
   'reporteVerificacionEnviadoEn',
   'dictamenVerificacion',
+  'reporteCuadrilla',
+  'reporteCuadrillaEnviado',
+  'reporteCuadrillaEnviadoEn',
+  'cuadrillaRecursos',
+  'fechaCierre',
 ] as const;
 
 function leerMapaCacheEvaluaciones(): Record<string, Record<string, unknown>> {
@@ -77,6 +82,8 @@ function tieneDatosEvaluacion(datos?: Record<string, unknown>): boolean {
       datos.prioridadEvaluada ||
       datos.reporteVerificacionEnviado ||
       datos.reporteVerificacion ||
+      datos.reporteCuadrillaEnviado ||
+      datos.reporteCuadrilla ||
       datos.ultimoReportePrioridad ||
       (Array.isArray(datos.reportesPrioridad) && datos.reportesPrioridad.length > 0) ||
       (Array.isArray(datos.reportesTerreno) && datos.reportesTerreno.length > 0)
@@ -175,6 +182,20 @@ export function fusionarDatosAdicionalesMision(
     actuales.reporteVerificacionEnviado === undefined
   ) {
     fusionados.reporteVerificacionEnviado = true;
+  }
+  if (
+    combinadosPrevios.reporteCuadrillaEnviado === true &&
+    actuales.reporteCuadrillaEnviado === undefined
+  ) {
+    fusionados.reporteCuadrillaEnviado = true;
+  }
+  if (
+    (!Array.isArray(actuales.cuadrillaRecursos) ||
+      (actuales.cuadrillaRecursos as unknown[]).length === 0) &&
+    Array.isArray(combinadosPrevios.cuadrillaRecursos) &&
+    (combinadosPrevios.cuadrillaRecursos as unknown[]).length > 0
+  ) {
+    fusionados.cuadrillaRecursos = combinadosPrevios.cuadrillaRecursos;
   }
 
   const tipologiaConstatada =

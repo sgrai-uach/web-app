@@ -18,7 +18,7 @@ import {
 import { dataUrlToBlob } from '@/lib/utils/mediaUtils';
 import { obtenerDetalleMision } from '@/services/misionesService';
 import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge';
-import type { EvidenciaOutboxPayload } from '@/types/offline';
+import type { AdjuntoLocal, EvidenciaOutboxPayload } from '@/types/offline';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
 
 export function useConnectivity() {
@@ -59,6 +59,8 @@ export function useConnectivity() {
           ? ''
           : process.env.NEXT_PUBLIC_API_URL || '';
 
+      const adjuntosSincronizadosMap = new Map<string, AdjuntoLocal>();
+
       await sincronizarColaOutbox(async (accion) => {
         const authHeaders: Record<string, string> = token
           ? { Authorization: `Bearer ${token}` }
@@ -78,6 +80,68 @@ export function useConnectivity() {
             method: accion.metodo,
             headers: authHeaders,
             body: formData,
+          });
+        } else if (accion.tipo === 'CERRAR_FAENA') {
+          const rawPayload = { ...(accion.payload || {}) } as Record<string, unknown>;
+          const pendientesLocalIds = Array.isArray(
+            rawPayload._adjuntosPendientesLocalIds
+          )
+            ? (rawPayload._adjuntosPendientesLocalIds as string[])
+            : [];
+          delete rawPayload._adjuntosPendientesLocalIds;
+
+          const adjuntoIdsActuales = Array.isArray(rawPayload.adjunto_ids)
+            ? [...(rawPayload.adjunto_ids as string[])]
+            : [];
+          const adjuntosActuales = Array.isArray(rawPayload.adjuntos)
+            ? [...(rawPayload.adjuntos as Array<Record<string, unknown>>)]
+            : [];
+
+          for (const localId of pendientesLocalIds) {
+            const resuelto = adjuntosSincronizadosMap.get(localId);
+            if (resuelto?.id && !adjuntoIdsActuales.includes(resuelto.id)) {
+              adjuntoIdsActuales.push(resuelto.id);
+              const idxLocal = adjuntosActuales.findIndex((a) => a?.id === localId);
+              const itemSincronizado = {
+                id: resuelto.id,
+                nombreArchivo: resuelto.nombreArchivo,
+                url: resuelto.url,
+                tipoMime: resuelto.tipoMime,
+                tamanoBytes: resuelto.tamanoBytes,
+              };
+              if (idxLocal >= 0) {
+                adjuntosActuales[idxLocal] = itemSincronizado;
+              } else {
+                adjuntosActuales.push(itemSincronizado);
+              }
+            }
+          }
+
+          const adjuntosFiltrados = adjuntosActuales.filter(
+            (a) => typeof a?.id !== 'string' || !a.id.startsWith('local-')
+          );
+
+          const bodyCerrar: Record<string, unknown> = {
+            ...rawPayload,
+            ...(adjuntoIdsActuales.length > 0
+              ? { adjunto_ids: adjuntoIdsActuales }
+              : {}),
+            ...(adjuntosFiltrados.length > 0 ? { adjuntos: adjuntosFiltrados } : {}),
+          };
+          if (adjuntoIdsActuales.length === 0) {
+            delete bodyCerrar.adjunto_ids;
+          }
+          if (adjuntosFiltrados.length === 0) {
+            delete bodyCerrar.adjuntos;
+          }
+
+          res = await fetch(`${apiUrl}${accion.url}`, {
+            method: accion.metodo,
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders,
+            },
+            body: JSON.stringify(bodyCerrar),
           });
         } else {
           res = await fetch(`${apiUrl}${accion.url}`, {
@@ -267,6 +331,10 @@ export function useConnectivity() {
                 creadoEn: new Date().toISOString(),
                 sincronizacionPendiente: false,
               });
+              adjuntosSincronizadosMap.set(
+                evPayload.adjuntoLocalId,
+                adjuntoDefinitivo
+              );
               await reemplazarAdjuntoLocalEnMision(
                 evPayload.misionId,
                 evPayload.adjuntoLocalId,
@@ -320,6 +388,79 @@ export function useConnectivity() {
               }
             } catch {
               // Ignorar fallos de persistencia secundaria
+            }
+          }
+        }
+        if (procesada && accion.tipo === 'CERRAR_FAENA') {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/cerrar/);
+          const misionId = match?.[1];
+          if (misionId) {
+            if (esExito) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  let fechaCierreServidor =
+                    (local.datosAdicionales?.fechaCierre as string | undefined) ||
+                    new Date().toISOString();
+                  let reporteTerrenoIdServidor =
+                    local.datosAdicionales?.reporteTerrenoId;
+                  try {
+                    const bodyJson = await res.clone().json();
+                    if (bodyJson?.data?.mision?.fechaCierre) {
+                      fechaCierreServidor = bodyJson.data.mision.fechaCierre;
+                    }
+                    if (bodyJson?.data?.reporteTerreno?.id) {
+                      reporteTerrenoIdServidor = bodyJson.data.reporteTerreno.id;
+                    }
+                  } catch {
+                    // Ignorar si la respuesta no contiene JSON
+                  }
+                  const reporteCuadrillaPrevio = local.datosAdicionales
+                    ?.reporteCuadrilla as Record<string, unknown> | undefined;
+                  await guardarMisionLocal({
+                    ...local,
+                    estado: 'COMPLETADA',
+                    sincronizacionPendiente: false,
+                    actualizadoEn: fechaCierreServidor,
+                    datosAdicionales: {
+                      ...local.datosAdicionales,
+                      estadoCuadrilla: 'DISPONIBLE',
+                      fechaCierre: fechaCierreServidor,
+                      reporteCuadrillaEnviado: true,
+                      ...(reporteTerrenoIdServidor
+                        ? { reporteTerrenoId: reporteTerrenoIdServidor }
+                        : {}),
+                      ...(reporteCuadrillaPrevio
+                        ? {
+                            reporteCuadrilla: {
+                              ...reporteCuadrillaPrevio,
+                              ...(typeof reporteTerrenoIdServidor === 'string'
+                                ? { id: reporteTerrenoIdServidor }
+                                : {}),
+                              sincronizado: true,
+                            },
+                          }
+                        : {}),
+                    },
+                  });
+                }
+              } catch {
+                // Ignorar fallos de persistencia secundaria
+              }
+            } else if (esConflictoTerminal || esErrorIrrecuperable) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  await guardarMisionLocal({
+                    ...local,
+                    sincronizacionPendiente: false,
+                    actualizadoEn: new Date().toISOString(),
+                  });
+                }
+                await obtenerDetalleMision(misionId);
+              } catch {
+                // Ignorar fallos al reconciliar con el servidor
+              }
             }
           }
         }

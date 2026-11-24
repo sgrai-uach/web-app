@@ -256,14 +256,16 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
     );
   });
 
-  it('H40: suscribe a la sala cuadrilla:{unidadId}, despliega alerta ATENCION_CUADRILLA y navega a /cuadrilla/misiones/{id}', async () => {
+  it('H40: suscribe a sala cuadrilla:{id}, despliega MisionAsignadaBanner y navega a /cuadrilla/misiones/{id} al pulsar Ver Misión', async () => {
     vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
       usuario: {
         ...usuarioPatrulla,
-        rolCodigo: 'DELEGADO_CUADRILLA',
+        rolId: 'rol-cuadrilla',
         rolNombre: 'Delegado de Cuadrilla',
-        unidadId: 'cuadrilla-uuid-40',
-        unidadNombre: 'Cuadrilla Vías 1',
+        rolCodigo: 'DELEGADO_CUADRILLA',
+        permisos: ['misiones:terreno:ejecutar'],
+        unidadId: 'cuadrilla-uuid-555',
+        unidadNombre: 'Cuadrilla Vías y Canales 1',
       },
       token: 'jwt-mock-cuadrilla',
       cargando: false,
@@ -280,37 +282,52 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
       recargarSesion: vi.fn(),
     });
 
-    render(
+    const { unmount } = render(
       <NotificacionesTerrenoProvider>
         <TestConsumer />
       </NotificacionesTerrenoProvider>
     );
 
-    expect(socketClient.unirseASalaCuadrilla).toHaveBeenCalledWith('cuadrilla-uuid-40');
+    expect(socketClient.conectarSocket).toHaveBeenCalledWith('jwt-mock-cuadrilla');
+    expect(socketClient.unirseASalaCuadrilla).toHaveBeenCalledWith('cuadrilla-uuid-555');
+    expect(socketClient.unirseASalaPatrulla).not.toHaveBeenCalled();
 
     await act(async () => {
       socketHandler({
-        notificacionId: 'notif-cuad-40',
-        misionId: 'mis-cuad-40',
-        codigo: 'MIS-2026-0040',
+        notificacionId: 'notif-cuad-1',
+        misionId: '70000000-0000-4000-8000-000000000001',
+        codigo: 'MIS-2026-0005',
         tipoMision: 'ATENCION_CUADRILLA',
         patrullaId: null,
-        cuadrillaId: 'cuadrilla-uuid-40',
-        incidenteId: 'inc-40',
-        incidenteCodigo: 'INC-2026-0040',
-        incidenteFolio: 'FOL-40',
-        tipoAfectacion: 'Despeje de árbol caído',
-        direccion: 'Av. Alemania 600',
+        cuadrillaId: 'cuadrilla-uuid-555',
+        incidenteId: '30000000-0000-4000-8000-000000000001',
+        incidenteCodigo: 'INC-2026-0001',
+        incidenteFolio: 'FOL-0001',
+        tipoAfectacion: 'Despeje de árbol caído sobre calzada',
+        direccion: 'Av. Ramón Picarte 1100, Valdivia',
         prioridad: 'ALTA',
-        asignadoEn: '2026-11-22T14:00:00Z',
+        asignadoEn: '2026-11-22T13:55:00Z',
       });
     });
 
-    const btnVer = screen.getByTestId('btn-ver-mision-banner');
+    expect(screen.getByTestId('codigo-mision-banner')).toHaveTextContent('MIS-2026-0005');
+    expect(screen.getByTestId('afectacion-banner')).toHaveTextContent(
+      'Despeje de árbol caído sobre calzada'
+    );
+
     await act(async () => {
-      fireEvent.click(btnVer);
+      fireEvent.click(screen.getByTestId('btn-ver-mision-banner'));
     });
 
-    expect(mockPush).toHaveBeenCalledWith('/cuadrilla/misiones/mis-cuad-40');
+    expect(notificacionesService.emitirAckLectura).toHaveBeenCalledWith(
+      'notif-cuad-1',
+      '70000000-0000-4000-8000-000000000001'
+    );
+    expect(mockPush).toHaveBeenCalledWith(
+      '/cuadrilla/misiones/70000000-0000-4000-8000-000000000001'
+    );
+
+    unmount();
+    expect(socketClient.salirDeSalaCuadrilla).toHaveBeenCalledWith('cuadrilla-uuid-555');
   });
 });

@@ -9,10 +9,15 @@ import {
   Clock,
   HardHat,
   Navigation,
+  WifiOff,
+  FileCheck,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
 import { useToastOptional } from '@/components/ui/Toast';
 import {
   MisionDetalleTopBar,
@@ -32,6 +37,11 @@ import {
   type CoordenadasGPS,
 } from '@/components/misiones/RechazoMisionModal';
 import { CargaEvidenciaCard } from '@/components/misiones/CargaEvidenciaCard';
+import { CierreMisionCuadrillaCard } from '@/components/misiones/CierreMisionCuadrillaCard';
+import {
+  obtenerReporteCierreCuadrillaMision,
+  type ResultadoCierreCuadrilla,
+} from '@/services/cierreCuadrillaService';
 import {
   obtenerDetalleMision,
   aceptarMision,
@@ -42,8 +52,8 @@ import {
 import { extraerAdjuntosDeMision } from '@/services/offlineQueue';
 import { formatearEstado, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { AdjuntoLocal, MisionLocal } from '@/types/offline';
-import sharedStyles from '@/components/misiones/MisionDetailLayout.module.css';
-import styles from './CuadrillaDetailPage.module.css';
+import styles from '@/components/misiones/MisionDetailLayout.module.css';
+import cuadrillaStyles from './CuadrillaDetailPage.module.css';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -78,6 +88,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
   const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
+  const [seccionCierreAbierta, setSeccionCierreAbierta] = useState<boolean>(true);
 
   const cargarDetalle = useCallback(
     async (silencioso = false) => {
@@ -260,6 +271,8 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   );
   const esRechazable = mostrarBotonAceptar;
 
+  const esMisionActiva = esEnCurso;
+
   // H42 se habilita una vez aceptada la misión (EN_CURSO) y mientras no haya arribo registrado
   const tieneLlegadaRegistrada = Boolean(
     mision.fechaLlegada || mision.datosAdicionales?.hitoLlegada
@@ -268,14 +281,31 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     unidadActiva &&
       esCuadrilla &&
       tienePermisoEjecutar &&
-      esEnCurso &&
+      esMisionActiva &&
       !tieneLlegadaRegistrada
   );
 
   // H43: Adjuntar evidencia multimedia en faena activa
   const puedeAdjuntarEvidencia = Boolean(
-    unidadActiva && esCuadrilla && tienePermisoEvidencia && esEnCurso
+    unidadActiva && esCuadrilla && tienePermisoEvidencia && esMisionActiva
   );
+
+  // H68: Cierre técnico final de cuadrilla
+  const puedeEjecutarCierre = Boolean(
+    unidadActiva && esCuadrilla && tienePermisoEjecutar && esMisionActiva
+  );
+
+  const reporteCierreExistente = obtenerReporteCierreCuadrillaMision(mision);
+  const reporteCierreEnviado =
+    Boolean(reporteCierreExistente) ||
+    Boolean(mision.datosAdicionales?.reporteCuadrillaEnviado) ||
+    esFinalizada;
+
+  const mostrarSeccionCierre =
+    puedeEjecutarCierre ||
+    Boolean(reporteCierreExistente) ||
+    Boolean(mision.datosAdicionales?.reporteCuadrillaEnviado) ||
+    (tieneUnidadAsignada && esFinalizada);
   const adjuntosMision = extraerAdjuntosDeMision(mision);
   const reporteTerrenoIdMision =
     typeof mision.datosAdicionales?.reporteTerrenoId === 'string'
@@ -306,6 +336,49 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       ? mision.datosAdicionales.fechaCierre
       : null;
 
+  const handleAceptarAsignacion = async () => {
+    if (!mision || aceptando) return;
+    setAceptando(true);
+    setErrorAceptacion(null);
+    setMensajeConfirmacion(null);
+
+    try {
+      const resultado = await aceptarMision(mision.id, {
+        misionActual: mision,
+        tipoUnidad: 'cuadrilla',
+      });
+      setMision(resultado.mision);
+      setMensajeConfirmacion(resultado.mensaje);
+      if (toast) {
+        if (resultado.enColaOffline) {
+          toast.showWarning(resultado.mensaje, 'Guardado sin conexión', {
+            dedupKey: `aceptar-mision-offline-${mision.id}`,
+          });
+        } else if (resultado.yaAceptadaPreviamente) {
+          toast.showInfo(resultado.mensaje, 'Misión ya en curso', {
+            dedupKey: `aceptar-mision-idemp-${mision.id}`,
+          });
+        } else {
+          toast.showSuccess(resultado.mensaje, 'Asignación aceptada', {
+            dedupKey: `aceptar-mision-${mision.id}`,
+          });
+        }
+      }
+      await actualizarPendientes();
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'No se pudo confirmar la aceptación de la asignación.';
+      setErrorAceptacion(msg);
+      if (toast) {
+        toast.showError(msg, 'No se pudo aceptar la asignación');
+      }
+    } finally {
+      setAceptando(false);
+    }
+  };
+
   const handleConfirmarRechazo = async (
     motivo: string,
     coordenadas?: CoordenadasGPS
@@ -330,7 +403,6 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
           }
         : null
     );
-    setMensajeConfirmacion(res.mensaje);
     setModalRechazoAbierto(false);
     if (toast) {
       if (res.modoOffline) {
@@ -364,8 +436,24 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     await actualizarPendientes();
   };
 
+  const handleCierreEnviado = async (resultado: ResultadoCierreCuadrilla) => {
+    if (resultado.mision) {
+      setMision(resultado.mision);
+    }
+    setMensajeConfirmacion(resultado.mensaje);
+    if (toast) {
+      if (resultado.offline) {
+        toast.showWarning(resultado.mensaje, 'Guardado sin conexión');
+      } else {
+        toast.showSuccess(resultado.mensaje, 'Misión cerrada');
+      }
+    }
+    await actualizarPendientes();
+    router.push('/cuadrilla/misiones');
+  };
+
   return (
-    <div className={sharedStyles.container}>
+    <div className={styles.container}>
       <MisionDetalleTopBar
         backHref="/cuadrilla/misiones"
         backLabel={estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}
@@ -390,19 +478,37 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         mision={mision}
         trabajoTexto={trabajoTexto}
         etiquetaFecha={
-          esEnCurso && mision.fechaInicio ? 'Inicio de trayecto' : 'Despachada'
+          esMisionActiva && mision.fechaInicio ? 'Inicio de trayecto' : 'Despachada'
         }
         fechaPrincipal={mision.fechaInicio || mision.fechaDespacho}
-        fechaCierre={fechaCierreTexto}
+        fechaCierre={esFinalizada ? fechaCierreTexto : null}
         onVerMapa={() => setMapaAbierto(true)}
       />
+
+      {!(unidadActiva && esMisionActiva) && mision.sincronizacionPendiente && (
+        <div className={styles.offlineQueueBanner} role="status">
+          <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+          <span>
+            Acción registrada localmente. Pendiente de sincronizar con el Centro de
+            Mando.
+          </span>
+        </div>
+      )}
+
+      {!(unidadActiva && esMisionActiva) &&
+        mensajeConfirmacion &&
+        !mision.sincronizacionPendiente && (
+          <div className={styles.SyncedBanner} role="status">
+            {mensajeConfirmacion}
+          </div>
+        )}
 
       {/* Acciones Operativas de Despacho (H40 — Aceptar / H41 — Rechazar) */}
       {(mostrarBotonAceptar || esRechazable) && (
         <MisionDespachoActionsCard
           ariaLabel="Acciones operativas de despacho"
           titulo="Acciones de Despacho"
-          descripcion="Confirme la asignación para notificar a la central que la cuadrilla inicia el desplazamiento, o registre un rechazo motivado si existe un impedimento."
+          descripcion="Confirme la aceptación para notificar a la central de operaciones que la cuadrilla inicia el desplazamiento y asume la atención de la emergencia, o registre un rechazo motivado si existe un impedimento técnico o de fuerza mayor."
           mostrarAceptar={mostrarBotonAceptar}
           etiquetaAceptar="Aceptar Asignación"
           aceptando={aceptando}
@@ -423,13 +529,13 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       )}
 
       {/* Vista activa: Faena en Curso (H40) */}
-      {unidadActiva && esEnCurso && (
+      {unidadActiva && esMisionActiva && (
         <MisionEstadoActivoCard
-          ariaLabel="Estado de faena en curso"
+          ariaLabel="Estado de faena operativa"
           icono={
             <HardHat
               size={20}
-              color="var(--color-primary-teal)"
+              color="var(--color-primary-teal, #1B6F7D)"
               aria-hidden="true"
             />
           }
@@ -448,10 +554,10 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       {/* Confirmación de arribo a terreno (H42 — Post-aceptación) */}
       {mostrarBotonLlegada && (
         <section
-          className={styles.arrivalCard}
+          className={cuadrillaStyles.arrivalCard}
           aria-label="Reporte de llegada a terreno"
         >
-          <h2 className={styles.arrivalTitle}>
+          <h2 className={cuadrillaStyles.arrivalTitle}>
             <MapPinCheck
               size={20}
               color="var(--color-primary-teal)"
@@ -459,14 +565,14 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
             />
             <span>Confirmación de arribo</span>
           </h2>
-          <p className={styles.arrivalDescription}>
+          <p className={cuadrillaStyles.arrivalDescription}>
             Presione el botón para certificar la presencia física del equipo en el
             lugar mediante las coordenadas GPS del dispositivo móvil y notificar a la
             central.
           </p>
 
           {errorGps && (
-            <div className={styles.arrivalAlertError} role="alert">
+            <div className={cuadrillaStyles.arrivalAlertError} role="alert">
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                 <AlertTriangle size={18} aria-hidden="true" />
                 <span>{errorGps}</span>
@@ -477,7 +583,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    className={styles.contingencyButton}
+                    className={cuadrillaStyles.contingencyButton}
                     icon={<Navigation size={15} />}
                     loading={reportando}
                     onClick={() => handleReportarLlegada(true)}
@@ -496,7 +602,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
             loading={reportando}
             icon={<MapPinCheck size={20} />}
             onClick={() => handleReportarLlegada(false)}
-            className={styles.arrivalButton}
+            className={cuadrillaStyles.arrivalButton}
           >
             Llegada a Terreno
           </Button>
@@ -504,44 +610,107 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       )}
 
       {/* Panel informativo cuando la cuadrilla ya registró arribo a terreno (H42) */}
-      {unidadActiva && esEnCurso && tieneLlegadaRegistrada && (
+      {unidadActiva && esMisionActiva && tieneLlegadaRegistrada && (
         <section
-          className={styles.activeWorkPanel}
+          className={cuadrillaStyles.activeWorkPanel}
           aria-label="Trabajos de terreno en curso"
         >
-          <div className={styles.activeWorkHeader}>
+          <div className={cuadrillaStyles.activeWorkHeader}>
             <CheckCircle2 size={20} aria-hidden="true" />
             <span>En Trabajos de Terreno</span>
           </div>
           {fechaLlegadaDisplay && (
-            <div className={styles.activeWorkTimeRow}>
+            <div className={cuadrillaStyles.activeWorkTimeRow}>
               <Clock size={16} color="var(--color-text-muted)" aria-hidden="true" />
               <span>
                 Arribo registrado a las{' '}
-                <span className={styles.activeWorkTimeValue}>
+                <span className={cuadrillaStyles.activeWorkTimeValue}>
                   {formatearFechaHora24h(fechaLlegadaDisplay)}
                 </span>
               </span>
             </div>
           )}
-          <p className={styles.arrivalDescription}>
+          <p className={cuadrillaStyles.arrivalDescription}>
             La cuadrilla se encuentra operando en el sitio. Proceda con las maniobras
             de faena y el registro de evidencias multimedia.
           </p>
         </section>
       )}
 
-      {/* Evidencia multimedia de faena (H43) */}
-      {(puedeAdjuntarEvidencia || adjuntosMision.length > 0) && (
-        <CargaEvidenciaCard
-          misionId={mision.id}
-          incidenteId={mision.incidenteId}
-          reporteTerrenoId={reporteTerrenoIdMision}
-          adjuntos={adjuntosMision}
-          soloLectura={!puedeAdjuntarEvidencia}
-          alAdjuntarEvidencia={handleEvidenciaCargada}
-        />
+      {/* Gestión Técnica de Faena y Cierre de Misión (H68 / H43) */}
+      {mostrarSeccionCierre && (
+        <section
+          className={styles.evaluationFormsSection}
+          data-testid="formularios-reporte-tecnico"
+          aria-label="Gestión técnica y cierre de misión de cuadrilla"
+        >
+          <div className={styles.evaluationHeader}>
+            <h3 className={styles.evaluationTitle}>
+              <ClipboardCheck
+                size={20}
+                color="var(--color-primary-teal, #1B6F7D)"
+                aria-hidden="true"
+              />
+              <span>Gestión Técnica de Faena</span>
+            </h3>
+          </div>
+
+          <div className={styles.evaluationContent}>
+            <SeccionDesplegable
+              titulo="Finalizar Misión e Informe Técnico"
+              icono={<FileCheck size={18} aria-hidden="true" />}
+              abierto={seccionCierreAbierta}
+              onToggle={setSeccionCierreAbierta}
+              indicador={
+                reporteCierreEnviado ? (
+                  <Chip
+                    variant="success"
+                    size="sm"
+                    icon={<CheckCircle2 size={12} />}
+                  >
+                    Completado
+                  </Chip>
+                ) : mision.sincronizacionPendiente ? (
+                  <Chip variant="warning" size="sm">
+                    Pendiente
+                  </Chip>
+                ) : null
+              }
+            >
+              <CierreMisionCuadrillaCard
+                misionActual={mision}
+                adjuntosMision={adjuntosMision}
+                reporteTerrenoId={reporteTerrenoIdMision}
+                puedeAdjuntarEvidencia={puedeAdjuntarEvidencia}
+                usuarioActualId={usuario?.id}
+                deshabilitado={!puedeEjecutarCierre}
+                onCierreEnviado={handleCierreEnviado}
+                onAdjuntarEvidencia={handleEvidenciaCargada}
+              />
+            </SeccionDesplegable>
+          </div>
+        </section>
       )}
+
+      {/* Respaldo RBAC si cuenta con reportes:crear sin misiones:terreno:ejecutar */}
+      {!mostrarSeccionCierre &&
+        (puedeAdjuntarEvidencia || adjuntosMision.length > 0) && (
+          <section
+            id="seccion-evidencia-cuadrilla"
+            className={styles.evidenceStandaloneWrapper}
+            aria-label="Evidencia multimedia de la faena"
+          >
+            <CargaEvidenciaCard
+              embebida
+              misionId={mision.id}
+              incidenteId={mision.incidenteId}
+              reporteTerrenoId={reporteTerrenoIdMision}
+              adjuntos={adjuntosMision}
+              soloLectura={!puedeAdjuntarEvidencia}
+              alAdjuntarEvidencia={handleEvidenciaCargada}
+            />
+          </section>
+        )}
 
       {Array.isArray(mision.bitacoraTiempos) && mision.bitacoraTiempos.length > 0 && (
         <MisionBitacoraTimeline

@@ -63,3 +63,22 @@ export function obtenerVarianteChipPrioridad(prioridad?: string | null): ChipVar
   }
 }
 
+export function obtenerVarianteChipEstadoTerreno(estado?: string | null): ChipVariant {
+  const norm = (estado || '').trim().toUpperCase();
+  switch (norm) {
+    case 'FINALIZADO':
+    case 'CONTROLADO':
+      return 'success';
+    case 'ESTABLE':
+      return 'info';
+    case 'REQUIERE_SEGUIMIENTO':
+      return 'warning';
+    case 'CRITICO':
+    case 'CRÍTICO':
+    case 'INACCESIBLE':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+

@@ -4,16 +4,17 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
+  AlertCircle,
   MapPin,
-  MapPinCheck,
   Map,
   Calendar,
-  Clock,
   CheckCircle,
   CheckCircle2,
   WifiOff,
   Archive,
   XCircle,
+  MapPinCheck,
+  Clock,
   History,
   Send,
   FileCheck,
@@ -23,11 +24,13 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import {
   ConnectionStatusBadge,
   type ConnectionStatus,
 } from '@/components/common/ConnectionStatusBadge';
+import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import {
   formatearPrioridad,
   formatearFechaHora24h,
@@ -45,8 +48,8 @@ export interface MisionDetalleTopBarProps {
 }
 
 /**
- * Barra superior estandarizada compartida entre las vistas de detalle de
- * Patrulla Verificadora y Delegado de Cuadrilla.
+ * Barra superior estandarizada (teal oscuro #14505A) compartida entre las vistas
+ * de detalle de Patrulla Verificadora y Cuadrilla Operativa.
  */
 export function MisionDetalleTopBar({
   backHref,
@@ -80,7 +83,7 @@ export interface MisionDetalleHeaderCardProps {
 }
 
 /**
- * Ficha principal de identificación de misión con borde lateral teal institucional,
+ * Ficha principal de identificación de misión con borde superior mint institucional,
  * tipología formateada, ubicación con acceso al mapa, trabajo y fechas operativas.
  */
 export function MisionDetalleHeaderCard({
@@ -91,24 +94,21 @@ export function MisionDetalleHeaderCard({
   fechaCierre,
   onVerMapa,
 }: MisionDetalleHeaderCardProps) {
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
-  }
-
   return (
     <div className={styles.missionHeader}>
       <div className={styles.headerRow}>
         <div className={styles.codeArea}>
+          <AlertCircle
+            size={20}
+            color="var(--color-primary-teal, #1B6F7D)"
+            aria-hidden="true"
+          />
           <span className={styles.code}>{mision.codigoIncidente}</span>
-          <span className={`${styles.priorityChip} ${prioridadClase}`}>
+          <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
             {formatearPrioridad(mision.prioridad)}
-          </span>
+          </Chip>
         </div>
-        <EstadoBadge estado={mision.estado} />
+        <EstadoBadge estado={mision.estado} size="md" />
       </div>
 
       <div className={styles.detailGrid}>
@@ -215,7 +215,9 @@ export function MisionEstadoActivoCard({
           {icono}
           <h2 className={styles.enTrayectoTitle}>{titulo}</h2>
         </div>
-        <span className={styles.activeStatusChip}>Misión activa</span>
+        <Chip variant="success" size="sm">
+          Misión activa
+        </Chip>
       </div>
 
       <div className={styles.enTrayectoContent}>
@@ -281,9 +283,6 @@ export function MisionNoEncontradaCard({
       <div className={styles.notFoundCard} role="alert">
         <p className={styles.notFoundTitle}>Misión no encontrada</p>
         <p className={styles.notFoundDescription}>{descripcion}</p>
-        <Link href={backHref} className={styles.notFoundBackLink}>
-          Volver a la bandeja
-        </Link>
       </div>
     </div>
   );

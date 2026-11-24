@@ -87,8 +87,8 @@ Sistema universal de alertas flotantes montado en la raíz (`layout.tsx`). Sopor
 
 Primitivas visuales homologadas bajo Flat UI (`border-radius: 0px`, `MisionDetailLayout.module.css`, iconografía `lucide-react`) compartidas entre **Patrulla Verificadora** (`/patrulla/misiones/[id]`) y **Delegado de Cuadrilla** (`/cuadrilla/misiones/[id]`):
 
-- **`<MisionDetalleTopBar />`:** Barra superior con retorno a bandeja y `<ConnectionStatusBadge />`.
-- **`<MisionDetalleHeaderCard />`:** Ficha superior con código de incidente, chip de prioridad, `<EstadoBadge />`, tipología formateada, ubicación con acceso al mapa, trabajo y fecha operativa dinámica.
-- **`<MisionDespachoActionsCard />`:** Tarjeta de acciones de despacho configurable para aceptación (`Aceptar Misión` / `Aceptar Asignación`) y/o rechazo motivado.
-- **`<MisionEstadoActivoCard />`:** Tarjeta de estado activo (*En Trayecto / Evaluación* o *Faena en Curso*) con indicador de sincronización offline y grilla de 3 estados canónicos.
-- **`<MisionNoEncontradaCard />` y `<MisionSoloLecturaNotice />`:** Estado vacío estandarizado y pie informativo de solo lectura.
+- **`<MisionDetalleTopBar />`:** Barra superior (`#14505A`) con retorno a bandeja y `<ConnectionStatusBadge />`.
+- **`<MisionDetalleHeaderCard />`:** Ficha superior con código de incidente, chip de prioridad, `<EstadoBadge />`, tipología formateada, ubicación con visor `<MapaModal />` y fecha operativa (`Despachada` / `Inicio de trayecto` / `Finalizada`).
+- **`<MisionDespachoActionsCard />`:** Tarjeta de acciones operativas para misiones `DESPACHADA` que unifica el botón primario táctil de confirmación (`Aceptar Misión` en H36 o `Aceptar Asignación` en H40, `min-height: 56px`), alerta inline de error (`role="alert"`) y el botón secundario `Rechazar Misión` (H41/H69).
+- **`<MisionEstadoActivoCard />`:** Tarjeta de estado activo (`En Trayecto / Evaluación` para patrulla o `Faena en Curso` para cuadrilla) con banner de sincronización pendiente/confirmada y grilla de los 3 estados canónicos (`Misión`, `Patrulla`/`Cuadrilla`, `Incidente`).
+- **`<MisionNoEncontradaCard />` y `<MisionSoloLecturaNotice />`:** Estados de respaldo para misiones ausentes en caché o en modo solo lectura.

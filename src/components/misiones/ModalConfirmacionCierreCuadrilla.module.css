@@ -1,0 +1,19 @@
+.infoNotice {
+  margin-top: var(--space-3, 12px);
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  background-color: var(--color-info-bg, #e0f2f1);
+  color: var(--color-primary-teal-dark, #14505a);
+  border-left: 3px solid var(--color-primary-teal, #1b6f7d);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.materialList {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8125rem;
+}

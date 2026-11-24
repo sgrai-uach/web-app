@@ -10,7 +10,10 @@ import styles from './layout.module.css';
 /**
  * Rutas que se presentan a ancho completo del dispositivo (sin padding lateral del layout).
  */
-const RUTAS_ANCHO_COMPLETO = [/^\/patrulla\/misiones\/[^/]+\/?$/];
+const RUTAS_ANCHO_COMPLETO = [
+  /^\/patrulla\/misiones\/[^/]+\/?$/,
+  /^\/cuadrilla\/misiones\/[^/]+\/?$/,
+];
 
 export default function TerrenoLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '/';

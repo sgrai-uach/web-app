@@ -19,7 +19,7 @@ import { MisionCard } from '@/components/misiones/MisionCard';
 import { NuevaMisionBanner } from '@/components/misiones/NuevaMisionBanner';
 import { useMisionesSocket } from '@/hooks/useMisionesSocket';
 import type { MisionLocal } from '@/types/offline';
-import styles from './PatrullaMisionesPage.module.css';
+import styles from '@/components/misiones/MisionesBandeja.module.css';
 
 function PatrullaMisionesContenido() {
   const { usuario, unidadActiva, tieneUnidadAsignada, estadoAsignacion } = useAuth();
@@ -83,6 +83,17 @@ function PatrullaMisionesContenido() {
     },
     habilitado: Boolean(unidadActiva),
   });
+
+  // Refrescar bandeja automáticamente cuando eventos de otro integrante sincronicen cambios
+  useEffect(() => {
+    const handleSync = () => {
+      void cargarMisiones();
+    };
+    window.addEventListener('sgrai:mision-sincronizada', handleSync);
+    return () => {
+      window.removeEventListener('sgrai:mision-sincronizada', handleSync);
+    };
+  }, [cargarMisiones]);
 
   const cambiarFiltro = (nuevoFiltro: FiltroEstado) => {
     const params = new URLSearchParams(searchParams.toString());

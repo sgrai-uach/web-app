@@ -1993,6 +1993,8 @@ export interface paths {
                                     observaciones: string | null;
                                     personasAfectadas: number;
                                     requiereApoyoAdicional: boolean;
+                                    horasHombre?: number | null;
+                                    materialesConsumidos?: components["schemas"]["MaterialConsumidoDetalle"][];
                                     evaluacion: {
                                         [key: string]: unknown;
                                     };
@@ -2012,6 +2014,16 @@ export interface paths {
                                         email?: string | null;
                                         rut?: string | null;
                                     };
+                                    creadoEn: string;
+                                }[];
+                                /** @description Evidencias multimedia vinculadas directamente al incidente (incluyendo archivos cargados en terreno durante misiones en curso antes del informe de cierre) */
+                                adjuntos?: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    nombreArchivo: string;
+                                    url: string;
+                                    tipoMime: string;
+                                    tamanoBytes: number;
                                     creadoEn: string;
                                 }[];
                                 /**
@@ -3609,16 +3621,16 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Confirmar y aceptar misión asignada desde terreno (HU-36 / HU-40)
-         * @description Permite al Delegado de Cuadrilla (HU-40) o a la patrulla verificadora (HU-36) confirmar y aceptar la misión asignada desde su dispositivo móvil (PWA). Para cuadrillas (`ATENCION_CUADRILLA`, requiere permiso `misiones:terreno:ejecutar`): ejecuta una transacción atómica que (1) actualiza `mision.estado` de `DESPACHADA` a `EN_CURSO` fijando `fecha_inicio = CURRENT_TIMESTAMP`, (2) actualiza `cuadrilla.estado = 'EN_MISION'`, (3) actualiza `incidente.estado = 'EN_ATENCION'`, (4) registra el hito `'Asignación Aceptada por Cuadrilla'` (`MISION_ACEPTADA`) en `mision_hito`, y emite los eventos WebSocket `incidente:actualizado` y `mision:actualizada` hacia el Centro de Mando. Para patrullas verificadoras (`VERIFICACION`, requiere permiso `misiones:terreno:verificar`), mantiene `patrulla_verificadora.estado = 'EN_VERIFICACION'` e `incidente.estado = 'VERIFICANDO'` registrando `'Misión Aceptada por Patrulla'`.
+         * Confirmar y aceptar misión asignada desde terreno (H36, H40)
+         * @description Permite a la patrulla verificadora o al delegado de cuadrilla confirmar y aceptar la misión asignada desde su dispositivo móvil (PWA). Ejecuta una transición atómica actualizando mision.estado de DESPACHADA a EN_CURSO, fijando mision.fecha_inicio = CURRENT_TIMESTAMP y registrando el hito en mision_hito. Para VERIFICACION mantiene patrulla en EN_VERIFICACION e incidente en VERIFICANDO ('Misión Aceptada por Patrulla'); para ATENCION_CUADRILLA actualiza cuadrilla a EN_MISION e incidente a EN_ATENCION ('Asignación Aceptada por Cuadrilla'), emitiendo los eventos WebSocket hacia el Centro de Mando. Requiere el permiso RBAC 'misiones:terreno:verificar' o 'misiones:terreno:ejecutar'.
          */
         post: {
             parameters: {
                 query?: never;
                 header?: {
-                    /** @description Token Bearer JWT de sesión de terreno (Delegado de Cuadrilla o Patrulla) */
+                    /** @description Token Bearer JWT de sesión de la unidad operativa en terreno */
                     authorization?: string;
-                    /** @description UUID del usuario autenticado con permiso misiones:terreno:ejecutar o misiones:terreno:verificar */
+                    /** @description UUID del usuario autenticado con permiso misiones:terreno:verificar o misiones:terreno:ejecutar */
                     "x-user-id"?: string;
                 };
                 path: {
@@ -3657,7 +3669,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Acceso denegado. Se requiere el permiso 'misiones:terreno:ejecutar' (cuadrilla) o 'misiones:terreno:verificar' (patrulla) y pertenecer a la unidad asignada */
+                /** @description Acceso denegado. Se requiere el permiso 'misiones:terreno:verificar' o 'misiones:terreno:ejecutar' y pertenecer a la unidad asignada */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -3880,6 +3892,10 @@ export interface paths {
                                         tipo: string;
                                         /** @description Cantidad física asignada a la cuadrilla */
                                         cantidadAsignada: number;
+                                        /** @description Indica si es maquinaria/vehículo individual (true) o insumo consumible/granel (false) */
+                                        esIndividual?: boolean;
+                                        /** @description Unidad de medida declarada en el detalle del recurso */
+                                        unidad?: string | null;
                                     }[];
                                 } | null;
                                 /** @description Patrulla verificadora asignada (null si fue asignada una cuadrilla operativa) */
@@ -4032,6 +4048,13 @@ export interface paths {
                                     personasAfectadas: number;
                                     /** @description Estado operativo al momento del reporte (ej. FINALIZADO, EN_CURSO) */
                                     estadoTerreno: string;
+                                    /**
+                                     * @description Horas hombre invertidas por la cuadrilla (HU-68)
+                                     * @example 6.5
+                                     */
+                                    horasHombre?: number | null;
+                                    /** @description Listado de materiales e insumos consumidos en la faena (HU-68) */
+                                    materialesConsumidos?: components["schemas"]["MaterialConsumidoDetalle"][];
                                     /** @description Fotografías, videos o documentos levantados como evidencia en terreno */
                                     adjuntos: {
                                         /**
@@ -4067,6 +4090,36 @@ export interface paths {
                                     /** @description Fecha y hora de última modificación en formato ISO 8601 */
                                     actualizadoEn: string;
                                 }[];
+                                /** @description Evidencia multimedia cargada durante la misión o vinculada al incidente asociado (HU-43) */
+                                adjuntos?: {
+                                    /**
+                                     * Format: uuid
+                                     * @description Identificador único UUID del archivo adjunto
+                                     */
+                                    id: string;
+                                    /**
+                                     * @description Nombre original del archivo
+                                     * @example foto_evaluacion_1.jpg
+                                     */
+                                    nombreArchivo: string;
+                                    /**
+                                     * @description Ruta de acceso pública o relativa del recurso estático bajo Caddy
+                                     * @example /uploads/evidencia/foto_evaluacion_1.jpg
+                                     */
+                                    url: string;
+                                    /**
+                                     * @description MIME type del archivo
+                                     * @example image/jpeg
+                                     */
+                                    tipoMime: string;
+                                    /**
+                                     * @description Tamaño en bytes del archivo
+                                     * @example 1048576
+                                     */
+                                    tamanoBytes: number;
+                                    /** @description Fecha y hora de carga del archivo en formato ISO 8601 */
+                                    creadoEn: string;
+                                }[];
                                 /** @description Estado consolidado de evaluaciones en terreno realizadas en la misión (HU-37 / HU-38 / HU-39) */
                                 evaluaciones?: {
                                     tipologiaEvaluada: boolean;
@@ -4079,6 +4132,8 @@ export interface paths {
                                     reporteVerificacionEnviadoEn?: string | null;
                                     /** @enum {string|null} */
                                     dictamenVerificacion?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
+                                    reporteCuadrillaEnviado?: boolean;
+                                    reporteCuadrillaEnviadoEn?: string | null;
                                 };
                             };
                         };
@@ -9679,6 +9734,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/misiones/{id}/cerrar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enviar informe técnico final y cerrar misión de cuadrilla en terreno (HU-68)
+         * @description Permite al Delegado de Cuadrilla completar y enviar el informe técnico final de resolución de la emergencia al culminar los trabajos. Ejecuta una transacción atómica que: (1) descuenta los materiales consumidos del inventario logístico (recurso y cuadrilla_recurso), (2) inserta el informe en reporte_terreno (tipo_reporte = 'REPORTE_CUADRILLA'), (3) actualiza mision.estado = 'COMPLETADA' con fecha_cierre = CURRENT_TIMESTAMP, (4) transiciona cuadrilla.estado = 'DISPONIBLE' y libera su dotación humana (si no posee otra misión activa), y (5) registra el hito MISION_COMPLETADA en mision_hito. El incidente no se cierra automáticamente y permanece en evaluación del Encargado (H86). Emite eventos WebSocket 'mision:actualizada' e 'incidente:actualizado' hacia las salas 'encargado' y 'mapa', además de 'cuadrilla:actualizada' y 'recurso:actualizado'. Requiere permiso RBAC 'misiones:terreno:ejecutar'.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identificador único UUID de la misión */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Informe técnico final de faenas ejecutadas, materiales consumidos, horas hombre y evaluación del terreno */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CerrarMisionCuadrillaBody"];
+                };
+            };
+            responses: {
+                /** @description Informe técnico final registrado, misión cerrada y cuadrilla liberada exitosamente */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CerrarMisionCuadrillaResponse"];
+                    };
+                };
+                /** @description Datos de entrada inválidos (ej. resumen_faenas < 15 caracteres, horas_hombre <= 0, recurso_id duplicado o intento de consumir recurso individual/vehículo) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token inválido */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere permiso 'misiones:terreno:ejecutar' y pertenecer a la cuadrilla asignada (o rol Administrador) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Misión o recurso material indicado no encontrado */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto: la misión no está en estado EN_CURSO, no tiene cuadrilla asignada, o el stock del recurso consumido es insuficiente */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -12286,6 +12430,8 @@ export interface components {
                     observaciones: string | null;
                     personasAfectadas: number;
                     requiereApoyoAdicional: boolean;
+                    horasHombre?: number | null;
+                    materialesConsumidos?: components["schemas"]["MaterialConsumidoDetalle"][];
                     evaluacion: {
                         [key: string]: unknown;
                     };
@@ -12305,6 +12451,16 @@ export interface components {
                         email?: string | null;
                         rut?: string | null;
                     };
+                    creadoEn: string;
+                }[];
+                /** @description Evidencias multimedia vinculadas directamente al incidente (incluyendo archivos cargados en terreno durante misiones en curso antes del informe de cierre) */
+                adjuntos?: {
+                    /** Format: uuid */
+                    id: string;
+                    nombreArchivo: string;
+                    url: string;
+                    tipoMime: string;
+                    tamanoBytes: number;
                     creadoEn: string;
                 }[];
                 /**
@@ -12355,6 +12511,34 @@ export interface components {
                 creadoEn: string;
                 actualizadoEn: string;
             };
+        };
+        MaterialConsumidoDetalle: {
+            /**
+             * Format: uuid
+             * @description UUID del recurso consumido
+             */
+            recursoId: string;
+            /**
+             * @description Nombre del recurso material
+             * @example Sacos de arena 25kg
+             */
+            nombre: string;
+            /**
+             * @description Cantidad consumida
+             * @example 15
+             */
+            cantidad: number;
+            /**
+             * @description Unidad de medida
+             * @example sacos
+             */
+            unidad?: string | null;
+            /** @description Observación adicional del consumo */
+            observacion?: string | null;
+            /** @description Stock en inventario previo al descuento */
+            stockAnterior?: number;
+            /** @description Stock en inventario posterior al descuento */
+            stockPosterior?: number;
         };
         CrearIncidenteManualInput: {
             /**
@@ -13051,6 +13235,13 @@ export interface components {
                     personasAfectadas: number;
                     /** @description Estado operativo al momento del reporte (ej. FINALIZADO, EN_CURSO) */
                     estadoTerreno: string;
+                    /**
+                     * @description Horas hombre invertidas por la cuadrilla (HU-68)
+                     * @example 6.5
+                     */
+                    horasHombre?: number | null;
+                    /** @description Listado de materiales e insumos consumidos en la faena (HU-68) */
+                    materialesConsumidos?: components["schemas"]["MaterialConsumidoDetalle"][];
                     /** @description Fotografías, videos o documentos levantados como evidencia en terreno */
                     adjuntos: {
                         /**
@@ -13150,13 +13341,13 @@ export interface components {
              */
             hito: string;
             /**
-             * @description Glosa descriptiva del hito operativo ('Asignación Aceptada por Cuadrilla' en HU-40 o 'Misión Aceptada por Patrulla' en HU-36)
-             * @example Asignación Aceptada por Cuadrilla
+             * @description Glosa descriptiva del hito operativo
+             * @example Misión Aceptada por Patrulla
              */
             descripcion: string;
             /**
              * Format: uuid
-             * @description UUID del funcionario en sesión (Delegado de Cuadrilla o líder de patrulla) que confirmó la aceptación
+             * @description UUID del funcionario de patrulla en sesión que confirmó la salida
              */
             registradoPorId: string | null;
             /** @description Latitud reportada al momento del hito */
@@ -13165,6 +13356,280 @@ export interface components {
             longitud: number | null;
             /** @description Fecha y hora del hito en formato ISO 8601 */
             creadoEn: string;
+        };
+        MaterialConsumidoBody: {
+            /**
+             * Format: uuid
+             * @description Identificador único UUID del recurso material o insumo consumido
+             * @example b0000000-0000-4000-8000-000000000010
+             */
+            recurso_id: string;
+            /**
+             * @description Cantidad física de unidades consumidas durante la faena
+             * @example 15
+             */
+            cantidad: number;
+            /**
+             * @description Unidad de medida referencial (ej. sacos, unidades, litros)
+             * @example sacos
+             */
+            unidad?: string;
+            /**
+             * @description Observación específica sobre el consumo del material
+             * @example Utilizados para contención perimetral en acceso norte
+             */
+            observacion?: string;
+        };
+        CerrarMisionCuadrillaBody: {
+            /**
+             * @description Resumen técnico de las faenas ejecutadas en terreno (obligatorio, mínimo 15 caracteres)
+             * @example Despeje completo de alcantarilla obstruida, extracción de sedimentos e instalación de barrera de sacos de arena.
+             */
+            resumen_faenas: string;
+            /**
+             * @description Listado de materiales e insumos consumidos con desglose de cantidades
+             * @default []
+             */
+            materiales_consumidos: components["schemas"]["MaterialConsumidoBody"][];
+            /**
+             * @description Horas hombre totales invertidas por la cuadrilla en la faena (admite decimales)
+             * @example 6.5
+             */
+            horas_hombre: number;
+            /**
+             * @description Evaluación del estado final del terreno al culminar los trabajos
+             * @example CONTROLADO
+             * @enum {string}
+             */
+            estado_terreno: "CONTROLADO" | "ESTABLE" | "FINALIZADO" | "REQUIERE_SEGUIMIENTO" | "CRITICO" | "INACCESIBLE";
+            /**
+             * @description Observaciones adicionales de terreno o recomendaciones post-intervención
+             * @example Calzada habilitada al tránsito; se sugiere limpieza preventiva de cámara aguas arriba.
+             */
+            observaciones?: string | null;
+            /**
+             * @description Detalle de daños remanentes constatados tras la faena
+             * @example Solera poniente con desgaste superficial sin riesgo estructural.
+             */
+            danos_estimados?: string | null;
+            /**
+             * @description Indica si el punto requiere apoyo posterior o seguimiento logístico adicional
+             * @default false
+             * @example false
+             */
+            requiere_apoyo_adicional: boolean;
+            /**
+             * @description Indica si durante los trabajos se detectó vulnerabilidad social que requiera Ficha FIBE
+             * @default false
+             * @example false
+             */
+            requiere_asistencia_social: boolean;
+            /** @description Listado opcional de UUIDs de evidencias multimedia cargadas vía POST /api/evidencia/adjuntos */
+            adjunto_ids?: string[];
+            /** @description Metadatos opcionales de archivos multimedia asociados al informe técnico final */
+            adjuntos?: components["schemas"]["AdjuntoReporteInput"][];
+            /**
+             * @description Coordenada GPS opcional de latitud (WGS84) al cerrar la misión
+             * @example -39.819588
+             */
+            latitud?: number;
+            /**
+             * @description Coordenada GPS opcional de longitud (WGS84) al cerrar la misión
+             * @example -73.245209
+             */
+            longitud?: number;
+        };
+        RecursoConsumidoActualizado: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            cantidadConsumida: number;
+            cantidadInventarioAnterior: number;
+            cantidadInventarioActual: number;
+            cantidadEnUsoActual: number;
+            estado: string;
+        };
+        CerrarMisionCuadrillaResponse: {
+            /** @example Informe técnico final registrado, misión cerrada y cuadrilla disponible exitosamente. */
+            message: string;
+            data: {
+                reporteTerreno: {
+                    /**
+                     * Format: uuid
+                     * @description Identificador único UUID del reporte de terreno
+                     */
+                    id: string;
+                    /**
+                     * Format: uuid
+                     * @description Identificador de la misión asociada
+                     */
+                    misionId: string;
+                    /**
+                     * @description Naturaleza del reporte (EVALUACION_PRIORIDAD, VERIFICACION_CIERRE, REPORTE_CUADRILLA)
+                     * @example VERIFICACION_CIERRE
+                     */
+                    tipoReporte?: string;
+                    /**
+                     * @description Dictamen operativo de la patrulla verificadora al cerrar la verificación (HU-39)
+                     * @example REQUIERE_CUADRILLA
+                     * @enum {string|null}
+                     */
+                    dictamen?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
+                    /** @description Justificación obligatoria cuando el dictamen es NO_ABORDABLE (HU-39 / HU-86) */
+                    motivoNoAbordable?: string | null;
+                    /** @description Indica si se solicitó derivación social / Ficha FIBE en este reporte (HU-39) */
+                    requiereAsistenciaSocial?: boolean;
+                    /**
+                     * @description Número correlativo de versión del reporte en esta misión (1 = inicial, 2+ = rectificaciones)
+                     * @example 1
+                     */
+                    versionReporte?: number;
+                    /**
+                     * @description Indica si es una modificación/reenvío de evaluación en terreno
+                     * @example false
+                     */
+                    esRectificacion?: boolean;
+                    /**
+                     * @description Etiqueta legible del número de reporte para el Centro de Mando
+                     * @example Reporte de Evaluación #1 (Inicial)
+                     */
+                    etiquetaReporte?: string;
+                    /**
+                     * @description Prioridad sugerida por el sistema en este reporte (HU-38)
+                     * @enum {string|null}
+                     */
+                    prioridadSugerida?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | null;
+                    /**
+                     * @description Prioridad confirmada por la patrulla en este reporte (HU-38)
+                     * @enum {string|null}
+                     */
+                    prioridadAsignada?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | null;
+                    /** @description Justificación técnica si se modificó la prioridad sugerida (HU-38) */
+                    justificacionPrioridad?: string | null;
+                    /** @description Desglose del formulario de evaluación en terreno (núcleo familiar, niños, discapacitados, mascotas, vivienda, riesgos) */
+                    detallesEvaluacion?: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Datos del funcionario o patrullero que emitió el reporte */
+                    evaluador: {
+                        /**
+                         * Format: uuid
+                         * @description Identificador único UUID del usuario
+                         */
+                        id: string;
+                        /** @description Nombre completo del evaluador */
+                        nombre: string;
+                        /**
+                         * Format: email
+                         * @description Correo institucional
+                         */
+                        email: string;
+                        /** @description RUT del funcionario */
+                        rut?: string | null;
+                    };
+                    /** @description Diagnóstico técnico consolidado de la intervención */
+                    resumenTecnico: string;
+                    /** @description Labores y maniobras ejecutadas en terreno */
+                    accionesRealizadas: string | null;
+                    /** @description Indica si se requiere escalamiento logístico o relevo */
+                    requiereApoyoAdicional: boolean;
+                    /** @description Descripción o estimación preliminar de daños observados */
+                    danosEstimados: string | null;
+                    /** @description Observaciones de seguridad o condiciones de terreno */
+                    observaciones: string | null;
+                    /** @description Cantidad estimada de personas o familias afectadas */
+                    personasAfectadas: number;
+                    /** @description Estado operativo al momento del reporte (ej. FINALIZADO, EN_CURSO) */
+                    estadoTerreno: string;
+                    /**
+                     * @description Horas hombre invertidas por la cuadrilla (HU-68)
+                     * @example 6.5
+                     */
+                    horasHombre?: number | null;
+                    /** @description Listado de materiales e insumos consumidos en la faena (HU-68) */
+                    materialesConsumidos?: components["schemas"]["MaterialConsumidoDetalle"][];
+                    /** @description Fotografías, videos o documentos levantados como evidencia en terreno */
+                    adjuntos: {
+                        /**
+                         * Format: uuid
+                         * @description Identificador único UUID del archivo adjunto
+                         */
+                        id: string;
+                        /**
+                         * @description Nombre original del archivo
+                         * @example foto_evaluacion_1.jpg
+                         */
+                        nombreArchivo: string;
+                        /**
+                         * @description Ruta de acceso pública o relativa del recurso estático bajo Caddy
+                         * @example /uploads/evidencia/foto_evaluacion_1.jpg
+                         */
+                        url: string;
+                        /**
+                         * @description MIME type del archivo
+                         * @example image/jpeg
+                         */
+                        tipoMime: string;
+                        /**
+                         * @description Tamaño en bytes del archivo
+                         * @example 1048576
+                         */
+                        tamanoBytes: number;
+                        /** @description Fecha y hora de carga del archivo en formato ISO 8601 */
+                        creadoEn: string;
+                    }[];
+                    /** @description Fecha y hora del levantamiento del reporte en formato ISO 8601 */
+                    creadoEn: string;
+                    /** @description Fecha y hora de última modificación en formato ISO 8601 */
+                    actualizadoEn: string;
+                };
+                mision: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    titulo: string;
+                    /** @enum {string} */
+                    tipoMision: "VERIFICACION" | "ATENCION_CUADRILLA" | "PREVENCION" | "RECUPERACION" | "ASISTENCIA_SOCIAL";
+                    /**
+                     * @example COMPLETADA
+                     * @enum {string}
+                     */
+                    estado: "PLANIFICADA" | "DESPACHADA" | "EN_CURSO" | "COMPLETADA" | "CANCELADA" | "RECHAZADA";
+                    /** @enum {string} */
+                    prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+                    /** Format: uuid */
+                    incidenteId: string | null;
+                    /** Format: uuid */
+                    cuadrillaId: string | null;
+                    fechaInicio: string | null;
+                    fechaCierre: string;
+                    actualizadoEn: string;
+                };
+                cuadrilla: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /** @example DISPONIBLE */
+                    estado: string;
+                    /** Format: uuid */
+                    delegacionId?: string | null;
+                };
+                incidente: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    /** @example EN_ATENCION */
+                    estado: string;
+                    prioridad: string;
+                    requiereAsistenciaSocial: boolean;
+                } | null;
+                recursosActualizados: components["schemas"]["RecursoConsumidoActualizado"][];
+                hito: components["schemas"]["MisionHitoRegistrado"] & {
+                    metadatos?: {
+                        [key: string]: unknown;
+                    } | null;
+                };
+            };
         };
         ListarPuntosCriticosResponse: {
             /** @description Colección de puntos críticos almacenados */
@@ -14469,17 +14934,17 @@ export interface components {
                     /** Format: uuid */
                     patrullaId: string | null;
                     /** Format: uuid */
-                    cuadrillaId?: string | null;
+                    cuadrillaId: string | null;
                     /** @description Timestamp ISO 8601 fijado al momento de aceptar la misión */
                     fechaInicio: string;
                     actualizadoEn: string;
                 };
-                cuadrilla?: {
+                cuadrilla: {
                     /** Format: uuid */
                     id: string;
                     nombre: string;
                     /**
-                     * @description Actualizado a EN_MISION al aceptar la asignación (HU-40)
+                     * @description Estado actualizado de la cuadrilla al aceptar la asignación
                      * @example EN_MISION
                      */
                     estado: string;
@@ -14501,11 +14966,12 @@ export interface components {
                     id: string;
                     codigo: string;
                     /**
-                     * @description EN_ATENCION cuando acepta una cuadrilla (HU-40) o VERIFICANDO cuando acepta una patrulla (HU-36)
-                     * @example EN_ATENCION
+                     * @description Estado operativo del incidente tras aceptar la misión (VERIFICANDO o EN_ATENCION)
+                     * @example VERIFICANDO
                      */
                     estado: string;
-                    prioridad?: string;
+                    /** @enum {string} */
+                    prioridad?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
                 } | null;
                 hito: components["schemas"]["MisionHitoRegistrado"];
             };
@@ -16031,6 +16497,233 @@ export interface components {
              * @example Valdivia2026!
              */
             confirmacionPassword: string;
+        };
+        AdjuntoCreadoResponse: {
+            /**
+             * Format: uuid
+             * @description UUID del registro en tabla adjunto
+             */
+            id: string;
+            /** @example evidencia_terreno.jpg */
+            nombreArchivo: string;
+            /** @example /uploads/evidencia/a1b2c3d4.webp */
+            url: string;
+            /** @example image/webp */
+            tipoMime: string;
+            /** @example 145820 */
+            tamanoBytes: number;
+            /** Format: uuid */
+            incidenteId: string | null;
+            /** Format: uuid */
+            reporteTerrenoId: string | null;
+            /** Format: date-time */
+            creadoEn: string;
+        };
+        /** @description Datos de la patrulla verificadora previa que fue liberada automáticamente (null si no había patrulla) */
+        PatrullaLiberada: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            /** @example DISPONIBLE */
+            estado: string;
+            /** Format: uuid */
+            misionPreviaId?: string | null;
+        } | null;
+        AsignarCuadrillaMisionInput: {
+            /**
+             * @description Tipo de misión táctica a despachar
+             * @example ATENCION_CUADRILLA
+             * @enum {string}
+             */
+            tipoMision: "ATENCION_CUADRILLA";
+            /**
+             * Format: uuid
+             * @description UUID del incidente en estado REPORTADO o VERIFICANDO a atender
+             * @example 30000000-0000-4000-8000-000000000001
+             */
+            incidenteId: string;
+            /**
+             * Format: uuid
+             * @description UUID de la cuadrilla operativa disponible a despachar
+             * @example 50000000-0000-4000-8000-000000000001
+             */
+            cuadrillaId: string;
+            /**
+             * @description Título descriptivo de la misión operativa (se autogenera si se omite)
+             * @example Atención y despeje táctico - Incidente INC-2026-001
+             */
+            titulo?: string;
+            /**
+             * @description Instrucciones tácticas u observaciones impartidas a la cuadrilla
+             * @example Despejar ramas caídas sobre tendido eléctrico en sector Las Ánimas.
+             */
+            descripcion?: string;
+            /**
+             * @description Nivel de prioridad. Si se omite, se hereda de la misión de verificación activa de la patrulla o del incidente.
+             * @example ALTA
+             * @enum {string}
+             */
+            prioridad?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+        };
+        CrearMisionResponse: {
+            /** @example Misión de verificación creada y patrulla despachada exitosamente. */
+            message: string;
+            data: {
+                mision: components["schemas"]["MisionCreadaResumen"];
+                incidente: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    estado: string;
+                };
+                patrulla: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    estado: string;
+                };
+                hitoInicial: {
+                    /** Format: uuid */
+                    id: string;
+                    hito: string;
+                    descripcion: string;
+                    creadoEn: string;
+                };
+                /**
+                 * NotificacionMisionDetalle
+                 * @description Trazabilidad completa de la notificación de misión despachada
+                 */
+                notificacion?: {
+                    /**
+                     * Format: uuid
+                     * @description Identificador único de la notificación
+                     */
+                    id: string;
+                    /**
+                     * Format: uuid
+                     * @description Identificador de la misión asociada
+                     */
+                    misionId: string;
+                    /**
+                     * Format: uuid
+                     * @description Identificador de la patrulla destinataria
+                     */
+                    patrullaId: string;
+                    /**
+                     * @description Estado actual del ciclo de vida de la notificación
+                     * @enum {string}
+                     */
+                    estado: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
+                    /**
+                     * @description Contador de emisiones hacia la patrulla
+                     * @example 1
+                     */
+                    intentosEnvio: number;
+                    /** @description Marca temporal UTC de registro en base de datos */
+                    creadaAt: string;
+                    /** @description Marca temporal UTC de emisión hacia la sala de la patrulla */
+                    enviadaAt: string | null;
+                    /** @description Marca temporal UTC del acuse de recibo técnico automático */
+                    recibidaAt: string | null;
+                    /** @description Marca temporal UTC del acuse de lectura operativa */
+                    leidaAt: string | null;
+                };
+            };
+        };
+        CrearMisionVerificacionInput: {
+            /**
+             * Format: uuid
+             * @description Identificador único UUID del incidente a verificar
+             * @example 50000000-0000-4000-8000-000000000001
+             */
+            incidenteId: string;
+            /**
+             * Format: uuid
+             * @description Identificador único UUID de la patrulla verificadora disponible
+             * @example f1000000-0000-4000-8000-000000000001
+             */
+            patrullaId: string;
+            /**
+             * @description Tipo de misión operativa a despachar (fijo en VERIFICACION para evaluación preliminar)
+             * @default VERIFICACION
+             * @example VERIFICACION
+             * @enum {string}
+             */
+            tipoMision: "VERIFICACION";
+            /**
+             * @description Título descriptivo opcional para la misión de verificación
+             * @example Verificación en terreno: Aniego en Las Ánimas
+             */
+            titulo?: string;
+            /**
+             * @description Instrucciones tácticas preliminares para la patrulla
+             * @example Evaluar anegamiento en calzada y riesgo de ingreso a viviendas.
+             */
+            descripcion?: string | null;
+            /**
+             * @description Nivel de prioridad o urgencia táctica (si se omite, hereda la del incidente)
+             * @example ALTA
+             * @enum {string}
+             */
+            prioridad?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+        };
+        RechazarMisionResponse: {
+            /** @example Misión rechazada exitosamente. La cuadrilla ha vuelto a estado DISPONIBLE y el incidente ha retornado a VERIFICANDO para su reasignación. */
+            message: string;
+            data: {
+                mision: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    /** @enum {string} */
+                    tipoMision: "VERIFICACION" | "ATENCION_CUADRILLA" | "PREVENCION" | "RECUPERACION" | "ASISTENCIA_SOCIAL";
+                    /**
+                     * @example RECHAZADA
+                     * @enum {string}
+                     */
+                    estado: "PLANIFICADA" | "DESPACHADA" | "EN_CURSO" | "COMPLETADA" | "CANCELADA" | "RECHAZADA";
+                    justificacionRechazo: string;
+                    fechaCierre: string;
+                    actualizadoEn: string;
+                };
+                cuadrilla: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /** @example DISPONIBLE */
+                    estado: string;
+                    /** Format: uuid */
+                    delegacionId?: string | null;
+                    /** Format: uuid */
+                    usuarioDelegadoId?: string | null;
+                };
+                incidente: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    /** @example VERIFICANDO */
+                    estado: string;
+                    prioridad: string;
+                } | null;
+                hito: components["schemas"]["MisionHitoRegistrado"];
+            };
+        };
+        RechazarMisionBody: {
+            /**
+             * @description Justificación técnica obligatoria del rechazo de la misión (mínimo 5 caracteres según Regla §3.3)
+             * @example Camión tolva presenta falla hidráulica en ruta de salida desde base.
+             */
+            justificacion_rechazo: string;
+            /**
+             * @description Latitud WGS84 opcional de la cuadrilla al momento del rechazo (-90 a 90)
+             * @example -39.81422
+             */
+            latitud?: number;
+            /**
+             * @description Longitud WGS84 opcional de la cuadrilla al momento del rechazo (-180 a 180)
+             * @example -73.24589
+             */
+            longitud?: number;
         };
         AdjuntoCreadoResponse: {
             /**

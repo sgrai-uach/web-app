@@ -21,7 +21,10 @@ import { ModalConfirmacionReporteCierre } from './ModalConfirmacionReporteCierre
 import {
   AlertaFeedbackReporte,
   CampoResumenReporte,
+  ContadorCaracteresReporte,
+  NotaInformativaReporte,
   ResumenReporteTerreno,
+  SwitchReporteTerreno,
   formatearAutorReporte,
   type FeedbackReporteState,
 } from './ReporteTerrenoBase';
@@ -419,12 +422,12 @@ export function EvaluacionReporteCierreCard({
                     aria-describedby={`${motivoId}-counter`}
                     className={styles.textareaField}
                   />
-                  <div id={`${motivoId}-counter`} className={styles.counterRow}>
-                    <span>Mínimo {MOTIVO_NO_ABORDABLE_MIN} caracteres</span>
-                    <span className={contadorMotivoClase || undefined}>
-                      {motivoLimpio.length} / {TEXTAREA_MAX}
-                    </span>
-                  </div>
+                  <ContadorCaracteresReporte
+                    id={`${motivoId}-counter`}
+                    actual={motivoLimpio.length}
+                    minimo={MOTIVO_NO_ABORDABLE_MIN}
+                    maximo={TEXTAREA_MAX}
+                  />
                 </div>
               </div>
             )}
@@ -457,12 +460,12 @@ export function EvaluacionReporteCierreCard({
                 aria-describedby={`${resumenId}-counter`}
                 className={styles.textareaField}
               />
-              <div id={`${resumenId}-counter`} className={styles.counterRow}>
-                <span>Mínimo {RESUMEN_TECNICO_MIN} caracteres</span>
-                <span className={contadorResumenClase || undefined}>
-                  {resumenLimpio.length} / {TEXTAREA_MAX}
-                </span>
-              </div>
+              <ContadorCaracteresReporte
+                id={`${resumenId}-counter`}
+                actual={resumenLimpio.length}
+                minimo={RESUMEN_TECNICO_MIN}
+                maximo={TEXTAREA_MAX}
+              />
             </div>
           </div>
 
@@ -478,21 +481,14 @@ export function EvaluacionReporteCierreCard({
                 Personas damnificadas / afectadas <span className={styles.requiredMark}>*</span>
               </label>
 
-              <div className={styles.infoNote} role="note" data-testid="nota-personas-previas">
-                <Info
-                  size={16}
-                  aria-hidden="true"
-                  style={{ flexShrink: 0, marginTop: '2px' }}
-                />
-                <span>
-                  Rescatado de la evaluación de prioridad previa; puede modificarlo
-                  si constató un número distinto
-                  {infoPersonasPrevias.evaluadorNombre
-                    ? ` (evaluación previa registrada por ${infoPersonasPrevias.evaluadorNombre})`
-                    : ''}
-                  .
-                </span>
-              </div>
+              <NotaInformativaReporte testId="nota-personas-previas">
+                Rescatado de la evaluación de prioridad previa; puede modificarlo
+                si constató un número distinto
+                {infoPersonasPrevias.evaluadorNombre
+                  ? ` (evaluación previa registrada por ${infoPersonasPrevias.evaluadorNombre})`
+                  : ''}
+                .
+              </NotaInformativaReporte>
 
               <div className={styles.personasControlRow}>
                 <button
@@ -572,31 +568,23 @@ export function EvaluacionReporteCierreCard({
               <span>4. Derivación Social y Evidencia</span>
             </h4>
 
-            <button
-              type="button"
-              role="switch"
-              aria-checked={form.requiere_asistencia_social}
+            <SwitchReporteTerreno
+              activo={form.requiere_asistencia_social}
               disabled={deshabilitado || guardando}
-              onClick={() =>
+              icono={<HeartHandshake size={18} aria-hidden="true" />}
+              etiqueta="Requiere Asistencia Social (Levantamiento Ficha FIBE)"
+              textoActivo="Sí"
+              textoInactivo="No"
+              onChange={(activo) =>
                 setForm((prev) => ({
                   ...prev,
-                  requiere_asistencia_social: !prev.requiere_asistencia_social,
+                  requiere_asistencia_social: activo,
                 }))
               }
-              className={`${styles.fibeSwitchBtn} ${
-                form.requiere_asistencia_social ? styles.fibeSwitchActive : ''
-              }`}
-            >
-              <span className={styles.fibeSwitchLabelGroup}>
-                <HeartHandshake size={18} aria-hidden="true" />
-                <span>Requiere Asistencia Social (Levantamiento Ficha FIBE)</span>
-              </span>
-              <span className={styles.switchStateTag}>
-                {form.requiere_asistencia_social ? 'Sí' : 'No'}
-              </span>
-            </button>
+            />
 
             <CargaEvidenciaCard
+              embebida
               misionId={misionActual.id}
               incidenteId={misionActual.incidenteId}
               reporteTerrenoId={reporteTerrenoIdActual}

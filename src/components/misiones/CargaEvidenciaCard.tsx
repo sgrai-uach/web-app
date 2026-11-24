@@ -28,6 +28,7 @@ export interface CargaEvidenciaCardProps {
   reporteTerrenoId?: string;
   adjuntos: AdjuntoLocal[];
   soloLectura?: boolean;
+  embebida?: boolean;
   alAdjuntarEvidencia?: (adjunto: AdjuntoLocal, enColaOffline: boolean) => void | Promise<void>;
 }
 
@@ -57,6 +58,7 @@ export function CargaEvidenciaCard({
   reporteTerrenoId,
   adjuntos,
   soloLectura = false,
+  embebida = false,
   alAdjuntarEvidencia,
 }: CargaEvidenciaCardProps) {
   const fotoInputRef = useRef<HTMLInputElement>(null);
@@ -125,7 +127,7 @@ export function CargaEvidenciaCard({
 
   return (
     <section
-      className={styles.card}
+      className={embebida ? `${styles.card} ${styles.cardEmbebida}` : styles.card}
       aria-label="Carga de evidencia multimedia en terreno"
     >
       <div className={styles.header}>

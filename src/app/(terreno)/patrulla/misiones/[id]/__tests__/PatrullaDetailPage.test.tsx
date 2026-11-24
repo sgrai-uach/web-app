@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import PatrullaMisionDetailPage from '../page';
+import { ToastProvider } from '@/components/ui/Toast';
 import * as AuthContextModule from '@/context/AuthContext';
 import * as misionesService from '@/services/misionesService';
 import * as useConnectivityModule from '@/hooks/useConnectivity';
@@ -349,6 +350,47 @@ describe('PatrullaMisionDetailPage — Confirmar y aceptar misión asignada (HU-
     expect(
       screen.queryByRole('button', { name: /aceptar misi[oó]n/i })
     ).not.toBeInTheDocument();
+  });
+
+  it('emite el toast homologado "Asignación aceptada" al confirmar salida con ToastProvider activo', async () => {
+    configurarAuthMock({ unidadActiva: true, permisoVerificar: true });
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(misionDespachadaMock);
+
+    vi.mocked(misionesService.aceptarMisionPatrulla).mockResolvedValueOnce({
+      mision: {
+        ...misionDespachadaMock,
+        estado: 'EN_CURSO',
+        fechaInicio: '2026-11-01T21:00:00.000Z',
+        sincronizacionPendiente: false,
+      },
+      enColaOffline: false,
+      mensaje:
+        'Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación.',
+    });
+
+    await act(async () => {
+      render(
+        <ToastProvider>
+          <Suspense fallback={<div>Cargando...</div>}>
+            <PatrullaMisionDetailPage
+              params={Promise.resolve({ id: misionDespachadaMock.id })}
+            />
+          </Suspense>
+        </ToastProvider>
+      );
+    });
+
+    const botonAceptar = await screen.findByRole('button', {
+      name: /aceptar misi[oó]n/i,
+    });
+
+    await act(async () => {
+      fireEvent.click(botonAceptar);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Asignación aceptada')).toBeInTheDocument();
+    });
   });
 });
 

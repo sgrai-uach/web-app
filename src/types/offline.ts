@@ -232,4 +232,78 @@ export type CrearReporteVerificacionPayload = NonNullable<
   paths['/api/misiones/{id}/reporte']['post']['requestBody']
 >['content']['application/json'];
 
+// ========================================================
+// HU-68: Cierre de Misión e Informe Técnico Final de Cuadrilla
+// ========================================================
+
+export type CerrarMisionCuadrillaPayload = NonNullable<
+  paths['/api/misiones/{id}/cerrar']['post']['requestBody']
+>['content']['application/json'];
+
+export type CerrarMisionCuadrillaResponseData =
+  paths['/api/misiones/{id}/cerrar']['post']['responses'][201]['content']['application/json']['data'];
+
+export type MaterialConsumidoPayload = NonNullable<
+  CerrarMisionCuadrillaPayload['materiales_consumidos']
+>[number];
+
+export type EstadoTerrenoCierreCuadrilla =
+  | 'FINALIZADO'
+  | 'CONTROLADO'
+  | 'ESTABLE'
+  | 'REQUIERE_SEGUIMIENTO'
+  | 'CRITICO'
+  | 'INACCESIBLE';
+
+export interface RecursoAsignadoCuadrillaLocal {
+  id: string;
+  nombre: string;
+  tipo: string;
+  cantidadAsignada: number;
+  esIndividual?: boolean;
+  unidad?: string | null;
+}
+
+export interface RecursoCatalogoConsumible {
+  id: string;
+  nombre: string;
+  tipo: string;
+  unidad?: string | null;
+  cantidadDisponible: number;
+  cantidadAsignada?: number;
+  esIndividual: boolean;
+  asignadoACuadrilla: boolean;
+  estado?: string;
+}
+
+export interface MaterialConsumidoFormItem {
+  recurso_id: string;
+  nombre?: string;
+  cantidad: number;
+  unidad?: string;
+  observacion?: string;
+}
+
+export interface CierreMisionCuadrillaForm {
+  resumen_faenas: string;
+  horas_hombre: number;
+  estado_terreno: EstadoTerrenoCierreCuadrilla;
+  materiales_consumidos: MaterialConsumidoFormItem[];
+  danos_estimados: string;
+  observaciones: string;
+  requiere_apoyo_adicional: boolean;
+  adjunto_ids: string[];
+  adjuntos: AdjuntoReportePreliminar[];
+}
+
+export interface ReporteCierreCuadrillaLocal extends CierreMisionCuadrillaForm {
+  id?: string;
+  misionId: string;
+  etiquetaReporte?: string;
+  evaluador?: EvaluadorReporteTerreno;
+  creadoEn: string;
+  sincronizado: boolean;
+}
+
+
 
