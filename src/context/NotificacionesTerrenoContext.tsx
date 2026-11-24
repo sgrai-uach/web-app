@@ -118,6 +118,11 @@ export function NotificacionesTerrenoProvider({
           activarAlertaSensorialMision();
           setAlertaActiva(alerta);
           setHistorialAlertas((prev) => [alerta, ...prev]);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('sgrai:mision_asignada', { detail: alerta })
+            );
+          }
         }
       }
     } finally {
@@ -187,6 +192,11 @@ export function NotificacionesTerrenoProvider({
         activarAlertaSensorialMision();
         setAlertaActiva(alerta);
         setHistorialAlertas((prev) => [alerta, ...prev]);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('sgrai:mision_asignada', { detail: alerta })
+          );
+        }
       }
     },
     [esCuadrilla, esPatrulla, reconciliarMisiones, usuario?.unidadId]
@@ -255,6 +265,66 @@ export function NotificacionesTerrenoProvider({
     };
     window.addEventListener('online', handleOnline);
 
+    // Reconciliar al volver a primer plano (PWA restaurada desde segundo plano)
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void reconciliarMisiones();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Puente seguro ante eventos de asignación emitidos por terrenoSocket (/terreno/socket)
+    const handleMisionSincronizada = (e: Event) => {
+      const detail = (e as CustomEvent<Partial<MisionAsignadaPayload>>)?.detail;
+      if (
+        detail &&
+        typeof detail.misionId === 'string' &&
+        (typeof detail.notificacionId === 'string' || typeof detail.asignadoEn === 'string')
+      ) {
+        void handleMisionAsignada({
+          notificacionId: detail.notificacionId || '',
+          misionId: detail.misionId,
+          codigo: detail.codigo || 'MISION',
+          tipoMision:
+            detail.tipoMision || (esCuadrilla ? 'ATENCION_CUADRILLA' : 'VERIFICACION'),
+          tipoUnidad: detail.tipoUnidad ?? (esCuadrilla ? 'CUADRILLA' : 'PATRULLA'),
+          patrullaId: detail.patrullaId ?? (!esCuadrilla ? unidadId : null),
+          cuadrillaId: detail.cuadrillaId ?? (esCuadrilla ? unidadId : null),
+          incidenteId: detail.incidenteId ?? null,
+          incidenteCodigo: detail.incidenteCodigo ?? null,
+          incidenteFolio: detail.incidenteFolio ?? null,
+          tipoAfectacion: detail.tipoAfectacion ?? null,
+          direccion: detail.direccion ?? null,
+          prioridad: detail.prioridad || 'ALTA',
+          asignadoEn: detail.asignadoEn || new Date().toISOString(),
+        });
+      } else {
+        void reconciliarMisiones();
+      }
+    };
+    window.addEventListener('sgrai:mision-sincronizada', handleMisionSincronizada);
+
+    const handleMisionRechazada = (e: Event) => {
+      const detail = (e as CustomEvent<{ misionId?: string }>)?.detail;
+      if (detail?.misionId) {
+        marcarAlertaLeidaPorMision(detail.misionId);
+      } else {
+        setAlertaActiva(null);
+      }
+    };
+    window.addEventListener('sgrai:mision-rechazada', handleMisionRechazada);
+
+    // Sondeo de respaldo mientras la app está visible para garantizar visibilidad en Inicio (/terreno)
+    const intervaloReconciliacion = setInterval(() => {
+      const visible =
+        typeof document === 'undefined' || document.visibilityState === 'visible';
+      const online =
+        typeof navigator === 'undefined' || navigator.onLine !== false;
+      if (visible && online) {
+        void reconciliarMisiones();
+      }
+    }, 20000);
+
     // Reconciliación inicial al montar
     void reconciliarMisiones();
 
@@ -296,9 +366,13 @@ export function NotificacionesTerrenoProvider({
     }
 
     return () => {
+      clearInterval(intervaloReconciliacion);
       unsuscribeMision();
       unsubscribeConnect();
       window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('sgrai:mision-sincronizada', handleMisionSincronizada);
+      window.removeEventListener('sgrai:mision-rechazada', handleMisionRechazada);
       if (typeof window !== 'undefined') {
         window.removeEventListener('sgrai:simular-mision', handleSimularMision);
       }
@@ -314,6 +388,7 @@ export function NotificacionesTerrenoProvider({
     usuario?.unidadId,
     token,
     handleMisionAsignada,
+    marcarAlertaLeidaPorMision,
     reconciliarMisiones,
   ]);
 

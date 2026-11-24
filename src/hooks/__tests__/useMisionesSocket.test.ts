@@ -35,6 +35,8 @@ describe('useMisionesSocket (H35 — Tiempo Real y Refresco Automático de Misio
     vi.spyOn(socketClient, 'conectarSocket').mockReturnValue(
       mockSocket as unknown as ReturnType<typeof socketClient.conectarSocket>
     );
+    vi.spyOn(socketClient, 'unirseASalaPatrulla').mockImplementation(() => {});
+    vi.spyOn(socketClient, 'unirseASalaCuadrilla').mockImplementation(() => {});
 
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
       usuario: {
@@ -141,14 +143,77 @@ describe('useMisionesSocket (H35 — Tiempo Real y Refresco Automático de Misio
     expect(onMisionActualizada).not.toHaveBeenCalled();
   });
 
-  it('abandona la sala al desmontar el hook', () => {
+  it('se suscribe a la sala de cuadrilla para DELEGADO_CUADRILLA y propaga mision:asignada', () => {
+    vi.spyOn(authContext, 'useAuth').mockReturnValue({
+      usuario: {
+        id: 'user-cuad-1',
+        rut: '15.222.333-4',
+        nombre: 'Delegado Cuadrilla 1',
+        email: 'cuadrilla@valdivia.cl',
+        rolId: 'rol-cuad',
+        rolNombre: 'Delegado de Cuadrilla',
+        rolCodigo: 'DELEGADO_CUADRILLA',
+        delegacionId: 'del-1',
+        delegacionNombre: 'Centro',
+        permisos: [],
+        unidadId: 'cuad-200',
+        unidadNombre: 'Cuadrilla Hidráulica 1',
+        unidadActiva: true,
+      },
+      token: 'mock-jwt-cuad',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: false,
+      esCuadrilla: true,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
+    });
+
+    const onNuevaMision = vi.fn();
+    renderHook(() => useMisionesSocket({ onNuevaMision }));
+
+    const connectHandler = eventListeners['connect']?.[0];
+    act(() => {
+      connectHandler?.();
+    });
+
+    expect(socketClient.unirseASalaCuadrilla).toHaveBeenCalledWith('cuad-200');
+    expect(mockSocket.emit).toHaveBeenCalledWith('join', 'cuadrilla:cuad-200');
+
+    const misionAsignadaHandler = eventListeners['mision:asignada']?.[0];
+    const payloadCuadrilla = {
+      misionId: 'mis-cuad-200',
+      codigo: 'MIS-2026-0200',
+      tipoMision: 'ATENCION_CUADRILLA',
+      tipoUnidad: 'CUADRILLA' as const,
+      cuadrillaId: 'cuad-200',
+      patrullaId: null,
+      asignadoEn: '2026-11-24T12:00:00Z',
+    };
+
+    act(() => {
+      misionAsignadaHandler?.(payloadCuadrilla);
+    });
+
+    expect(onNuevaMision).toHaveBeenCalledWith(payloadCuadrilla);
+  });
+
+  it('remueve listeners al desmontar sin emitir leave sobre la sala compartida', () => {
     const { unmount } = renderHook(() => useMisionesSocket());
 
     unmount();
 
     expect(mockSocket.off).toHaveBeenCalledWith('connect', expect.any(Function));
     expect(mockSocket.off).toHaveBeenCalledWith('mision:asignada', expect.any(Function));
-    expect(mockSocket.emit).toHaveBeenCalledWith('leave', 'patrulla:pat-100');
+    expect(mockSocket.off).toHaveBeenCalledWith('mision:actualizada', expect.any(Function));
+    expect(mockSocket.off).toHaveBeenCalledWith('mision:rechazada', expect.any(Function));
+    expect(mockSocket.emit).not.toHaveBeenCalledWith('leave', expect.any(String));
   });
 });
 

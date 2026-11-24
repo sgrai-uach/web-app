@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { resolverUrlSocketTerreno } from './socketClient';
 
 let socketInstance: Socket | null = null;
 
@@ -6,11 +7,7 @@ let socketInstance: Socket | null = null;
  * Resuelve la URL base para la conexión Socket.io según las variables de entorno o la ventana activa.
  */
 export function getSocketUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SOCKET_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    (typeof window !== 'undefined' ? window.location.origin : '')
-  );
+  return resolverUrlSocketTerreno();
 }
 
 /**

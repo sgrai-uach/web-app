@@ -1,7 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { conectarSocket } from '@/lib/socket/socketClient';
+import {
+  conectarSocket,
+  unirseASalaPatrulla,
+  unirseASalaCuadrilla,
+} from '@/lib/socket/socketClient';
 import { useAuth } from '@/context/AuthContext';
 
 export interface MisionAsignadaSocketPayload {
@@ -46,6 +50,11 @@ export function useMisionesSocket({
     const socket = conectarSocket(token || undefined);
 
     function unirseASala() {
+      if (unidadTipo === 'cuadrilla' && unidadId) {
+        unirseASalaCuadrilla(unidadId);
+      } else if (unidadTipo === 'patrulla' && unidadId) {
+        unirseASalaPatrulla(unidadId);
+      }
       if (roomName) {
         socket.emit('join', roomName);
       }
@@ -112,9 +121,6 @@ export function useMisionesSocket({
       socket.off('mision:asignada', handleMisionAsignada);
       socket.off('mision:actualizada', handleMisionActualizada);
       socket.off('mision:rechazada', handleMisionActualizada);
-      if (roomName) {
-        socket.emit('leave', roomName);
-      }
     };
   }, [habilitado, roomName, token, unidadId, unidadTipo]);
 

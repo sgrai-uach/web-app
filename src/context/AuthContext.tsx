@@ -20,6 +20,7 @@ import type {
 import { esRolTerrenoPermitido } from '@/types/seguridad';
 import { limpiarAlmacenamientoOffline } from '@/services/offlineQueue';
 import { registrarPatrullaEnHistorial } from '@/services/perfilTerrenoService';
+import { desconectarSocket } from '@/lib/socket/socketClient';
 
 const SESSION_PROFILE_KEY = 'sgrai_usuario_sesion';
 
@@ -216,6 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    desconectarSocket();
     removeAuthCookie();
     guardarPerfilSesion(null);
     void limpiarAlmacenamientoOffline();

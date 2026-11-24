@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
 import { useToastOptional } from '@/components/ui/Toast';
+import { useNotificacionesTerrenoOptional } from '@/context/NotificacionesTerrenoContext';
 import {
   MisionDetalleTopBar,
   MisionDetalleHeaderCard,
@@ -79,6 +80,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const misionId = resolvedParams?.id;
   const router = useRouter();
   const toast = useToastOptional();
+  const notificaciones = useNotificacionesTerrenoOptional();
 
   const {
     usuario,
@@ -419,6 +421,15 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       }
     }
     await actualizarPendientes();
+    notificaciones?.marcarAlertaLeidaPorMision(mision.id);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('sgrai:mision-rechazada', { detail: { misionId: mision.id } })
+      );
+      window.dispatchEvent(
+        new CustomEvent('sgrai:mision_actualizada', { detail: { misionId: mision.id } })
+      );
+    }
     router.push('/cuadrilla/misiones');
   };
 
@@ -462,6 +473,12 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       }
     }
     await actualizarPendientes();
+    notificaciones?.marcarAlertaLeidaPorMision(mision.id);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('sgrai:mision_actualizada', { detail: { misionId: mision.id } })
+      );
+    }
     router.push('/cuadrilla/misiones');
   };
 

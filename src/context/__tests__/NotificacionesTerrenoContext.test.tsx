@@ -364,4 +364,190 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
     unmount();
     expect(socketClient.salirDeSalaCuadrilla).toHaveBeenCalledWith('cuadrilla-uuid-555');
   });
+
+  it('reconcilia al volver a visibilityState=visible y atiende sgrai:mision-sincronizada para DELEGADO_CUADRILLA', async () => {
+    vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
+      usuario: {
+        ...usuarioPatrulla,
+        rolId: 'rol-cuadrilla',
+        rolNombre: 'Delegado de Cuadrilla',
+        rolCodigo: 'DELEGADO_CUADRILLA',
+        permisos: ['misiones:terreno:ejecutar'],
+        unidadId: 'cuadrilla-uuid-777',
+        unidadNombre: 'Cuadrilla Eléctrica 2',
+      },
+      token: 'jwt-cuad-vis',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: false,
+      esCuadrilla: true,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
+    });
+
+    vi.mocked(notificacionesService.consultarMisionesPendientes).mockResolvedValue([]);
+    vi.mocked(notificacionesService.procesarMisionAsignada).mockResolvedValue({
+      esDuplicado: false,
+      mision: {
+        id: '70000000-0000-4000-8000-000000000777',
+        incidenteId: 'inc-777',
+        codigoIncidente: 'INC-777',
+        tipologia: 'Corte eléctrico mayor',
+        direccion: 'Valdivia',
+        prioridad: 'ALTA',
+        estado: 'DESPACHADA',
+        fechaDespacho: '2026-11-24T12:15:00Z',
+        actualizadoEn: '2026-11-24T12:15:00Z',
+      },
+    });
+
+    render(
+      <NotificacionesTerrenoProvider>
+        <TestConsumer />
+      </NotificacionesTerrenoProvider>
+    );
+
+    await waitFor(() => {
+      expect(notificacionesService.consultarMisionesPendientes).toHaveBeenCalledTimes(1);
+    });
+
+    vi.mocked(notificacionesService.consultarMisionesPendientes).mockClear();
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
+
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    await waitFor(() => {
+      expect(notificacionesService.consultarMisionesPendientes).toHaveBeenCalledWith({
+        cuadrillaId: 'cuadrilla-uuid-777',
+      });
+    });
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent('sgrai:mision-sincronizada', {
+          detail: {
+            notificacionId: '80000000-0000-4000-8000-000000000777',
+            misionId: '70000000-0000-4000-8000-000000000777',
+            codigo: 'MIS-2026-0777',
+            tipoMision: 'ATENCION_CUADRILLA',
+            tipoUnidad: 'CUADRILLA',
+            cuadrillaId: 'cuadrilla-uuid-777',
+            patrullaId: null,
+            tipoAfectacion: 'Corte eléctrico mayor',
+            asignadoEn: '2026-11-24T12:15:00Z',
+          },
+        })
+      );
+    });
+
+    expect(screen.getByTestId('codigo-mision-banner')).toHaveTextContent('MIS-2026-0777');
+    expect(notificacionesService.procesarMisionAsignada).toHaveBeenCalledWith(
+      expect.objectContaining({
+        notificacionId: '80000000-0000-4000-8000-000000000777',
+        misionId: '70000000-0000-4000-8000-000000000777',
+        cuadrillaId: 'cuadrilla-uuid-777',
+      })
+    );
+  });
+
+  it('despacha sgrai:mision_asignada en window al recibir o reconciliar una reasignación y limpia la alerta ante sgrai:mision-rechazada', async () => {
+    vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
+      usuario: {
+        ...usuarioPatrulla,
+        rolId: 'rol-cuadrilla',
+        rolNombre: 'Delegado de Cuadrilla',
+        rolCodigo: 'DELEGADO_CUADRILLA',
+        permisos: ['misiones:terreno:ejecutar'],
+        unidadId: 'cuadrilla-uuid-888',
+        unidadNombre: 'Cuadrilla Despeje Sur',
+      },
+      token: 'jwt-cuad-bus',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: false,
+      esCuadrilla: true,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
+    });
+
+    const eventosRecibidos: string[] = [];
+    const listenerAsignada = (e: Event) => {
+      const detail = (e as CustomEvent<{ misionId?: string }>)?.detail;
+      if (detail?.misionId) {
+        eventosRecibidos.push(detail.misionId);
+      }
+    };
+    window.addEventListener('sgrai:mision_asignada', listenerAsignada);
+
+    try {
+      vi.mocked(notificacionesService.consultarMisionesPendientes).mockResolvedValue([]);
+      vi.mocked(notificacionesService.procesarMisionAsignada).mockResolvedValue({
+        esDuplicado: false,
+        mision: {
+          id: '70000000-0000-4000-8000-000000000888',
+          incidenteId: 'inc-888',
+          codigoIncidente: 'INC-888',
+          tipologia: 'Árbol caído',
+          direccion: 'Sur 100',
+          prioridad: 'ALTA',
+          estado: 'DESPACHADA',
+          fechaDespacho: '2026-11-24T13:00:00Z',
+          actualizadoEn: '2026-11-24T13:00:00Z',
+        },
+      });
+
+      render(
+        <NotificacionesTerrenoProvider>
+          <TestConsumer />
+        </NotificacionesTerrenoProvider>
+      );
+
+      await act(async () => {
+        socketHandler({
+          notificacionId: '80000000-0000-4000-8000-000000000888',
+          misionId: '70000000-0000-4000-8000-000000000888',
+          codigo: 'MIS-2026-0888',
+          tipoMision: 'ATENCION_CUADRILLA',
+          tipoUnidad: 'CUADRILLA',
+          cuadrillaId: 'cuadrilla-uuid-888',
+          patrullaId: null,
+          tipoAfectacion: 'Árbol caído',
+          asignadoEn: '2026-11-24T13:00:00Z',
+        });
+      });
+
+      expect(screen.getByTestId('codigo-mision-banner')).toHaveTextContent('MIS-2026-0888');
+      expect(eventosRecibidos).toContain('70000000-0000-4000-8000-000000000888');
+
+      await act(async () => {
+        window.dispatchEvent(
+          new CustomEvent('sgrai:mision-rechazada', {
+            detail: { misionId: '70000000-0000-4000-8000-000000000888' },
+          })
+        );
+      });
+
+      expect(screen.getByTestId('estado-alerta')).toHaveTextContent('sin-alerta');
+    } finally {
+      window.removeEventListener('sgrai:mision_asignada', listenerAsignada);
+    }
+  });
 });

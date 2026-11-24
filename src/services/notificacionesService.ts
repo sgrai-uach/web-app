@@ -74,6 +74,7 @@ export function mapearAlertaAMisionLocal(alerta: MisionAsignadaAlerta): MisionLo
     sincronizacionPendiente: false,
     datosAdicionales: {
       titulo: alerta.tipoAfectacion || `Misión ${alerta.codigo}`,
+      codigoMision: alerta.codigo,
       incidenteFolio: alerta.incidenteFolio,
       notificacionId: alerta.notificacionId,
       tipoMision: alerta.tipoMision,

@@ -6,13 +6,37 @@ let socketInstance: Socket | null = null;
 let currentPatrullaId: string | null = null;
 let currentCuadrillaId: string | null = null;
 
-function resolveSocketUrl(): string {
+export function resolverUrlSocketTerreno(): string {
   if (typeof window === 'undefined') return 'http://localhost:3001';
-  return (
-    process.env.NEXT_PUBLIC_SOCKET_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    'http://localhost:3001'
-  );
+
+  const configured =
+    process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL;
+
+  if (configured) {
+    try {
+      const parsed = new URL(configured);
+      const hostConfigurado = parsed.hostname;
+      const hostActual = window.location.hostname;
+      if (
+        (hostConfigurado === 'localhost' || hostConfigurado === '127.0.0.1') &&
+        hostActual &&
+        hostActual !== 'localhost' &&
+        hostActual !== '127.0.0.1'
+      ) {
+        parsed.hostname = hostActual;
+        return parsed.origin;
+      }
+    } catch {
+      // Conservar valor configurado si no es una URL absoluta estándar
+    }
+    return configured;
+  }
+
+  return window.location.origin || 'http://localhost:3001';
+}
+
+function resolveSocketUrl(): string {
+  return resolverUrlSocketTerreno();
 }
 
 /**
@@ -53,7 +77,7 @@ export function getSocket(tokenOverride?: string): Socket {
     const authActual = (socketInstance.auth as { token?: string } | undefined)?.token;
     if (authActual !== token) {
       socketInstance.auth = { token };
-      if (socketInstance.connected) {
+      if (socketInstance.connected || socketInstance.active) {
         socketInstance.disconnect();
         socketInstance.connect();
       }
@@ -67,8 +91,15 @@ export function getSocket(tokenOverride?: string): Socket {
  * Conecta el socket al servidor en tiempo real, refrescando el JWT si cambió desde la sesión anterior.
  */
 export function conectarSocket(token?: string): Socket {
+  const authPrevio = (socketInstance?.auth as { token?: string } | undefined)?.token;
+  const reconectadoPorCambioToken = Boolean(
+    socketInstance &&
+      token &&
+      authPrevio !== token &&
+      (socketInstance.connected || socketInstance.active)
+  );
   const socket = getSocket(token);
-  if (!socket.connected) {
+  if (!socket.connected && !reconectadoPorCambioToken) {
     socket.connect();
   }
   return socket;

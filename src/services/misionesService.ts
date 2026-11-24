@@ -536,28 +536,42 @@ function resolverEsReclasificacionHito(
   return ultimoHitoTipologia?.hito === 'TIPOLOGIA_RECLASIFICADA';
 }
 
+const inFlightSyncMap = new Map<string, Promise<MisionLocal[]>>();
+
 /**
  * Consulta y sincroniza el listado de misiones asignadas desde el backend SGRAI.
  * Si hay conectividad, actualiza el almacenamiento local IndexedDB (Offline-First).
  * Si ocurre una falla de red o se está offline, devuelve las misiones persistidas localmente.
  */
 export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<MisionLocal[]> {
-  try {
-    const token = typeof window !== 'undefined' ? getAuthCookie() : null;
-    const { data, error } = await apiClient.GET('/api/misiones', {
-      params: {
-        query: {
-          tipoMision: filtros?.tipoMision,
-          patrullaId: filtros?.patrullaId,
-          cuadrillaId: filtros?.cuadrillaId,
-          ordenarPor: 'creadoEn',
-          orden: 'desc',
+  const claveSync = JSON.stringify({
+    tipoMision: filtros?.tipoMision ?? '',
+    patrullaId: filtros?.patrullaId ?? '',
+    cuadrillaId: filtros?.cuadrillaId ?? '',
+  });
+  const enVuelo = inFlightSyncMap.get(claveSync);
+  if (enVuelo) {
+    return enVuelo;
+  }
+
+  const promesa = (async (): Promise<MisionLocal[]> => {
+    try {
+      const token = typeof window !== 'undefined' ? getAuthCookie() : null;
+      const { data, error } = await apiClient.GET('/api/misiones', {
+        params: {
+          query: {
+            tipoMision: filtros?.tipoMision,
+            patrullaId: filtros?.patrullaId,
+            cuadrillaId: filtros?.cuadrillaId,
+            ordenarPor: 'creadoEn',
+            orden: 'desc',
+            limit: 50,
+          },
+          header: {
+            authorization: token ? (token.startsWith('Bearer ') ? token : `Bearer ${token}`) : '',
+          },
         },
-        header: {
-          authorization: token ? (token.startsWith('Bearer ') ? token : `Bearer ${token}`) : '',
-        },
-      },
-    });
+      });
 
     if (!error && data && Array.isArray(data.data)) {
       let localesPreviasMap = new Map<string, MisionLocal>();
@@ -636,6 +650,7 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
             ...datosPrevios,
             trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
             titulo: item.titulo,
+            codigoMision: item.codigo,
             tipoMision: item.tipoMision,
             patrullaId: (item as Record<string, unknown>).patrullaId as string | null | undefined,
             patrullaNombre: (item as Record<string, unknown>).patrullaNombre as string | null | undefined,
@@ -652,11 +667,19 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
       }
       return remotas;
     }
-  } catch {
-    // Modo sin conexión o falla de red: continuar con almacenamiento local
-  }
+    } catch {
+      // Modo sin conexión o falla de red: continuar con almacenamiento local
+    }
 
-  return (await obtenerMisionesLocales()) || [];
+    return (await obtenerMisionesLocales()) || [];
+  })();
+
+  inFlightSyncMap.set(claveSync, promesa);
+  try {
+    return await promesa;
+  } finally {
+    inFlightSyncMap.delete(claveSync);
+  }
 }
 
 /**
