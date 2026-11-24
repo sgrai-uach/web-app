@@ -1,0 +1,161 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+  width: 100%;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+}
+
+.checkboxHighlight {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+  min-height: 56px;
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  background-color: var(--color-white, #ffffff);
+  border: 2px solid var(--color-primary-teal, #1b6f7d);
+  border-left: 6px solid var(--color-primary-teal, #1b6f7d);
+  border-radius: var(--radius-none, 0px);
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.checkboxHighlight:hover {
+  background-color: var(--color-info-bg, #e0f2f1);
+}
+
+.checkboxHighlightActive {
+  background-color: var(--color-warning-bg, #fff3e0);
+  border-color: var(--color-warning, #e65100);
+  border-left-color: var(--color-warning, #e65100);
+}
+
+.checkboxHighlightActive:hover {
+  background-color: var(--color-warning-bg, #fff3e0);
+}
+
+.checkboxHighlightDisabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.checkboxControlRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+}
+
+.checkboxInput {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--color-warning, #e65100);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.checkboxTextGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.checkboxTitle {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: var(--color-text-dark, #2b2b2b);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.checkboxSubtitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #5f676e);
+}
+
+.conditionalPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  padding: var(--space-3, 12px);
+  background-color: var(--color-bg-light, #eceff3);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-left: 4px solid var(--color-warning, #e65100);
+  border-radius: var(--radius-none, 0px);
+  animation: apoyoPanelReveal 0.2s ease-out;
+}
+
+@keyframes apoyoPanelReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conditionalPanel {
+    animation: none;
+  }
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+
+.fieldLabel {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-dark, #2b2b2b);
+}
+
+.fieldHint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #5f676e);
+  line-height: 1.4;
+}
+
+.requiredMark {
+  color: var(--color-danger, #d32f2f);
+}
+
+.textareaField {
+  resize: none;
+  min-height: 96px;
+  overflow-y: auto;
+}
+
+.textareaSecondary {
+  resize: none;
+  min-height: 72px;
+  overflow-y: auto;
+}
+
+.submitBtn {
+  min-height: 48px;
+  border-radius: var(--radius-none, 0px);
+  font-weight: 700;
+}
+
+.historyStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+}

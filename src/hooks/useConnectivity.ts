@@ -143,6 +143,18 @@ export function useConnectivity() {
             },
             body: JSON.stringify(bodyCerrar),
           });
+        } else if (accion.tipo === 'SOLICITAR_APOYO') {
+          const rawPayload = { ...(accion.payload || {}) } as Record<string, unknown>;
+          delete rawPayload._localId;
+
+          res = await fetch(`${apiUrl}${accion.url}`, {
+            method: accion.metodo,
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders,
+            },
+            body: JSON.stringify(rawPayload),
+          });
         } else {
           res = await fetch(`${apiUrl}${accion.url}`, {
             method: accion.metodo,
@@ -455,6 +467,99 @@ export function useConnectivity() {
                     ...local,
                     sincronizacionPendiente: false,
                     actualizadoEn: new Date().toISOString(),
+                  });
+                }
+                await obtenerDetalleMision(misionId);
+              } catch {
+                // Ignorar fallos al reconciliar con el servidor
+              }
+            }
+          }
+        }
+
+        if (procesada && accion.tipo === 'SOLICITAR_APOYO') {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/apoyo/);
+          const misionId = match?.[1];
+          const localIdAccion =
+            typeof accion.payload?._localId === 'string'
+              ? accion.payload._localId
+              : undefined;
+          if (misionId) {
+            if (esExito) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  let idServidor: string | undefined;
+                  try {
+                    const bodyJson = await res.clone().json();
+                    const rep =
+                      bodyJson?.data?.reporteTerreno ?? bodyJson?.data?.reporte;
+                    if (typeof rep?.id === 'string') {
+                      idServidor = rep.id;
+                    }
+                  } catch {
+                    // Ignorar si no hay JSON
+                  }
+                  const listaActual = Array.isArray(
+                    local.datosAdicionales?.solicitudesApoyoLocales
+                  )
+                    ? (local.datosAdicionales.solicitudesApoyoLocales as Array<
+                        Record<string, unknown>
+                      >)
+                    : [];
+                  const listaActualizada = listaActual.map((item) => {
+                    const coincide = localIdAccion
+                      ? item.localId === localIdAccion
+                      : item.sincronizado === false;
+                    if (!coincide) return item;
+                    return {
+                      ...item,
+                      ...(idServidor ? { id: idServidor } : {}),
+                      sincronizado: true,
+                    };
+                  });
+                  const quedanPendientes = listaActualizada.some(
+                    (item) => item.sincronizado === false
+                  );
+                  await guardarMisionLocal({
+                    ...local,
+                    sincronizacionPendiente: quedanPendientes,
+                    actualizadoEn: new Date().toISOString(),
+                    datosAdicionales: {
+                      ...(local.datosAdicionales || {}),
+                      requiereApoyoAdicional: true,
+                      solicitudesApoyoLocales: listaActualizada,
+                    },
+                  });
+                }
+              } catch {
+                // Ignorar fallos de persistencia secundaria
+              }
+            } else if (esConflictoTerminal || esErrorIrrecuperable) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  const listaActual = Array.isArray(
+                    local.datosAdicionales?.solicitudesApoyoLocales
+                  )
+                    ? (local.datosAdicionales.solicitudesApoyoLocales as Array<
+                        Record<string, unknown>
+                      >)
+                    : [];
+                  const listaFiltrada = localIdAccion
+                    ? listaActual.filter((item) => item.localId !== localIdAccion)
+                    : listaActual.filter((item) => item.sincronizado !== false);
+                  const quedanPendientes = listaFiltrada.some(
+                    (item) => item.sincronizado === false
+                  );
+                  await guardarMisionLocal({
+                    ...local,
+                    sincronizacionPendiente: quedanPendientes,
+                    actualizadoEn: new Date().toISOString(),
+                    datosAdicionales: {
+                      ...(local.datosAdicionales || {}),
+                      solicitudesApoyoLocales: listaFiltrada,
+                    },
                   });
                 }
                 await obtenerDetalleMision(misionId);

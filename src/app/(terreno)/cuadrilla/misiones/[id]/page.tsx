@@ -12,6 +12,7 @@ import {
   WifiOff,
   FileCheck,
   ClipboardCheck,
+  LifeBuoy,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
@@ -43,10 +44,15 @@ import {
 } from '@/components/misiones/RechazoMisionModal';
 import { CargaEvidenciaCard } from '@/components/misiones/CargaEvidenciaCard';
 import { CierreMisionCuadrillaCard } from '@/components/misiones/CierreMisionCuadrillaCard';
+import { SolicitudApoyoCuadrillaCard } from '@/components/misiones/SolicitudApoyoCuadrillaCard';
 import {
   obtenerReporteCierreCuadrillaMision,
   type ResultadoCierreCuadrilla,
 } from '@/services/cierreCuadrillaService';
+import {
+  obtenerSolicitudesApoyoMision,
+  type ResultadoSolicitudApoyo,
+} from '@/services/solicitudApoyoService';
 import {
   obtenerDetalleMision,
   aceptarMision,
@@ -93,6 +99,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
   const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
+  const [seccionApoyoAbierta, setSeccionApoyoAbierta] = useState<boolean>(true);
   const [seccionCierreAbierta, setSeccionCierreAbierta] = useState<boolean>(true);
 
   const estadoTelemetriaNormalizado = mision?.estado?.toUpperCase() || '';
@@ -310,6 +317,15 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     unidadActiva && esCuadrilla && tienePermisoEvidencia && esMisionActiva
   );
 
+  // H44: Solicitud de apoyo adicional en terreno (sin interrumpir la faena EN_CURSO)
+  const puedeSolicitarApoyo = Boolean(
+    unidadActiva && esCuadrilla && tienePermisoEvidencia && esMisionActiva
+  );
+  const solicitudesApoyo = obtenerSolicitudesApoyoMision(mision);
+  const apoyoPendienteSync = solicitudesApoyo.some((s) => !s.sincronizado);
+  const mostrarSeccionApoyo =
+    puedeSolicitarApoyo || solicitudesApoyo.length > 0;
+
   // H68: Cierre técnico final de cuadrilla
   const puedeEjecutarCierre = Boolean(
     unidadActiva && esCuadrilla && tienePermisoEjecutar && esMisionActiva
@@ -411,6 +427,16 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       };
     });
     await actualizarPendientes();
+  };
+
+  const handleApoyoSolicitado = async (resultado: ResultadoSolicitudApoyo) => {
+    if (resultado.mision) {
+      setMision(resultado.mision);
+    }
+    await actualizarPendientes();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
+    }
   };
 
   const handleCierreEnviado = async (resultado: ResultadoCierreCuadrilla) => {
@@ -626,7 +652,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         </section>
       )}
 
-      {/* Gestión Técnica de Faena y Cierre de Misión (H68 / H43) */}
+      {/* Gestión Técnica de Faena: Solicitud de Apoyo (H44) y Cierre de Misión (H68 / H43) */}
       {mostrarSeccionCierre && (
         <section
           className={styles.evaluationFormsSection}
@@ -645,6 +671,30 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
           </div>
 
           <div className={styles.evaluationContent}>
+            {mostrarSeccionApoyo && (
+              <SeccionDesplegable
+                titulo="Solicitar Apoyo Adicional"
+                icono={<LifeBuoy size={18} aria-hidden="true" />}
+                abierto={seccionApoyoAbierta}
+                onToggle={setSeccionApoyoAbierta}
+                indicador={
+                  solicitudesApoyo.length > 0 ? (
+                    <Chip variant="warning" size="sm">
+                      {apoyoPendienteSync
+                        ? `Pendiente sync (${solicitudesApoyo.length})`
+                        : `Apoyo solicitado (${solicitudesApoyo.length})`}
+                    </Chip>
+                  ) : null
+                }
+              >
+                <SolicitudApoyoCuadrillaCard
+                  misionActual={mision}
+                  deshabilitado={!puedeSolicitarApoyo}
+                  onApoyoSolicitado={handleApoyoSolicitado}
+                />
+              </SeccionDesplegable>
+            )}
+
             <SeccionDesplegable
               titulo="Finalizar Misión e Informe Técnico"
               icono={<FileCheck size={18} aria-hidden="true" />}
@@ -682,6 +732,35 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       )}
 
       {/* Respaldo RBAC si cuenta con reportes:crear sin misiones:terreno:ejecutar */}
+      {!mostrarSeccionCierre && mostrarSeccionApoyo && (
+        <section
+          className={styles.evidenceStandaloneWrapper}
+          aria-label="Solicitud de apoyo adicional en terreno"
+        >
+          <SeccionDesplegable
+            titulo="Solicitar Apoyo Adicional"
+            icono={<LifeBuoy size={18} aria-hidden="true" />}
+            abierto={seccionApoyoAbierta}
+            onToggle={setSeccionApoyoAbierta}
+            indicador={
+              solicitudesApoyo.length > 0 ? (
+                <Chip variant="warning" size="sm">
+                  {apoyoPendienteSync
+                    ? `Pendiente sync (${solicitudesApoyo.length})`
+                    : `Apoyo solicitado (${solicitudesApoyo.length})`}
+                </Chip>
+              ) : null
+            }
+          >
+            <SolicitudApoyoCuadrillaCard
+              misionActual={mision}
+              deshabilitado={!puedeSolicitarApoyo}
+              onApoyoSolicitado={handleApoyoSolicitado}
+            />
+          </SeccionDesplegable>
+        </section>
+      )}
+
       {!mostrarSeccionCierre &&
         (puedeAdjuntarEvidencia || adjuntosMision.length > 0) && (
           <section
