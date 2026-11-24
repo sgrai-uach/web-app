@@ -230,4 +230,39 @@ describe('solicitudApoyoService (HU-44)', () => {
     expect(lista[1].detalleApoyoRequerido).toBe('Motoniveladora pesada');
     expect(lista[1].sincronizado).toBe(true);
   });
+
+  it('filtra reportes de tipo VERIFICACION_CIERRE o EVALUACION_PRIORIDAD aunque traigan requiere_apoyo_adicional=true', () => {
+    const lista = obtenerSolicitudesApoyoMision({
+      ...misionBase,
+      datosAdicionales: {
+        reportesTerreno: [
+          {
+            id: 'rep-verif-cierre',
+            tipoReporte: 'VERIFICACION_CIERRE',
+            requiereApoyoAdicional: true,
+            detalleApoyoRequerido: 'Requiere cuadrilla de limpieza',
+            creadoEn: '2026-11-23T18:25:00.000Z',
+          },
+          {
+            id: 'rep-eval-prio',
+            tipo_reporte: 'EVALUACION_PRIORIDAD',
+            requiere_apoyo_adicional: true,
+            detalle_apoyo_requerido: 'Prioridad alta verificada',
+            creadoEn: '2026-11-23T18:15:00.000Z',
+          },
+          {
+            id: 'rep-apoyo-real',
+            tipoReporte: 'SOLICITUD_APOYO',
+            requiereApoyoAdicional: true,
+            detalleApoyoRequerido: 'Motobomba adicional 4"',
+            creadoEn: '2026-11-23T18:30:00.000Z',
+          },
+        ],
+      },
+    });
+
+    expect(lista).toHaveLength(1);
+    expect(lista[0].id).toBe('rep-apoyo-real');
+    expect(lista[0].detalleApoyoRequerido).toBe('Motobomba adicional 4"');
+  });
 });

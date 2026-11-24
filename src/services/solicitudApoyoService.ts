@@ -65,6 +65,13 @@ function normalizarSolicitudDesdeRegistro(
   misionId: string,
   sincronizadoPorDefecto: boolean
 ): SolicitudApoyoLocal | null {
+  const tipoReporte = String(raw.tipoReporte ?? raw.tipo_reporte ?? '')
+    .trim()
+    .toUpperCase();
+  if (tipoReporte === 'VERIFICACION_CIERRE' || tipoReporte === 'EVALUACION_PRIORIDAD') {
+    return null;
+  }
+
   const requiere = Boolean(
     raw.requiereApoyoAdicional ?? raw.requiere_apoyo_adicional ?? false
   );
