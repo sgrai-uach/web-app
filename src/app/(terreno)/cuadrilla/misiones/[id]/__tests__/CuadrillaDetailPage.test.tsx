@@ -8,7 +8,6 @@ import * as misionesService from '@/services/misionesService';
 import {
   obtenerDetalleMision,
   aceptarMision,
-  rechazarMision,
   MisionServiceError,
 } from '@/services/misionesService';
 import * as useConnectivityModule from '@/hooks/useConnectivity';

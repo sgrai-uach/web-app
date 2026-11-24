@@ -374,4 +374,118 @@ describe('useConnectivity hook', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('drena acción SOLICITAR_APOYO limpiando _localId y marcando la solicitud como sincronizada (201) y descarta ante 409', async () => {
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+    vi.mocked(offlineQueue.contarAccionesPendientes).mockResolvedValue(0);
+    vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+      id: 'mis-apoyo-44',
+      incidenteId: 'inc-apoyo-44',
+      codigoIncidente: 'INC-2026-0044',
+      tipologia: 'Deslizamiento',
+      direccion: 'Av. Alemania 900',
+      prioridad: 'ALTA',
+      estado: 'EN_CURSO',
+      fechaDespacho: '2026-11-23T18:00:00.000Z',
+      sincronizacionPendiente: true,
+      datosAdicionales: {
+        solicitudesApoyoLocales: [
+          {
+            localId: 'apoyo-local-1',
+            misionId: 'mis-apoyo-44',
+            requiereApoyoAdicional: true,
+            detalleApoyoRequerido: 'Motoniveladora urgente',
+            resumenTecnico: '',
+            observaciones: '',
+            creadoEn: '2026-11-23T18:10:00.000Z',
+            sincronizado: false,
+          },
+        ],
+      },
+      actualizadoEn: '2026-11-23T18:10:00.000Z',
+    });
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        clone: () => ({
+          json: async () => ({
+            data: { reporteTerreno: { id: 'rep-remoto-44' } },
+          }),
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        clone: () => ({
+          json: async () => ({ message: 'La misión no está EN_CURSO' }),
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    let procesada201 = false;
+    let procesada409 = false;
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (ejecutor) => {
+      procesada201 = await ejecutor({
+        id: 'out-apoyo-1',
+        tipo: 'SOLICITAR_APOYO',
+        url: '/api/misiones/mis-apoyo-44/apoyo',
+        metodo: 'POST',
+        timestamp: '2026-11-23T18:10:00.000Z',
+        intentos: 0,
+        payload: {
+          requiereApoyoAdicional: true,
+          detalleApoyoRequerido: 'Motoniveladora urgente',
+          _localId: 'apoyo-local-1',
+        },
+      });
+      procesada409 = await ejecutor({
+        id: 'out-apoyo-2',
+        tipo: 'SOLICITAR_APOYO',
+        url: '/api/misiones/mis-apoyo-44/apoyo',
+        metodo: 'POST',
+        timestamp: '2026-11-23T18:11:00.000Z',
+        intentos: 0,
+        payload: {
+          requiereApoyoAdicional: true,
+          detalleApoyoRequerido: 'Otra solicitud inválida',
+          _localId: 'apoyo-local-2',
+        },
+      });
+      return { total: 2, exitosas: 2, fallidas: 0 };
+    });
+
+    const { result } = renderHook(() => useConnectivity());
+
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+
+    expect(procesada201).toBe(true);
+    expect(procesada409).toBe(true);
+    const [, firstInit] = fetchMock.mock.calls[0];
+    expect(JSON.parse(firstInit.body as string)).toEqual({
+      requiereApoyoAdicional: true,
+      detalleApoyoRequerido: 'Motoniveladora urgente',
+    });
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'mis-apoyo-44',
+        sincronizacionPendiente: false,
+        datosAdicionales: expect.objectContaining({
+          solicitudesApoyoLocales: [
+            expect.objectContaining({
+              id: 'rep-remoto-44',
+              localId: 'apoyo-local-1',
+              sincronizado: true,
+            }),
+          ],
+        }),
+      })
+    );
+
+    vi.unstubAllGlobals();
+  });
 });
