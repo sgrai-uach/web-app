@@ -1,8 +1,14 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { ClipboardCheck, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
+import {
+  ConfirmacionResumen,
+  ConfirmacionResumenFila,
+  ConfirmacionResumenJustificacion,
+} from '@/components/common/ConfirmacionResumen';
+import { Chip } from '@/components/ui/Chip';
 import styles from './ModalConfirmacionTipologia.module.css';
 
 export interface ModalConfirmacionTipologiaProps {
@@ -26,102 +32,63 @@ export function ModalConfirmacionTipologia({
   alConfirmar,
   alCancelar,
 }: ModalConfirmacionTipologiaProps) {
-  useEffect(() => {
-    if (!abierto) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !cargando) {
-        alCancelar();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [abierto, cargando, alCancelar]);
-
-  if (!abierto) return null;
+  const mensaje = esReclasificacion
+    ? '¿Desea confirmar la reclasificación de la tipología del incidente con los siguientes antecedentes técnicos?'
+    : '¿Desea ratificar la tipología del incidente constatada presencialmente en terreno?';
 
   return (
-    <div
-      className={styles.overlay}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-tipologia-titulo"
+    <ConfirmModal
+      abierto={abierto}
+      variante="teal"
+      tamano="md"
+      titleId="modal-tipologia-titulo"
+      titulo="Confirmar Evaluación de Tipología"
+      mensaje={mensaje}
+      icono={<ClipboardCheck size={22} />}
+      textoConfirmar="Confirmar y Enviar"
+      textoCargando="Guardando..."
+      textoCancelar="Cancelar"
+      iconoConfirmar={<CheckCircle2 size={18} />}
+      cargando={cargando}
+      alConfirmar={alConfirmar}
+      alCancelar={alCancelar}
     >
-      <div className={styles.modal}>
-        <div className={styles.headerRow}>
-          <div className={styles.iconContainer} aria-hidden="true">
-            <ClipboardCheck size={22} />
-          </div>
-          <h2 id="modal-tipologia-titulo" className={styles.title}>
-            Confirmar Evaluación de Tipología
-          </h2>
-        </div>
+      <ConfirmacionResumen>
+        <ConfirmacionResumenFila etiqueta="Acción">
+          {esReclasificacion ? 'Reclasificación en terreno' : 'Ratificación presencial'}
+        </ConfirmacionResumenFila>
 
-        <div className={styles.body}>
-          <p className={styles.message}>
-            {esReclasificacion
-              ? '¿Desea confirmar la reclasificación de la tipología del incidente con los siguientes antecedentes técnicos?'
-              : '¿Desea ratificar la tipología del incidente constatada presencialmente en terreno?'}
-          </p>
-
-          <div className={styles.summaryBox}>
-            <div className={styles.summaryRow}>
-              <span className={styles.summaryLabel}>Acción</span>
-              <span className={styles.summaryValue}>
-                {esReclasificacion ? 'Reclasificación en terreno' : 'Ratificación presencial'}
-              </span>
+        <ConfirmacionResumenFila etiqueta="Tipología">
+          {esReclasificacion ? (
+            <div className={styles.chipTransition}>
+              <Chip variant="neutral" size="md">
+                {tipologiaOriginal || 'Sin clasificar'}
+              </Chip>
+              <ArrowRight
+                size={14}
+                className={styles.transitionArrow}
+                aria-hidden="true"
+              />
+              <Chip variant="teal" size="md">
+                {tipologiaNueva}
+              </Chip>
             </div>
+          ) : (
+            <Chip variant="teal" size="md">
+              {tipologiaNueva}
+            </Chip>
+          )}
+        </ConfirmacionResumenFila>
 
-            <div className={styles.summaryRow}>
-              <span className={styles.summaryLabel}>Tipología</span>
-              {esReclasificacion ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span className={styles.tipoChip}>{tipologiaOriginal || 'Sin clasificar'}</span>
-                  <ArrowRight size={14} color="var(--color-primary-teal)" aria-hidden="true" />
-                  <span className={`${styles.tipoChip} ${styles.chipReclasificado}`}>
-                    {tipologiaNueva}
-                  </span>
-                </div>
-              ) : (
-                <span className={styles.tipoChip}>{tipologiaNueva}</span>
-              )}
-            </div>
-
-            {esReclasificacion && justificacion && (
-              <div>
-                <span className={styles.summaryLabel}>Justificación técnica:</span>
-                <div className={styles.justificacionBox}>{justificacion}</div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className={styles.actionRow}>
-          <Button
-            type="button"
-            variant="outline"
-            size="md"
-            onClick={alCancelar}
-            disabled={cargando}
-            className={styles.actionBtn}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            size="md"
-            onClick={alConfirmar}
-            loading={cargando}
-            icon={<CheckCircle2 size={18} />}
-            className={styles.actionBtn}
-          >
-            {cargando ? 'Guardando...' : 'Confirmar y Enviar'}
-          </Button>
-        </div>
-      </div>
-    </div>
+        {esReclasificacion && justificacion && (
+          <ConfirmacionResumenJustificacion
+            etiqueta="Justificación técnica"
+            contenido={justificacion}
+          />
+        )}
+      </ConfirmacionResumen>
+    </ConfirmModal>
   );
 }
 
 export default ModalConfirmacionTipologia;
-

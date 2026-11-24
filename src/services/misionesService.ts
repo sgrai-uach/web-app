@@ -231,10 +231,17 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
             (previa.sincronizacionPendiente || tieneOutboxPendiente) &&
             estadoPermiteOptimista
         );
+        const tipoAfectacionRemoto = (
+          item as { incidenteTipoAfectacion?: string | null }
+        ).incidenteTipoAfectacion;
 
         const baseDatosAdicionales = {
           trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
           titulo: item.titulo,
+          patrullaId: (item as Record<string, unknown>).patrullaId as string | null | undefined,
+          patrullaNombre: (item as Record<string, unknown>).patrullaNombre as string | null | undefined,
+          cuadrillaId: (item as Record<string, unknown>).cuadrillaId as string | null | undefined,
+          cuadrillaNombre: (item as Record<string, unknown>).cuadrillaNombre as string | null | undefined,
         };
 
         return {
@@ -242,9 +249,11 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
           incidenteId: item.incidenteId || '',
           codigoIncidente: item.incidenteCodigo || item.codigo,
           tipologia:
-            mantenerOptimista && previa?.tipologia
+            mantenerOptimista && previa
               ? previa.tipologia
-              : limpiarTituloMision(item.titulo),
+              : tipoAfectacionRemoto
+                ? formatearTipologia(tipoAfectacionRemoto)
+                : limpiarTituloMision(item.titulo),
           direccion:
             item.descripcion ||
             (item.delegacionNombre ? `Sector ${item.delegacionNombre}` : 'Valdivia'),
@@ -259,7 +268,7 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
           datosAdicionales:
             mantenerOptimista && previa?.datosAdicionales
               ? { ...baseDatosAdicionales, ...previa.datosAdicionales }
-              : baseDatosAdicionales,
+              : { ...(previa?.datosAdicionales || {}), ...baseDatosAdicionales },
           actualizadoEn: item.actualizadoEn,
         };
       });
@@ -311,11 +320,64 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         (Boolean(incidenteIdRemoto) && incidentesConOutbox.has(incidenteIdRemoto));
       const estadoPermiteOptimista =
         d.estado === 'DESPACHADA' || d.estado === 'EN_CURSO';
+      const previaLocal = previa ?? undefined;
+
       const mantenerOptimista = Boolean(
         previa &&
           (previa.sincronizacionPendiente || tieneOutboxPendiente) &&
           estadoPermiteOptimista
       );
+
+      const reportesRemotos = Array.isArray(d.reportesTerreno) ? d.reportesTerreno : [];
+      const bitacoraRemota = Array.isArray(d.bitacoraTiempos) ? d.bitacoraTiempos : [];
+      const evalRemota = (
+        d as {
+          evaluaciones?: {
+            tipologiaEvaluada?: boolean;
+            tipologiaEvaluadaEn?: string | null;
+            prioridadEvaluada?: boolean;
+            prioridadEvaluadaEn?: string | null;
+            versionReportePrioridad?: number | null;
+          };
+        }
+      ).evaluaciones;
+
+      const hitosTipologia = bitacoraRemota.filter(
+        (h) => h.hito === 'TIPOLOGIA_RECLASIFICADA' || h.hito === 'TIPOLOGIA_CONFIRMADA'
+      );
+      const ultimoHitoTipologia =
+        hitosTipologia.length > 0 ? hitosTipologia[hitosTipologia.length - 1] : undefined;
+
+      const metadatosHito = (
+        ultimoHitoTipologia as { metadatos?: Record<string, unknown> | null } | undefined
+      )?.metadatos;
+
+      const justificacionDesdeHito =
+        typeof metadatosHito?.justificacion === 'string'
+          ? metadatosHito.justificacion
+          : ultimoHitoTipologia?.hito === 'TIPOLOGIA_RECLASIFICADA' &&
+              typeof ultimoHitoTipologia.descripcion === 'string' &&
+              ultimoHitoTipologia.descripcion.includes('Justificación:')
+            ? ultimoHitoTipologia.descripcion.split('Justificación:')[1]?.trim() || undefined
+            : undefined;
+
+      const tipologiaEvaluada =
+        Boolean(previaLocal?.datosAdicionales?.tipologiaEvaluada) ||
+        Boolean(evalRemota?.tipologiaEvaluada) ||
+        hitosTipologia.length > 0;
+
+      const prioridadEvaluada =
+        Boolean(previaLocal?.datosAdicionales?.prioridadEvaluada) ||
+        Boolean(evalRemota?.prioridadEvaluada) ||
+        reportesRemotos.length > 0;
+
+      const versionReportePrioridad =
+        evalRemota?.versionReportePrioridad ??
+        (typeof previaLocal?.datosAdicionales?.versionReportePrioridad === 'number'
+          ? previaLocal.datosAdicionales.versionReportePrioridad
+          : reportesRemotos.length > 0
+            ? reportesRemotos.length
+            : undefined);
 
       const datosRemotos = {
         trabajo:
@@ -325,6 +387,16 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         titulo: d.titulo,
         estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION',
         estadoIncidente: d.incidente?.estado || 'VERIFICANDO',
+        reportesTerreno: reportesRemotos,
+        tipologiaEvaluada,
+        esReclasificacion:
+          ultimoHitoTipologia !== undefined
+            ? ultimoHitoTipologia.hito === 'TIPOLOGIA_RECLASIFICADA'
+            : Boolean(previaLocal?.datosAdicionales?.esReclasificacion),
+        justificacionTipologia:
+          justificacionDesdeHito ?? previaLocal?.datosAdicionales?.justificacionTipologia,
+        prioridadEvaluada,
+        ...(versionReportePrioridad !== undefined ? { versionReportePrioridad } : {}),
       };
 
       const misionLocal: MisionLocal = {
@@ -353,7 +425,11 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         datosAdicionales:
           mantenerOptimista && previa?.datosAdicionales
             ? { ...datosRemotos, ...previa.datosAdicionales }
-            : datosRemotos,
+            : {
+                ...(previaLocal?.datosAdicionales || {}),
+                ...datosRemotos,
+                ...(reportesRemotos.length > 0 ? { reportesPrioridad: undefined } : {}),
+              },
         actualizadoEn: d.actualizadoEn,
       };
 

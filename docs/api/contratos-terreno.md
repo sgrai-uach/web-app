@@ -2,7 +2,7 @@
 
 Este documento detalla los contratos HTTP y WebSocket consumidos por la aplicación de terreno (`sgrai-pwa`) desde el backend `sgrai-api`.
 
-Todos los tipos TypeScript de estos endpoints se derivan estrictamente de [src/types/api-generated.d.ts](file:///home/zetastormy/Development/SGRAI/web-app/src/types/api-generated.d.ts).
+Todos los tipos TypeScript de estos endpoints se derivan estrictamente de [`src/types/api-generated.d.ts`](../../src/types/api-generated.d.ts).
 
 ---
 
@@ -143,7 +143,48 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 
 ---
 
-### 2.2 Rechazo Motivado de Misión por Patrulla Verificadora (H41, H69)
+### 2.2 Evaluar Terreno y Asignar/Modificar Prioridad del Incidente (H38)
+- **Historia:** H38
+- **Método:** `PATCH`
+- **Ruta:** `/api/incidentes/{id}/prioridad` (y cálculo auxiliar en `POST /api/incidentes/{id}/prioridad/calcular`)
+- **Permiso RBAC requerido:** `misiones:terreno:verificar`
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+#### Request Body (`PATCH /api/incidentes/{id}/prioridad`)
+```json
+{
+  "prioridad": "CRITICA",
+  "prioridadSugerida": "ALTA",
+  "justificacionPrioridad": "Se constata riesgo eléctrico activo sobre acceso único de vivienda con adultos mayores.",
+  "nucleoFamiliarTotal": 4,
+  "cantidadNinos": 1,
+  "cantidadAdultosMayores": 2,
+  "personasDiscapacitadas": 0,
+  "personasElectrodependientes": 0,
+  "mascotasAfectadas": 1,
+  "viviendasAfectadas": 1,
+  "nivelCompromisoVivienda": "MODERADO",
+  "riesgoElectrico": true,
+  "riesgoEstructural": false,
+  "riesgoQuimicoSanitario": false,
+  "aislamientoVial": false,
+  "requiereEvacuacion": false,
+  "requiereAsistenciaSocial": true,
+  "requiereApoyoAdicional": true,
+  "detallesAdicionales": "Se requiere coordinación con empresa eléctrica y cuadrilla de despeje.",
+  "factoresGatillantes": [
+    "Peligro eléctrico activo en terreno",
+    "Adultos mayores afectados (2)"
+  ],
+  "versionReporte": 1,
+  "misionId": "60000000-0000-4000-8000-000000000001"
+}
+```
+
+#### Reglas de Validación y Versionado
+- Si `prioridad !== prioridadSugerida`, el campo `justificacionPrioridad` es obligatorio y debe tener al menos **5 caracteres**.
+- Cada envío o rectificación incrementa `versionReporte` (`1`, `2`, `...`), registrando un reporte distinguible en el Centro de Mando y emitiendo el evento WebSocket `incidente:actualizado`.
+### 2.3 Rechazo Motivado de Misión por Patrulla Verificadora (H41, H69)
 - **Historia:** H41, H69
 - **Método:** `POST`
 - **Ruta:** `/api/misiones/{id}/rechazar`
@@ -200,6 +241,7 @@ Esto notifica de inmediato al Encargado del Centro de Mando en `sgrai-web` para 
 #### Comportamiento Offline-First
 - En caso de pérdida de señal o error de red, la PWA valida localmente con Zod (`rechazoMisionSchema`), persiste el estado `RECHAZADA` con `sincronizacionPendiente: true` en IndexedDB y almacena la mutación `RECHAZAR_MISION` en `outbox`.
 - El badge de conectividad refleja de inmediato `1 pendiente` y el worker/hook `useConnectivity` reintenta la mutación al recuperar la conexión.
+
 
 ---
 

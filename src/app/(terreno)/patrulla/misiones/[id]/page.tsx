@@ -16,17 +16,21 @@ import {
   ClipboardCheck,
   WifiOff,
   AlertCircle,
+  ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
+import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
 import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
 import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
+import { EvaluacionPrioridadCard } from '@/components/misiones/EvaluacionPrioridadCard';
 import { RechazoMisionModal, type CoordenadasGPS } from '@/components/misiones/RechazoMisionModal';
 import {
   obtenerDetalleMision,
@@ -60,6 +64,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const [errorAceptacion, setErrorAceptacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
   const [seccionCategorizacionAbierta, setSeccionCategorizacionAbierta] = useState<boolean>(true);
+  const [seccionPrioridadAbierta, setSeccionPrioridadAbierta] = useState<boolean>(false);
   const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
   const [feedbackMensaje, setFeedbackMensaje] = useState<{
     tipo: 'success' | 'offline';
@@ -70,10 +75,22 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     setCargando(true);
     try {
       const encontrada = await obtenerDetalleMision(misionId);
-      if (encontrada?.datosAdicionales?.tipologiaEvaluada) {
-        setSeccionCategorizacionAbierta(false);
+      if (encontrada) {
+        setMision(encontrada);
+        const reportesCount = Array.isArray(encontrada.datosAdicionales?.reportesPrioridad)
+          ? encontrada.datosAdicionales.reportesPrioridad.length
+          : Array.isArray(encontrada.datosAdicionales?.reportesTerreno)
+            ? encontrada.datosAdicionales.reportesTerreno.length
+            : 0;
+        const tipologiaYaEvaluada = Boolean(encontrada.datosAdicionales?.tipologiaEvaluada);
+        const prioridadYaEvaluada =
+          Boolean(encontrada.datosAdicionales?.prioridadEvaluada) || reportesCount > 0;
+
+        setSeccionCategorizacionAbierta(!tipologiaYaEvaluada);
+        setSeccionPrioridadAbierta(tipologiaYaEvaluada && !prioridadYaEvaluada);
+      } else {
+        setMision(null);
       }
-      setMision(encontrada || null);
     } finally {
       setCargando(false);
     }
@@ -177,14 +194,6 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         </div>
       </div>
     );
-  }
-
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
   }
 
   const estadoNormalizado = mision.estado?.toUpperCase() || '';
@@ -334,11 +343,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               aria-hidden="true"
             />
             <span className={styles.code}>{mision.codigoIncidente}</span>
-            <span className={`${styles.priorityChip} ${prioridadClase}`}>
+            <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
               {formatearPrioridad(mision.prioridad)}
-            </span>
+            </Chip>
           </div>
-          <EstadoBadge estado={mision.estado} />
+          <EstadoBadge estado={mision.estado} size="md" />
         </div>
 
         <div className={styles.detailGrid}>
@@ -464,7 +473,9 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                   En Trayecto / Evaluación
                 </h2>
               </div>
-              <span className={styles.activeStatusChip}>Misión activa</span>
+              <Chip variant="success" size="sm">
+                Misión activa
+              </Chip>
             </div>
 
             <div className={styles.enTrayectoContent}>
@@ -519,49 +530,116 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             </div>
 
             <div className={styles.evaluationContent}>
-              <SeccionDesplegable
-                titulo="Categorización del incidente"
-                icono={<Tag size={18} />}
-                abierto={seccionCategorizacionAbierta}
-                onToggle={(abierto) => setSeccionCategorizacionAbierta(abierto)}
-                indicador={
-                  mision.datosAdicionales?.tipologiaEvaluada ? (
-                    <span className={styles.badgeCompletado}>
-                      <CheckCircle2 size={14} aria-hidden="true" />
-                      <span>Completado</span>
-                    </span>
-                  ) : mision.sincronizacionPendiente ? (
-                    <span className={styles.syncPendingBadge}>Pendiente</span>
-                  ) : null
-                }
-              >
-                {(!tienePermisoVerificar ||
-                  !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-                    mision.incidenteId || ''
-                  )) && (
-                  <div className={styles.permissionWarning} role="note" style={{ marginBottom: '12px' }}>
-                    {!tienePermisoVerificar
-                      ? 'Su perfil no cuenta con el permiso misiones:terreno:verificar para categorizar incidentes.'
-                      : 'No se dispone de un identificador de incidente válido para registrar la categorización.'}
-                  </div>
-                )}
-                <EvaluacionTipologiaCard
-                  incidenteId={mision.incidenteId}
-                  misionActual={mision}
-                  deshabilitado={
-                    !tienePermisoVerificar ||
-                    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-                      mision.incidenteId || ''
-                    )
-                  }
-                  onTipologiaActualizada={(resultado) => {
-                    if (resultado.mision) {
-                      setMision(resultado.mision);
-                    }
-                    setSeccionCategorizacionAbierta(false);
-                  }}
-                />
-              </SeccionDesplegable>
+              {(() => {
+                const reportesPrioridadCount = Array.isArray(
+                  mision.datosAdicionales?.reportesPrioridad
+                )
+                  ? mision.datosAdicionales.reportesPrioridad.length
+                  : Array.isArray(mision.datosAdicionales?.reportesTerreno)
+                    ? mision.datosAdicionales.reportesTerreno.length
+                    : 0;
+                const tipologiaCompletada = Boolean(
+                  mision.datosAdicionales?.tipologiaEvaluada
+                );
+                const prioridadCompletada =
+                  Boolean(mision.datosAdicionales?.prioridadEvaluada) ||
+                  reportesPrioridadCount > 0;
+                const versionPrioridad =
+                  typeof mision.datosAdicionales?.versionReportePrioridad === 'number'
+                    ? mision.datosAdicionales.versionReportePrioridad
+                    : reportesPrioridadCount > 0
+                      ? reportesPrioridadCount
+                      : undefined;
+
+                return (
+                  <>
+                    <SeccionDesplegable
+                      titulo="Categorización del incidente"
+                      icono={<Tag size={18} />}
+                      abierto={seccionCategorizacionAbierta}
+                      onToggle={(abierto) => setSeccionCategorizacionAbierta(abierto)}
+                      indicador={
+                        tipologiaCompletada ? (
+                          <Chip
+                            variant="success"
+                            size="sm"
+                            icon={<CheckCircle2 size={12} />}
+                          >
+                            Completado
+                          </Chip>
+                        ) : mision.sincronizacionPendiente ? (
+                          <Chip variant="warning" size="sm">
+                            Pendiente
+                          </Chip>
+                        ) : null
+                      }
+                    >
+                      {!tienePermisoVerificar && (
+                        <div
+                          className={styles.permissionWarning}
+                          role="note"
+                          style={{ marginBottom: '12px' }}
+                        >
+                          Su perfil no cuenta con el permiso misiones:terreno:verificar para
+                          categorizar incidentes.
+                        </div>
+                      )}
+                      <EvaluacionTipologiaCard
+                        incidenteId={mision.incidenteId}
+                        misionActual={mision}
+                        deshabilitado={!tienePermisoVerificar}
+                        onTipologiaActualizada={(resultado) => {
+                          if (resultado.mision) {
+                            setMision(resultado.mision);
+                          }
+                          setSeccionCategorizacionAbierta(false);
+                          if (!prioridadCompletada) {
+                            setSeccionPrioridadAbierta(true);
+                          }
+                        }}
+                      />
+                    </SeccionDesplegable>
+
+                    <SeccionDesplegable
+                      titulo="Evaluación en terreno y prioridad"
+                      icono={<ShieldAlert size={18} />}
+                      abierto={seccionPrioridadAbierta}
+                      onToggle={(abierto) => setSeccionPrioridadAbierta(abierto)}
+                      indicador={
+                        prioridadCompletada ? (
+                          <Chip
+                            variant="success"
+                            size="sm"
+                            icon={<CheckCircle2 size={12} />}
+                          >
+                            Completado
+                            {typeof versionPrioridad === 'number'
+                              ? ` (#${versionPrioridad})`
+                              : ''}
+                          </Chip>
+                        ) : mision.sincronizacionPendiente ? (
+                          <Chip variant="warning" size="sm">
+                            Pendiente
+                          </Chip>
+                        ) : null
+                      }
+                    >
+                      <EvaluacionPrioridadCard
+                        incidenteId={mision.incidenteId}
+                        misionActual={mision}
+                        deshabilitado={!tienePermisoVerificar}
+                        onPrioridadActualizada={(resultado) => {
+                          if (resultado.mision) {
+                            setMision(resultado.mision);
+                          }
+                          setSeccionPrioridadAbierta(false);
+                          void actualizarPendientes();
+                        }}
+                      />
+                    </SeccionDesplegable>
+                  </>
+                );
+              })()}
             </div>
           </section>
         </>

@@ -106,7 +106,7 @@ export function TerrenoResumenOperativo() {
       window.removeEventListener('sgrai:mision_asignada', handleActualizar);
       window.removeEventListener('sgrai:mision_actualizada', handleActualizar);
     };
-  }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId]);
+  }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId, actualizarUnidadAsignada]);
 
   const UnidadIcon = esCuadrilla ? HardHat : Compass;
 
