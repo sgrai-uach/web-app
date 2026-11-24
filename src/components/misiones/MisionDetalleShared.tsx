@@ -193,6 +193,8 @@ export interface MisionEstadoActivoCardProps {
   mensajeOffline: string;
   mensajeConfirmacion?: string | null;
   estadosCanonicos: EstadoCanonicoItem[];
+  badgeExtra?: React.ReactNode;
+  bannerExtra?: React.ReactNode;
 }
 
 /**
@@ -207,6 +209,8 @@ export function MisionEstadoActivoCard({
   mensajeOffline,
   mensajeConfirmacion,
   estadosCanonicos,
+  badgeExtra,
+  bannerExtra,
 }: MisionEstadoActivoCardProps) {
   return (
     <section className={styles.enTrayectoCard} aria-label={ariaLabel}>
@@ -215,12 +219,17 @@ export function MisionEstadoActivoCard({
           {icono}
           <h2 className={styles.enTrayectoTitle}>{titulo}</h2>
         </div>
-        <Chip variant="success" size="sm">
-          Misión activa
-        </Chip>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {badgeExtra}
+          <Chip variant="success" size="sm">
+            Misión activa
+          </Chip>
+        </div>
       </div>
 
       <div className={styles.enTrayectoContent}>
+        {bannerExtra}
+
         {sincronizacionPendiente ? (
           <div className={styles.offlineQueueBanner} role="status">
             <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
@@ -283,6 +292,9 @@ export function MisionNoEncontradaCard({
       <div className={styles.notFoundCard} role="alert">
         <p className={styles.notFoundTitle}>Misión no encontrada</p>
         <p className={styles.notFoundDescription}>{descripcion}</p>
+        <Link href={backHref} className={styles.notFoundBackLink}>
+          Volver a la bandeja
+        </Link>
       </div>
     </div>
   );

@@ -32,6 +32,11 @@ import {
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
+import { useTelemetry } from '@/hooks/useTelemetry';
+import {
+  TelemetryStatusBadge,
+  TelemetryWarningBanner,
+} from '@/components/terreno/TelemetryStatusBadge';
 import {
   RechazoMisionModal,
   type CoordenadasGPS,
@@ -89,6 +94,21 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
   const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
   const [seccionCierreAbierta, setSeccionCierreAbierta] = useState<boolean>(true);
+
+  const estadoTelemetriaNormalizado = mision?.estado?.toUpperCase() || '';
+  const misionActivaTelemetria = Boolean(
+    unidadActiva &&
+      (estadoTelemetriaNormalizado === 'EN_CURSO' ||
+        estadoTelemetriaNormalizado === 'EN_RUTA' ||
+        estadoTelemetriaNormalizado === 'EN_TERRENO' ||
+        estadoTelemetriaNormalizado === 'ACEPTADA')
+  );
+
+  const { estado: estadoTelemetria, reintentar: reintentarTelemetria } = useTelemetry({
+    unidadId: usuario?.unidadId ?? null,
+    tipoUnidad: 'CUADRILLA',
+    activa: misionActivaTelemetria,
+  });
 
   const cargarDetalle = useCallback(
     async (silencioso = false) => {
@@ -336,49 +356,6 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       ? mision.datosAdicionales.fechaCierre
       : null;
 
-  const handleAceptarAsignacion = async () => {
-    if (!mision || aceptando) return;
-    setAceptando(true);
-    setErrorAceptacion(null);
-    setMensajeConfirmacion(null);
-
-    try {
-      const resultado = await aceptarMision(mision.id, {
-        misionActual: mision,
-        tipoUnidad: 'cuadrilla',
-      });
-      setMision(resultado.mision);
-      setMensajeConfirmacion(resultado.mensaje);
-      if (toast) {
-        if (resultado.enColaOffline) {
-          toast.showWarning(resultado.mensaje, 'Guardado sin conexión', {
-            dedupKey: `aceptar-mision-offline-${mision.id}`,
-          });
-        } else if (resultado.yaAceptadaPreviamente) {
-          toast.showInfo(resultado.mensaje, 'Misión ya en curso', {
-            dedupKey: `aceptar-mision-idemp-${mision.id}`,
-          });
-        } else {
-          toast.showSuccess(resultado.mensaje, 'Asignación aceptada', {
-            dedupKey: `aceptar-mision-${mision.id}`,
-          });
-        }
-      }
-      await actualizarPendientes();
-    } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : 'No se pudo confirmar la aceptación de la asignación.';
-      setErrorAceptacion(msg);
-      if (toast) {
-        toast.showError(msg, 'No se pudo aceptar la asignación');
-      }
-    } finally {
-      setAceptando(false);
-    }
-  };
-
   const handleConfirmarRechazo = async (
     motivo: string,
     coordenadas?: CoordenadasGPS
@@ -543,6 +520,18 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
           sincronizacionPendiente={Boolean(mision.sincronizacionPendiente)}
           mensajeOffline="Pendiente de sincronizar: La acción fue guardada en la cola local del dispositivo y se enviará automáticamente al recuperar conexión."
           mensajeConfirmacion={mensajeConfirmacion}
+          badgeExtra={
+            <TelemetryStatusBadge
+              estado={estadoTelemetria}
+              onRetry={reintentarTelemetria}
+            />
+          }
+          bannerExtra={
+            <TelemetryWarningBanner
+              estado={estadoTelemetria}
+              onRetry={reintentarTelemetria}
+            />
+          }
           estadosCanonicos={[
             { etiqueta: 'Misión', valor: 'En curso' },
             { etiqueta: 'Cuadrilla', valor: formatearEstado(estadoCuadrilla) },

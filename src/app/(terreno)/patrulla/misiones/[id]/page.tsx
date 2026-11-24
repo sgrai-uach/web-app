@@ -34,6 +34,11 @@ import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
 import { RechazoMisionModal, type CoordenadasGPS } from '@/components/misiones/RechazoMisionModal';
+import { useTelemetry } from '@/hooks/useTelemetry';
+import {
+  TelemetryStatusBadge,
+  TelemetryWarningBanner,
+} from '@/components/terreno/TelemetryStatusBadge';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
@@ -79,6 +84,20 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const [seccionCategorizacionAbierta, setSeccionCategorizacionAbierta] = useState<boolean>(true);
   const [seccionPrioridadAbierta, setSeccionPrioridadAbierta] = useState<boolean>(false);
   const [seccionReporteCierreAbierta, setSeccionReporteCierreAbierta] = useState<boolean>(false);
+
+  const estadoTelemetriaNormalizado = mision?.estado?.toUpperCase() || '';
+  const misionActivaTelemetria = Boolean(
+    unidadActiva &&
+      (estadoTelemetriaNormalizado === 'EN_CURSO' ||
+        estadoTelemetriaNormalizado === 'EN_RUTA' ||
+        estadoTelemetriaNormalizado === 'EN_TERRENO')
+  );
+
+  const { estado: estadoTelemetria, reintentar: reintentarTelemetria } = useTelemetry({
+    unidadId: usuario?.unidadId ?? null,
+    tipoUnidad: 'PATRULLA',
+    activa: misionActivaTelemetria,
+  });
 
   const cargarDetalle = useCallback(
     async (silencioso = false) => {
@@ -205,11 +224,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         status={status}
         pendingCount={pendientes}
         onRetry={sincronizar}
-<<<<<<< HEAD
         descripcion="La misión solicitada no existe o no se encuentra asignada a su unidad operativa, o no está disponible en caché local."
-=======
-        descripcion="La misión solicitada no existe, fue removida o no se encuentra disponible en caché local."
->>>>>>> origin/feature/h40-cuadrilla-aceptar-asignacion
       />
     );
   }
@@ -412,6 +427,18 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           sincronizacionPendiente={Boolean(mision.sincronizacionPendiente)}
           mensajeOffline="Pendiente de sincronizar: La aceptación fue guardada en la cola local del dispositivo y se enviará automáticamente al recuperar conexión."
           mensajeConfirmacion={mensajeConfirmacion}
+          badgeExtra={
+            <TelemetryStatusBadge
+              estado={estadoTelemetria}
+              onRetry={reintentarTelemetria}
+            />
+          }
+          bannerExtra={
+            <TelemetryWarningBanner
+              estado={estadoTelemetria}
+              onRetry={reintentarTelemetria}
+            />
+          }
           estadosCanonicos={[
             { etiqueta: 'Misión', valor: 'En curso' },
             { etiqueta: 'Patrulla', valor: 'En verificación' },

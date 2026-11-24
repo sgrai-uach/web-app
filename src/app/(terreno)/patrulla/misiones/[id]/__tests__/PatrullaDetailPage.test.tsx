@@ -2,7 +2,6 @@ import React, { Suspense } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import PatrullaMisionDetailPage from '../page';
-import { ToastProvider } from '@/components/ui/Toast';
 import * as AuthContextModule from '@/context/AuthContext';
 import * as misionesService from '@/services/misionesService';
 import * as useConnectivityModule from '@/hooks/useConnectivity';
