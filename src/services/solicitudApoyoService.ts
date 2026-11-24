@@ -269,8 +269,22 @@ export async function solicitarApoyoAdicional(
       );
 
       if (!error && response?.ok) {
-        const reporteRemoto =
-          data?.data?.reporteTerreno ?? data?.data?.reporte ?? undefined;
+        const dataRecord = data?.data as Record<string, unknown> | undefined;
+        const reporteRemoto = (dataRecord?.reporteTerreno ??
+          dataRecord?.reporte ??
+          undefined) as
+          | {
+              id?: string;
+              evaluador?: unknown;
+              requiereCuadrillaAdicional?: boolean;
+              requiere_cuadrilla_adicional?: boolean;
+              detalleApoyoRequerido?: string;
+              detalle_apoyo_requerido?: string;
+              resumenTecnico?: string;
+              observaciones?: string;
+              creadoEn?: string;
+            }
+          | undefined;
         const evaluadorRemoto = extraerEvaluadorDeObjeto(reporteRemoto?.evaluador);
         const reporteIdRemoto =
           data?.data?.reporteId ?? reporteRemoto?.id ?? undefined;

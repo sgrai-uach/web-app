@@ -2,11 +2,14 @@ import type { paths } from '@/types/api-generated';
 
 export type EstadoNotificacion = 'PENDIENTE_ENVIO' | 'ENVIADA' | 'RECIBIDA' | 'LEIDA';
 
+export type TipoUnidadNotificacion = 'PATRULLA' | 'CUADRILLA';
+
 export interface MisionAsignadaPayload {
   notificacionId?: string;
   misionId: string;
   codigo: string;
   tipoMision: string;
+  tipoUnidad?: TipoUnidadNotificacion;
   patrullaId?: string | null;
   cuadrillaId?: string | null;
   incidenteId?: string | null;
@@ -23,6 +26,7 @@ export interface MisionAsignadaAlerta {
   misionId: string;
   codigo: string;
   tipoMision: string;
+  tipoUnidad?: TipoUnidadNotificacion;
   patrullaId?: string | null;
   cuadrillaId?: string | null;
   incidenteId?: string | null;

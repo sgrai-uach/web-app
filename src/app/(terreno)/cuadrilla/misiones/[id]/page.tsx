@@ -34,6 +34,7 @@ import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
 import { useTelemetry } from '@/hooks/useTelemetry';
+import { useConfirmarLecturaMision } from '@/hooks/useConfirmarLecturaMision';
 import {
   TelemetryStatusBadge,
   TelemetryWarningBanner,
@@ -137,6 +138,12 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   useEffect(() => {
     void cargarDetalle();
   }, [cargarDetalle]);
+
+  useConfirmarLecturaMision({
+    misionId,
+    mision,
+    enabled: Boolean(mision && !cargando && esCuadrilla),
+  });
 
   useEffect(() => {
     const handleSync = () => {

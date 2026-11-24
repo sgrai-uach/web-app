@@ -19,8 +19,9 @@ function resolveSocketUrl(): string {
  * Obtiene o inicializa la conexión cliente de Socket.IO para terreno.
  */
 export function getSocket(tokenOverride?: string): Socket {
+  const token = tokenOverride || getAuthCookie() || undefined;
+
   if (!socketInstance) {
-    const token = tokenOverride || getAuthCookie() || undefined;
     const socketUrl = resolveSocketUrl();
 
     socketInstance = io(socketUrl, {
@@ -48,13 +49,22 @@ export function getSocket(tokenOverride?: string): Socket {
         socketInstance?.emit('unirse', room);
       }
     });
+  } else if (token) {
+    const authActual = (socketInstance.auth as { token?: string } | undefined)?.token;
+    if (authActual !== token) {
+      socketInstance.auth = { token };
+      if (socketInstance.connected) {
+        socketInstance.disconnect();
+        socketInstance.connect();
+      }
+    }
   }
 
   return socketInstance;
 }
 
 /**
- * Conecta el socket al servidor en tiempo real.
+ * Conecta el socket al servidor en tiempo real, refrescando el JWT si cambió desde la sesión anterior.
  */
 export function conectarSocket(token?: string): Socket {
   const socket = getSocket(token);
@@ -153,7 +163,7 @@ export function salirDeSalaCuadrilla(cuadrillaId: string): void {
 export function emitirAckNotificacionSocket(
   notificacionId: string,
   estado: 'RECIBIDA' | 'LEIDA'
-): Promise<{ ok: boolean; message?: string; error?: string }> {
+): Promise<{ ok: boolean; message?: string; error?: string; data?: unknown }> {
   return new Promise((resolve) => {
     const socket = getSocket();
 
@@ -169,7 +179,7 @@ export function emitirAckNotificacionSocket(
     socket.emit(
       'notificacion:ack',
       { notificacionId, estado },
-      (response: { ok: boolean; message?: string; error?: string }) => {
+      (response: { ok: boolean; message?: string; error?: string; data?: unknown }) => {
         clearTimeout(timer);
         resolve(response || { ok: true });
       }

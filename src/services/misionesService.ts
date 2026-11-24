@@ -626,6 +626,12 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
           sincronizacionPendiente: mantenerOptimista
             ? true
             : Boolean(previa?.sincronizacionPendiente),
+          ...(previa?.notificacionId ? { notificacionId: previa.notificacionId } : {}),
+          ...(item.trazabilidadNotificacion
+            ? { trazabilidadNotificacion: item.trazabilidadNotificacion }
+            : previa?.trazabilidadNotificacion
+              ? { trazabilidadNotificacion: previa.trazabilidadNotificacion }
+              : {}),
           datosAdicionales: {
             ...datosPrevios,
             trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
@@ -964,6 +970,9 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         fechaInicio:
           mantenerOptimista && previaLocal ? previaLocal.fechaInicio : d.fechaInicio || null,
         fechaLlegada: fechaLlegadaResuelta,
+        notificacionId: d.notificacionId ?? previaLocal?.notificacionId ?? null,
+        trazabilidadNotificacion:
+          d.trazabilidadNotificacion ?? previaLocal?.trazabilidadNotificacion ?? null,
         sincronizacionPendiente: mantenerOptimista,
         bitacoraTiempos: bitacoraRemota.map((h) => {
           const hExtra = h as {

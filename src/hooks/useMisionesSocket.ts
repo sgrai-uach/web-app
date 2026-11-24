@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getSocket } from '@/lib/socket/client';
+import { conectarSocket } from '@/lib/socket/socketClient';
 import { useAuth } from '@/context/AuthContext';
 
 export interface MisionAsignadaSocketPayload {
   misionId: string;
   codigo: string;
   tipoMision: string;
+  tipoUnidad?: 'PATRULLA' | 'CUADRILLA';
   patrullaId?: string | null;
   cuadrillaId?: string | null;
   incidenteId?: string | null;
@@ -19,7 +20,6 @@ export interface UseMisionesSocketOptions {
   onMisionActualizada?: (payload?: unknown) => void;
   habilitado?: boolean;
   intervaloPollingMs?: number;
-  vibrarAlAsignar?: boolean;
 }
 
 export function useMisionesSocket({
@@ -27,12 +27,9 @@ export function useMisionesSocket({
   onMisionActualizada,
   habilitado = true,
   intervaloPollingMs = 30000,
-  vibrarAlAsignar = true,
 }: UseMisionesSocketOptions = {}) {
-  const { usuario, esPatrulla, esCuadrilla } = useAuth();
+  const { usuario, token, esPatrulla, esCuadrilla } = useAuth();
   const [conectado, setConectado] = useState<boolean>(false);
-  const [ultimaMisionAsignada, setUltimaMisionAsignada] =
-    useState<MisionAsignadaSocketPayload | null>(null);
 
   const callbacksRef = useRef({ onNuevaMision, onMisionActualizada });
   useEffect(() => {
@@ -46,7 +43,7 @@ export function useMisionesSocket({
   useEffect(() => {
     if (!habilitado || typeof window === 'undefined') return;
 
-    const socket = getSocket();
+    const socket = conectarSocket(token || undefined);
 
     function unirseASala() {
       if (roomName) {
@@ -64,21 +61,22 @@ export function useMisionesSocket({
     }
 
     function handleMisionAsignada(payload: MisionAsignadaSocketPayload) {
-      if (unidadTipo === 'patrulla' && payload.patrullaId && payload.patrullaId !== unidadId) {
-        return;
+      if (unidadTipo === 'patrulla') {
+        if (
+          (payload.patrullaId && payload.patrullaId !== unidadId) ||
+          payload.tipoUnidad === 'CUADRILLA' ||
+          (!payload.patrullaId && Boolean(payload.cuadrillaId))
+        ) {
+          return;
+        }
       }
-      if (unidadTipo === 'cuadrilla' && payload.cuadrillaId && payload.cuadrillaId !== unidadId) {
-        return;
-      }
-
-      setUltimaMisionAsignada(payload);
-
-      // Vibración háptica institucional (H35)
-      if (vibrarAlAsignar && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        try {
-          navigator.vibrate([200, 100, 200]);
-        } catch {
-          // Silencioso en navegadores sin soporte de vibración
+      if (unidadTipo === 'cuadrilla') {
+        if (
+          (payload.cuadrillaId && payload.cuadrillaId !== unidadId) ||
+          payload.tipoUnidad === 'PATRULLA' ||
+          (!payload.cuadrillaId && Boolean(payload.patrullaId))
+        ) {
+          return;
         }
       }
 
@@ -118,7 +116,7 @@ export function useMisionesSocket({
         socket.emit('leave', roomName);
       }
     };
-  }, [habilitado, roomName, unidadId, unidadTipo, vibrarAlAsignar]);
+  }, [habilitado, roomName, token, unidadId, unidadTipo]);
 
   // Capa 2: Refresco al reanudar primer plano / foco
   useEffect(() => {
@@ -160,8 +158,6 @@ export function useMisionesSocket({
 
   return {
     conectado,
-    ultimaMisionAsignada,
-    descartarUltimaMision: () => setUltimaMisionAsignada(null),
   };
 }
 

@@ -76,6 +76,8 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 | `POST` | `/api/evidencia/adjuntos` | H43 | `DELEGADO_CUADRILLA` | Carga multipart de fotografías y archivos comprimidos. |
 | `POST` | `/api/misiones/{id}/apoyo` | H44 | `DELEGADO_CUADRILLA` | Solicitud estructurada de recursos o personal adicional. |
 | `POST` | `/api/misiones/{id}/cerrar` | H68 | `DELEGADO_CUADRILLA` | Cierre de faena con detalle de materiales consumidos. |
+| `PATCH` | `/api/terreno/notificaciones/{id}/estado` | H35 | `PATRULLA_VERIFICADORA`, `DELEGADO_CUADRILLA` | Acuse idempotente `RECIBIDA` o `LEIDA` (disparado automáticamente al abrir la misión). |
+| `GET` | `/api/terreno/misiones/pendientes` | H35 | `PATRULLA_VERIFICADORA`, `DELEGADO_CUADRILLA` | Reconciliación offline de asignaciones pendientes para patrulla o cuadrilla. |
 
 ---
 
@@ -394,22 +396,29 @@ Esto notifica de inmediato al Encargado del Centro de Mando en `sgrai-web` para 
 
 ### Canales y Eventos
 
-1. **Suscripción a Unidad:**
+1. **Suscripción a Unidad (Socket unificado en `socketClient.ts`):**
    - La patrulla escucha en `patrulla:{patrullaId}`.
    - La cuadrilla escucha en `cuadrilla:{cuadrillaId}`.
    - **Evento recibido `mision:asignada`:**
      ```json
      {
-       "misionId": "mis-102",
-       "incidenteId": "inc-450",
-       "codigoIncidente": "INC-2026-00450",
-       "tipologia": "CAIDA_ARBOL",
+       "notificacionId": "80000000-0000-4000-8000-000000000001",
+       "misionId": "60000000-0000-4000-8000-000000000001",
+       "codigo": "MIS-2026-0042",
+       "tipoMision": "ATENCION_CUADRILLA",
+       "tipoUnidad": "CUADRILLA",
+       "patrullaId": null,
+       "cuadrillaId": "50000000-0000-4000-8000-000000000001",
+       "incidenteId": "30000000-0000-4000-8000-000000000001",
+       "incidenteCodigo": "INC-2026-00450",
+       "incidenteFolio": "FOL-450",
+       "tipoAfectacion": "CAIDA_ARBOL",
        "direccion": "Av. Ramón Picarte 1230, Valdivia",
-       "coordenadas": { "lat": -39.8142, "lng": -73.2459 },
        "prioridad": "ALTA",
-       "fechaDespacho": "2026-10-27T16:00:00Z"
+       "asignadoEn": "2026-10-27T16:00:00Z"
      }
      ```
+   - **Evento emitido `notificacion:ack`:** `{ "notificacionId": "<uuid>", "estado": "RECIBIDA" | "LEIDA" }` (emitido automáticamente como `RECIBIDA` al llegar la notificación y como `LEIDA` al abrir el detalle de la misión).
 
 2. **Emisión de Telemetría GPS:**
    - **Evento emitido `telemetria:posicion` (H70):**

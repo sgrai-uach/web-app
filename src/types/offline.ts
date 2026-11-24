@@ -97,6 +97,8 @@ export interface MisionLocal {
   fechaDespacho: string;
   fechaInicio?: string | null;
   fechaLlegada?: string | null;
+  notificacionId?: string | null;
+  trazabilidadNotificacion?: 'PENDIENTE_ENVIO' | 'ENVIADA' | 'RECIBIDA' | 'LEIDA' | null;
   sincronizacionPendiente?: boolean;
   bitacoraTiempos?: MisionBitacoraHitoLocal[];
   datosAdicionales?: Record<string, unknown>;

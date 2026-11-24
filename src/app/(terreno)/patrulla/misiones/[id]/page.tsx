@@ -35,6 +35,7 @@ import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
 import { RechazoMisionModal, type CoordenadasGPS } from '@/components/misiones/RechazoMisionModal';
 import { useTelemetry } from '@/hooks/useTelemetry';
+import { useConfirmarLecturaMision } from '@/hooks/useConfirmarLecturaMision';
 import {
   TelemetryStatusBadge,
   TelemetryWarningBanner,
@@ -149,6 +150,12 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   useEffect(() => {
     void cargarDetalle();
   }, [cargarDetalle]);
+
+  useConfirmarLecturaMision({
+    misionId,
+    mision,
+    enabled: Boolean(mision && !cargando && esPatrulla),
+  });
 
   // Refrescar detalle local cuando la cola offline o eventos de otro integrante de la patrulla sincronicen la misión
   useEffect(() => {

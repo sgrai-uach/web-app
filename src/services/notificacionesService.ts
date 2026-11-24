@@ -2,6 +2,7 @@ import apiClient from '@/lib/api/client';
 import {
   guardarNotificacionLocal,
   obtenerNotificacionLocal,
+  obtenerNotificacionLocalPorMisionId,
   guardarMisionLocal,
   encolarAccionOutbox,
 } from '@/services/offlineQueue';
@@ -11,6 +12,15 @@ import type {
   MisionPendienteTerreno,
 } from '@/types/notificaciones';
 import type { MisionLocal } from '@/types/offline';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Valida que el identificador de notificación corresponda a un UUID real emitido por el backend.
+ */
+export function esUuidNotificacionValido(id?: string | null): id is string {
+  return typeof id === 'string' && UUID_REGEX.test(id.trim());
+}
 
 // Memoria volátil para deduplicación ultra-rápida síncrona
 const notificacionesProcesadasMemoria = new Set<string>();
@@ -81,6 +91,10 @@ export async function enviarAckHttp(
   notificacionId: string,
   estado: 'RECIBIDA' | 'LEIDA'
 ): Promise<boolean> {
+  if (!esUuidNotificacionValido(notificacionId)) {
+    return false;
+  }
+
   try {
     const { response, error } = await apiClient.PATCH(
       '/api/terreno/notificaciones/{id}/estado',
@@ -112,31 +126,39 @@ export async function enviarAckHttp(
 export async function procesarMisionAsignada(
   alerta: MisionAsignadaAlerta
 ): Promise<{ esDuplicado: boolean; mision: MisionLocal }> {
-  const duplicado = await esNotificacionDuplicada(alerta.notificacionId);
+  const tieneUuidValido = esUuidNotificacionValido(alerta.notificacionId);
+  const duplicado = tieneUuidValido
+    ? await esNotificacionDuplicada(alerta.notificacionId)
+    : false;
   const mision = mapearAlertaAMisionLocal(alerta);
 
   if (duplicado) {
     return { esDuplicado: true, mision };
   }
 
-  // Registrar en deduplicación
-  notificacionesProcesadasMemoria.add(alerta.notificacionId);
+  if (tieneUuidValido) {
+    notificacionesProcesadasMemoria.add(alerta.notificacionId);
+  }
 
   // Persistir en base de datos local (IndexedDB)
   try {
-    await guardarNotificacionLocal({
-      notificacionId: alerta.notificacionId,
-      misionId: alerta.misionId,
-      estado: 'RECIBIDA',
-      procesadoEn: new Date().toISOString(),
-    });
+    if (tieneUuidValido) {
+      await guardarNotificacionLocal({
+        notificacionId: alerta.notificacionId,
+        misionId: alerta.misionId,
+        estado: 'RECIBIDA',
+        procesadoEn: new Date().toISOString(),
+      });
+    }
     await guardarMisionLocal(mision);
   } catch {
     // Si IndexedDB falla, continuar con emisión de ACK
   }
 
-  // Emitir acuse técnico automático 'RECIBIDA' (WebSocket -> REST -> Outbox)
-  await emitirAckRecibida(alerta.notificacionId);
+  // Emitir acuse técnico automático 'RECIBIDA' solo si el ID es un UUID real del backend
+  if (tieneUuidValido) {
+    await emitirAckRecibida(alerta.notificacionId);
+  }
 
   return { esDuplicado: false, mision };
 }
@@ -145,6 +167,10 @@ export async function procesarMisionAsignada(
  * Emite el acuse técnico 'RECIBIDA' con estrategia híbrida: WebSocket -> REST -> Outbox Offline (HU-35 §3.2).
  */
 export async function emitirAckRecibida(notificacionId: string): Promise<void> {
+  if (!esUuidNotificacionValido(notificacionId)) {
+    return;
+  }
+
   // 1. Intento por WebSocket nativo
   const resSocket = await emitirAckNotificacionSocket(notificacionId, 'RECIBIDA');
   if (resSocket.ok) {
@@ -171,12 +197,16 @@ export async function emitirAckRecibida(notificacionId: string): Promise<void> {
 }
 
 /**
- * Emite el acuse de lectura operativa 'LEIDA' al interactuar con el banner o misión (HU-35 §3.4).
+ * Emite el acuse de lectura operativa 'LEIDA' al abrir la misión o interactuar con la alerta (HU-35 §3.4).
  */
 export async function emitirAckLectura(
   notificacionId: string,
   misionId?: string
 ): Promise<void> {
+  if (!esUuidNotificacionValido(notificacionId)) {
+    return;
+  }
+
   // Actualizar registro local
   try {
     await guardarNotificacionLocal({
@@ -214,18 +244,29 @@ export async function emitirAckLectura(
   }
 }
 
+export interface ConsultaMisionesPendientesFiltro {
+  patrullaId?: string;
+  cuadrillaId?: string;
+}
+
 /**
  * Consulta órdenes de misión despachadas pendientes de confirmación en el servidor (HU-35 §2.2 B).
  */
 export async function consultarMisionesPendientes(
-  patrullaId?: string
+  filtro?: string | ConsultaMisionesPendientesFiltro
 ): Promise<MisionPendienteTerreno[]> {
   try {
+    const query =
+      typeof filtro === 'string'
+        ? { patrullaId: filtro }
+        : {
+            ...(filtro?.patrullaId ? { patrullaId: filtro.patrullaId } : {}),
+            ...(filtro?.cuadrillaId ? { cuadrillaId: filtro.cuadrillaId } : {}),
+          };
+
     const { data, error } = await apiClient.GET('/api/terreno/misiones/pendientes', {
       params: {
-        query: {
-          patrullaId,
-        },
+        query,
       },
     });
 
@@ -236,5 +277,63 @@ export async function consultarMisionesPendientes(
     return data.data;
   } catch {
     return [];
+  }
+}
+
+export interface ConfirmarLecturaMisionParams {
+  misionId: string;
+  notificacionId?: string | null;
+  unidadId?: string | null;
+  esCuadrilla?: boolean;
+  trazabilidadNotificacion?: string | null;
+}
+
+/**
+ * Confirma automáticamente la lectura ('LEIDA') cuando el operador de terreno abre el detalle de la misión.
+ * Resuelve el UUID real de notificación en este orden:
+ * 1) `notificacionId` proveniente del detalle o caché local de misión;
+ * 2) Tabla `notificaciones` en IndexedDB;
+ * 3) Reconciliación remota vía GET `/api/terreno/misiones/pendientes`.
+ */
+export async function confirmarLecturaMisionAbierta(
+  params: ConfirmarLecturaMisionParams
+): Promise<boolean> {
+  const { misionId, notificacionId, unidadId, esCuadrilla, trazabilidadNotificacion } = params;
+  if (!misionId) return false;
+
+  if (trazabilidadNotificacion === 'LEIDA') {
+    return false;
+  }
+
+  try {
+    const registroLocal = await obtenerNotificacionLocalPorMisionId(misionId);
+    if (registroLocal?.estado === 'LEIDA') {
+      return false;
+    }
+
+    let idObjetivo: string | null = esUuidNotificacionValido(notificacionId)
+      ? notificacionId
+      : registroLocal && esUuidNotificacionValido(registroLocal.notificacionId)
+        ? registroLocal.notificacionId
+        : null;
+
+    if (!idObjetivo && unidadId) {
+      const pendientes = await consultarMisionesPendientes(
+        esCuadrilla ? { cuadrillaId: unidadId } : { patrullaId: unidadId }
+      );
+      const match = pendientes.find((p) => p.misionId === misionId);
+      if (match && esUuidNotificacionValido(match.notificacionId)) {
+        idObjetivo = match.notificacionId;
+      }
+    }
+
+    if (!idObjetivo) {
+      return false;
+    }
+
+    await emitirAckLectura(idObjetivo, misionId);
+    return true;
+  } catch {
+    return false;
   }
 }

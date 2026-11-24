@@ -1724,19 +1724,59 @@ export interface paths {
                                 /** @description Indica si el incidente posee una misión en estado EN_CURSO activa en terreno */
                                 tieneMisionEnCurso?: boolean;
                                 /**
+                                 * @description Indica si una cuadrilla operativa ya aceptó (EN_CURSO o COMPLETADA) una misión de atención para este incidente (HU-40)
+                                 * @default false
+                                 */
+                                cuadrillaAceptada: boolean;
+                                /** @description Indica si la cuadrilla asignada ya reportó su llegada física a terreno (LLEGADA_TERRENO) */
+                                cuadrillaEnTerreno?: boolean;
+                                /**
                                  * @description Último estado de trazabilidad de notificación de misión asociado al incidente (HU-35)
                                  * @enum {string}
                                  */
                                 trazabilidadNotificacion?: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
                                 /**
+                                 * Format: uuid
+                                 * @description ID de la misión correspondiente a la última trazabilidad de notificación del incidente
+                                 */
+                                trazabilidadMisionId?: string | null;
+                                /**
+                                 * @description Tipo de unidad (PATRULLA o CUADRILLA) destinataria de la última notificación de misión del incidente
+                                 * @enum {string|null}
+                                 */
+                                trazabilidadTipoUnidad?: "PATRULLA" | "CUADRILLA" | null;
+                                /**
                                  * @description Indica si la patrulla verificadora completó el diagnóstico técnico en terreno
                                  * @default false
                                  */
                                 verificado: boolean;
+                                /** @description Indica si la cuadrilla operativa finalizó sus faenas y envió el informe técnico final (HU-68) */
+                                faenasCuadrillaCompletadas?: boolean;
+                                /** @description Estado final del terreno informado por la cuadrilla al cierre (HU-68) */
+                                estadoTerrenoFinal?: string | null;
+                                /** @description Horas hombre invertidas reportadas en el último cierre de cuadrilla (HU-68) */
+                                horasHombreRegistradas?: number | null;
+                                /**
+                                 * @description Último dictamen técnico emitido por la patrulla verificadora (HU-39)
+                                 * @enum {string|null}
+                                 */
+                                dictamenTerreno?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
                                 /** @description Indica si el incidente fue verificado o reclasificado en terreno */
                                 reclasificadoEnTerreno?: boolean;
                                 /** @description Motivo o justificación técnica de la evaluación en terreno */
                                 justificacionReclasificacion?: string | null;
+                                /**
+                                 * @description Indica si una unidad en terreno solicitó apoyo adicional de recursos materiales o humanos (HU-44)
+                                 * @default false
+                                 */
+                                apoyoSolicitado: boolean;
+                                /**
+                                 * @description Indica si la solicitud de apoyo activa requiere despachar una cuadrilla adicional (HU-44)
+                                 * @default false
+                                 */
+                                requiereCuadrillaAdicional: boolean;
+                                /** @description Detalle del último apoyo adicional solicitado desde terreno (HU-44) */
+                                detalleApoyoRequerido?: string | null;
                                 /** @description Fecha y hora de registro en formato ISO 8601 */
                                 creadoEn: string;
                                 /** @description Última fecha y hora de actualización en formato ISO 8601 */
@@ -1928,6 +1968,11 @@ export interface paths {
                                      * @enum {string}
                                      */
                                     trazabilidadNotificacion?: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
+                                    /**
+                                     * Format: uuid
+                                     * @description ID de la notificación de misión más reciente asociada a esta misión
+                                     */
+                                    notificacionId?: string | null;
                                     /** @description Patrulla verificadora asignada */
                                     patrulla: {
                                         /** Format: uuid */
@@ -1993,8 +2038,8 @@ export interface paths {
                                     observaciones: string | null;
                                     personasAfectadas: number;
                                     requiereApoyoAdicional: boolean;
+                                    requiereCuadrillaAdicional?: boolean;
                                     detalleApoyoRequerido?: string | null;
-                                    detalle_apoyo_requerido?: string | null;
                                     horasHombre?: number | null;
                                     materialesConsumidos?: components["schemas"]["MaterialConsumidoDetalle"][];
                                     evaluacion: {
@@ -2033,6 +2078,17 @@ export interface paths {
                                  * @default false
                                  */
                                 verificado: boolean;
+                                /** @description Indica si la cuadrilla operativa finalizó sus faenas y envió el informe técnico final (HU-68) */
+                                faenasCuadrillaCompletadas?: boolean;
+                                /** @description Estado final del terreno informado por la cuadrilla al cierre (HU-68) */
+                                estadoTerrenoFinal?: string | null;
+                                /** @description Horas hombre invertidas reportadas en el último cierre de cuadrilla (HU-68) */
+                                horasHombreRegistradas?: number | null;
+                                /**
+                                 * @description Último dictamen técnico emitido por la patrulla verificadora (HU-39)
+                                 * @enum {string|null}
+                                 */
+                                dictamenTerreno?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
                                 /**
                                  * @description Indica si fue verificado o reclasificado en terreno
                                  * @default false
@@ -2040,6 +2096,18 @@ export interface paths {
                                 reclasificadoEnTerreno: boolean;
                                 /** @description Justificación técnica en terreno */
                                 justificacionReclasificacion?: string | null;
+                                /**
+                                 * @description Indica si una unidad en terreno solicitó apoyo adicional (HU-44)
+                                 * @default false
+                                 */
+                                apoyoSolicitado: boolean;
+                                /**
+                                 * @description Indica si la solicitud de apoyo activa requiere despachar una cuadrilla adicional (HU-44)
+                                 * @default false
+                                 */
+                                requiereCuadrillaAdicional: boolean;
+                                /** @description Detalle del último apoyo adicional solicitado desde terreno (HU-44) */
+                                detalleApoyoRequerido?: string | null;
                                 /** @description Detalle de la última reclasificación de tipología en terreno si hubo cambio */
                                 reclasificacionTipologia?: {
                                     /** Format: uuid */
@@ -2070,6 +2138,13 @@ export interface paths {
                                     dictamen?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
                                     motivoNoAbordable?: string | null;
                                     tipoReporte?: string | null;
+                                    estadoTerreno?: string | null;
+                                    etiquetaReporte?: string | null;
+                                    horasHombre?: number | null;
+                                    requiereApoyoAdicional?: boolean;
+                                    requiereCuadrillaAdicional?: boolean;
+                                    detalleApoyoRequerido?: string | null;
+                                    materialesConsumidos?: components["schemas"]["MaterialConsumidoDetalle"][] | null;
                                     versionReporte: number | null;
                                     esRectificacion: boolean;
                                 } | null;
@@ -3522,7 +3597,7 @@ export interface paths {
         put?: never;
         /**
          * Despachar misión operativa a patrulla verificadora (HU-20) o cuadrilla operativa (HU-21)
-         * @description Crea y despacha una misión en estado DESPACHADA. Si recibe `patrullaId` (HU-20), despacha una patrulla verificadora disponible sobre un incidente REPORTADO (cambiando el incidente a VERIFICANDO y la patrulla a EN_VERIFICACION). Si recibe `cuadrillaId` o `tipoMision: 'ATENCION_CUADRILLA'` (HU-21), despacha una cuadrilla disponible cambiando el incidente a EN_ATENCION y aplicando la Regla §3.2 ICS para concluir la verificación previa y liberar la patrulla a DISPONIBLE.
+         * @description Crea y despacha una misión en estado DESPACHADA. Si recibe `patrullaId` (HU-20), despacha una patrulla verificadora disponible sobre un incidente REPORTADO (cambiando el incidente a VERIFICANDO y la patrulla a EN_VERIFICACION). Si recibe `cuadrillaId` o `tipoMision: 'ATENCION_CUADRILLA'` (HU-21 / HU-44), despacha una cuadrilla disponible sobre un incidente en REPORTADO, VERIFICANDO o EN_ATENCION (apoyo adicional con misión distinta), opcionalmente incorpora `recursosAdicionales` permanentes a la dotación activa de la cuadrilla en `cuadrilla_recurso`, desactiva alertas previas de apoyo satisfechas (regla A3) y aplica la Regla §3.2 ICS para relevar la patrulla verificadora previa si aún no estaba liberada.
          */
         post: {
             parameters: {
@@ -3623,16 +3698,16 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Confirmar y aceptar misión asignada desde terreno (H36, H40)
-         * @description Permite a la patrulla verificadora o al delegado de cuadrilla confirmar y aceptar la misión asignada desde su dispositivo móvil (PWA). Ejecuta una transición atómica actualizando mision.estado de DESPACHADA a EN_CURSO, fijando mision.fecha_inicio = CURRENT_TIMESTAMP y registrando el hito en mision_hito. Para VERIFICACION mantiene patrulla en EN_VERIFICACION e incidente en VERIFICANDO ('Misión Aceptada por Patrulla'); para ATENCION_CUADRILLA actualiza cuadrilla a EN_MISION e incidente a EN_ATENCION ('Asignación Aceptada por Cuadrilla'), emitiendo los eventos WebSocket hacia el Centro de Mando. Requiere el permiso RBAC 'misiones:terreno:verificar' o 'misiones:terreno:ejecutar'.
+         * Confirmar y aceptar misión asignada desde terreno (HU-36 / HU-40)
+         * @description Permite al Delegado de Cuadrilla (HU-40) o a la patrulla verificadora (HU-36) confirmar y aceptar la misión asignada desde su dispositivo móvil (PWA). Para cuadrillas (`ATENCION_CUADRILLA`, requiere permiso `misiones:terreno:ejecutar`): ejecuta una transacción atómica que (1) actualiza `mision.estado` de `DESPACHADA` a `EN_CURSO` fijando `fecha_inicio = CURRENT_TIMESTAMP`, (2) actualiza `cuadrilla.estado = 'EN_MISION'`, (3) actualiza `incidente.estado = 'EN_ATENCION'`, (4) registra el hito `'Asignación Aceptada por Cuadrilla'` (`MISION_ACEPTADA`) en `mision_hito`, y emite los eventos WebSocket `incidente:actualizado` y `mision:actualizada` hacia el Centro de Mando. Para patrullas verificadoras (`VERIFICACION`, requiere permiso `misiones:terreno:verificar`), mantiene `patrulla_verificadora.estado = 'EN_VERIFICACION'` e `incidente.estado = 'VERIFICANDO'` registrando `'Misión Aceptada por Patrulla'`.
          */
         post: {
             parameters: {
                 query?: never;
                 header?: {
-                    /** @description Token Bearer JWT de sesión de la unidad operativa en terreno */
+                    /** @description Token Bearer JWT de sesión de terreno (Delegado de Cuadrilla o Patrulla) */
                     authorization?: string;
-                    /** @description UUID del usuario autenticado con permiso misiones:terreno:verificar o misiones:terreno:ejecutar */
+                    /** @description UUID del usuario autenticado con permiso misiones:terreno:ejecutar o misiones:terreno:verificar */
                     "x-user-id"?: string;
                 };
                 path: {
@@ -3671,7 +3746,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Acceso denegado. Se requiere el permiso 'misiones:terreno:verificar' o 'misiones:terreno:ejecutar' y pertenecer a la unidad asignada */
+                /** @description Acceso denegado. Se requiere el permiso 'misiones:terreno:ejecutar' (cuadrilla) o 'misiones:terreno:verificar' (patrulla) y pertenecer a la unidad asignada */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -3773,6 +3848,11 @@ export interface paths {
                                 prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
                                 /** @description Motivo documentado en caso de rechazo por la cuadrilla */
                                 justificacionRechazo: string | null;
+                                /**
+                                 * Format: uuid
+                                 * @description UUID de la última notificación emitida para esta misión (HU-35)
+                                 */
+                                notificacionId?: string | null;
                                 /**
                                  * @description Estado actual de entrega y lectura de la notificación de esta misión (HU-35)
                                  * @enum {string}
@@ -4042,9 +4122,16 @@ export interface paths {
                                     accionesRealizadas: string | null;
                                     /** @description Indica si se requiere escalamiento logístico o relevo */
                                     requiereApoyoAdicional: boolean;
-                                    /** @description Detalle específico del apoyo material o humano solicitado en terreno (HU-44) */
+                                    /**
+                                     * @description Indica si el apoyo adicional solicitado requiere despachar una cuadrilla adicional con una misión distinta (HU-44)
+                                     * @example true
+                                     */
+                                    requiereCuadrillaAdicional?: boolean;
+                                    /**
+                                     * @description Detalle de los recursos materiales o humanos adicionales solicitados desde terreno (HU-44)
+                                     * @example Se solicita motoniveladora y cuadrilla adicional de despeje
+                                     */
                                     detalleApoyoRequerido?: string | null;
-                                    detalle_apoyo_requerido?: string | null;
                                     /** @description Descripción o estimación preliminar de daños observados */
                                     danosEstimados: string | null;
                                     /** @description Observaciones de seguridad o condiciones de terreno */
@@ -8804,7 +8891,7 @@ export interface paths {
         head?: never;
         /**
          * Confirmar acuse de recibo o lectura de notificación de misión (HU-35)
-         * @description Registra de forma idempotente la confirmación técnica automática ('RECIBIDA') o la interacción operativa ('LEIDA') emitida por sgrai-pwa. Emite el evento WebSocket 'notificacion:trazabilidad_actualizada' hacia la Central de Operaciones. Requiere permiso 'misiones:terreno:verificar' y pertenencia a la patrulla destinataria (salvo rol Administrador).
+         * @description Registra de forma idempotente la confirmación técnica automática ('RECIBIDA') o la interacción operativa ('LEIDA') emitida por sgrai-pwa (patrullas verificadoras y cuadrillas operativas). Emite el evento WebSocket 'notificacion:trazabilidad_actualizada' hacia la Central de Operaciones. Requiere permiso 'misiones:terreno:verificar' o 'misiones:terreno:ejecutar' y pertenencia a la patrulla o cuadrilla destinataria (salvo rol Administrador).
          */
         patch: {
             parameters: {
@@ -8855,9 +8942,24 @@ export interface paths {
                                 misionId: string;
                                 /**
                                  * Format: uuid
-                                 * @description Identificador de la patrulla destinataria
+                                 * @description Identificador del incidente asociado si aplica
                                  */
-                                patrullaId: string;
+                                incidenteId?: string | null;
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador de la patrulla destinataria (null si corresponde a cuadrilla)
+                                 */
+                                patrullaId: string | null;
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador de la cuadrilla destinataria (null si corresponde a patrulla)
+                                 */
+                                cuadrillaId?: string | null;
+                                /**
+                                 * @description Tipo de unidad operativa destinataria (PATRULLA o CUADRILLA)
+                                 * @enum {string}
+                                 */
+                                tipoUnidad?: "PATRULLA" | "CUADRILLA";
                                 /**
                                  * @description Estado actual del ciclo de vida de la notificación
                                  * @enum {string}
@@ -8894,7 +8996,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Acceso denegado. Se requiere permiso 'misiones:terreno:verificar' y pertenecer a la patrulla asignada */
+                /** @description Acceso denegado. Se requiere permiso 'misiones:terreno:verificar' o 'misiones:terreno:ejecutar' y pertenecer a la patrulla o cuadrilla asignada */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -8928,12 +9030,13 @@ export interface paths {
         };
         /**
          * Consultar órdenes de misión pendientes de acuse para terreno (HU-35)
-         * @description Consulta las misiones asignadas a la patrulla del usuario autenticado cuyas notificaciones se encuentran en 'PENDIENTE_ENVIO' o 'ENVIADA'. Utilizado por sgrai-pwa al recuperar conectividad tras operar fuera de cobertura (Arquitectura Offline-First). Requiere permiso 'misiones:terreno:verificar'.
+         * @description Consulta las misiones asignadas a la patrulla o cuadrilla del usuario autenticado cuyas notificaciones se encuentran en 'PENDIENTE_ENVIO' o 'ENVIADA'. Utilizado por sgrai-pwa al recuperar conectividad tras operar fuera de cobertura (Arquitectura Offline-First). Requiere permiso 'misiones:terreno:verificar' o 'misiones:terreno:ejecutar'.
          */
         get: {
             parameters: {
                 query?: {
                     patrullaId?: string;
+                    cuadrillaId?: string;
                 };
                 header?: never;
                 path?: never;
@@ -8993,9 +9096,19 @@ export interface paths {
                                 estadoNotificacion: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
                                 /**
                                  * Format: uuid
-                                 * @description Identificador de la patrulla asignada
+                                 * @description Identificador de la patrulla asignada (si aplica)
                                  */
-                                patrullaId: string;
+                                patrullaId: string | null;
+                                /**
+                                 * Format: uuid
+                                 * @description Identificador de la cuadrilla asignada (si aplica)
+                                 */
+                                cuadrillaId?: string | null;
+                                /**
+                                 * @description Tipo de unidad operativa asignada (PATRULLA o CUADRILLA)
+                                 * @enum {string}
+                                 */
+                                tipoUnidad?: "PATRULLA" | "CUADRILLA";
                                 /**
                                  * Format: uuid
                                  * @description Identificador del incidente asociado si aplica
@@ -9042,7 +9155,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Acceso denegado. Se requiere permiso 'misiones:terreno:verificar' y pertenecer a una patrulla activa */
+                /** @description Acceso denegado. Se requiere permiso 'misiones:terreno:verificar' o 'misiones:terreno:ejecutar' y pertenecer a una patrulla o cuadrilla activa */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -9479,6 +9592,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/geolocalizacion/posiciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obtener posiciones GPS activas de unidades en terreno (HU-70)
+         * @description Retorna la lista de últimas posiciones GPS conocidas de todas las unidades operativas (patrullas y cuadrillas) vigentes en la caché de telemetría de Redis. Permite hidratar de forma instantánea el mapa interactivo del Centro de Mando en sgrai-web.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Posiciones activas obtenidas exitosamente */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Posiciones activas obtenidas exitosamente */
+                            message: string;
+                            data: {
+                                /**
+                                 * Format: uuid
+                                 * @description UUID de la unidad
+                                 */
+                                unidadId: string;
+                                /**
+                                 * @description Tipo de unidad
+                                 * @enum {string}
+                                 */
+                                tipoUnidad: "PATRULLA" | "CUADRILLA";
+                                /** @description Latitud actual */
+                                lat: number;
+                                /** @description Longitud actual */
+                                lng: number;
+                                /** @description Timestamp reportado por el dispositivo */
+                                timestamp: string;
+                                /** @description Rumbo en grados */
+                                rumbo?: number | null;
+                                /** @description Precisión en metros */
+                                precision?: number | null;
+                                /** @description Velocidad en m/s */
+                                velocidad?: number | null;
+                                /** @description Fecha y hora en que la API persistió la telemetría */
+                                recibidoEn: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description No autenticado o token ausente */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor al consultar posiciones activas */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/incidentes/{id}/prioridad/calcular": {
         parameters: {
             query?: never;
@@ -9739,104 +9934,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/misiones/{id}/apoyo": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Solicitar apoyo adicional de recursos materiales o humanos en terreno (HU-44)
-         * @description Permite al Delegado de Cuadrilla indicar en el reporte de terreno que se requiere apoyo adicional, especificando las necesidades (`detalleApoyoRequerido`, mínimo 5 caracteres) para alertar en tiempo real a la sala `encargado` del Centro de Mando sin interrumpir la faena en curso (`EN_CURSO`). Requiere permiso RBAC `reportes:crear`.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Identificador único UUID de la misión */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Detalle de recursos materiales o humanos adicionales requeridos en terreno */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["SolicitarApoyoBody"];
-                };
-            };
-            responses: {
-                /** @description Solicitud de apoyo registrada y alerta emitida hacia la sala encargado */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["SolicitarApoyoResponse"];
-                    };
-                };
-                /** @description Solicitud de apoyo creada, persistida en reporte_terreno y alerta emitida hacia la sala encargado */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["SolicitarApoyoResponse"];
-                    };
-                };
-                /** @description Datos inválidos (ej. requiereApoyoAdicional = true con detalleApoyoRequerido menor a 5 caracteres) */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description No autenticado o token inválido */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Acceso denegado. Requiere permiso 'reportes:crear' y pertenecer a la cuadrilla asignada */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Misión no encontrada */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Conflicto: la misión no se encuentra en estado EN_CURSO */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Error interno del servidor */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/misiones/{id}/cerrar": {
         parameters: {
             query?: never;
@@ -9905,6 +10002,95 @@ export interface paths {
                     content?: never;
                 };
                 /** @description Conflicto: la misión no está en estado EN_CURSO, no tiene cuadrilla asignada, o el stock del recurso consumido es insuficiente */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/misiones/{id}/apoyo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solicitar apoyo adicional de recursos materiales o humanos en terreno (HU-44)
+         * @description Permite al Delegado de Cuadrilla (o unidad asignada en terreno) indicar en su reporte si requiere apoyo adicional de recursos materiales o humanos sin interrumpir la faena en curso, incluyendo si se requiere despachar una cuadrilla adicional con misión distinta (`requiereCuadrillaAdicional`, default false). Si `requiereApoyoAdicional` es true, exige `detalleApoyoRequerido` (>= 5 caracteres). Persiste en `reporte_terreno` (`tipo_reporte = 'SOLICITUD_APOYO'`), registra el hito `APOYO_SOLICITADO` en `mision_hito`, emite la alerta visual prioritaria `'mision:apoyo_solicitado'` hacia la sala `encargado` del Centro de Mando y actualiza el tablero Kanban (`apoyoSolicitado`, `requiereCuadrillaAdicional`). Requiere permiso RBAC `'reportes:crear'`.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identificador único UUID de la misión */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Indicador de requerimiento de apoyo adicional y detalle específico de refuerzos solicitados */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SolicitarApoyoMisionInput"];
+                };
+            };
+            responses: {
+                /** @description Solicitud de apoyo adicional registrada y alertada al Centro de Mando exitosamente */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SolicitarApoyoMisionResponse"];
+                    };
+                };
+                /** @description Datos inválidos (ej. UUID inválido, JSON mal formado, o requiereApoyoAdicional = true sin detalleApoyoRequerido >= 5 caracteres) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token inválido */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere el permiso 'reportes:crear' y pertenecer a la unidad asignada a la misión (o rol Administrador) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Misión no encontrada */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto: la misión no se encuentra en estado EN_CURSO */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -10844,7 +11030,6 @@ export interface components {
             message: string;
             /**
              * CuadrillaResponse
-             * @description Información detallada de la cuadrilla operativa y su dotación
              * @description Información detallada de la cuadrilla operativa y su dotación
              */
             data: {
@@ -12334,19 +12519,59 @@ export interface components {
                 /** @description Indica si el incidente posee una misión en estado EN_CURSO activa en terreno */
                 tieneMisionEnCurso?: boolean;
                 /**
+                 * @description Indica si una cuadrilla operativa ya aceptó (EN_CURSO o COMPLETADA) una misión de atención para este incidente (HU-40)
+                 * @default false
+                 */
+                cuadrillaAceptada: boolean;
+                /** @description Indica si la cuadrilla asignada ya reportó su llegada física a terreno (LLEGADA_TERRENO) */
+                cuadrillaEnTerreno?: boolean;
+                /**
                  * @description Último estado de trazabilidad de notificación de misión asociado al incidente (HU-35)
                  * @enum {string}
                  */
                 trazabilidadNotificacion?: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
                 /**
+                 * Format: uuid
+                 * @description ID de la misión correspondiente a la última trazabilidad de notificación del incidente
+                 */
+                trazabilidadMisionId?: string | null;
+                /**
+                 * @description Tipo de unidad (PATRULLA o CUADRILLA) destinataria de la última notificación de misión del incidente
+                 * @enum {string|null}
+                 */
+                trazabilidadTipoUnidad?: "PATRULLA" | "CUADRILLA" | null;
+                /**
                  * @description Indica si la patrulla verificadora completó el diagnóstico técnico en terreno
                  * @default false
                  */
                 verificado: boolean;
+                /** @description Indica si la cuadrilla operativa finalizó sus faenas y envió el informe técnico final (HU-68) */
+                faenasCuadrillaCompletadas?: boolean;
+                /** @description Estado final del terreno informado por la cuadrilla al cierre (HU-68) */
+                estadoTerrenoFinal?: string | null;
+                /** @description Horas hombre invertidas reportadas en el último cierre de cuadrilla (HU-68) */
+                horasHombreRegistradas?: number | null;
+                /**
+                 * @description Último dictamen técnico emitido por la patrulla verificadora (HU-39)
+                 * @enum {string|null}
+                 */
+                dictamenTerreno?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
                 /** @description Indica si el incidente fue verificado o reclasificado en terreno */
                 reclasificadoEnTerreno?: boolean;
                 /** @description Motivo o justificación técnica de la evaluación en terreno */
                 justificacionReclasificacion?: string | null;
+                /**
+                 * @description Indica si una unidad en terreno solicitó apoyo adicional de recursos materiales o humanos (HU-44)
+                 * @default false
+                 */
+                apoyoSolicitado: boolean;
+                /**
+                 * @description Indica si la solicitud de apoyo activa requiere despachar una cuadrilla adicional (HU-44)
+                 * @default false
+                 */
+                requiereCuadrillaAdicional: boolean;
+                /** @description Detalle del último apoyo adicional solicitado desde terreno (HU-44) */
+                detalleApoyoRequerido?: string | null;
                 /** @description Fecha y hora de registro en formato ISO 8601 */
                 creadoEn: string;
                 /** @description Última fecha y hora de actualización en formato ISO 8601 */
@@ -12469,6 +12694,11 @@ export interface components {
                      * @enum {string}
                      */
                     trazabilidadNotificacion?: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
+                    /**
+                     * Format: uuid
+                     * @description ID de la notificación de misión más reciente asociada a esta misión
+                     */
+                    notificacionId?: string | null;
                     /** @description Patrulla verificadora asignada */
                     patrulla: {
                         /** Format: uuid */
@@ -12534,6 +12764,8 @@ export interface components {
                     observaciones: string | null;
                     personasAfectadas: number;
                     requiereApoyoAdicional: boolean;
+                    requiereCuadrillaAdicional?: boolean;
+                    detalleApoyoRequerido?: string | null;
                     horasHombre?: number | null;
                     materialesConsumidos?: components["schemas"]["MaterialConsumidoDetalle"][];
                     evaluacion: {
@@ -12572,6 +12804,17 @@ export interface components {
                  * @default false
                  */
                 verificado: boolean;
+                /** @description Indica si la cuadrilla operativa finalizó sus faenas y envió el informe técnico final (HU-68) */
+                faenasCuadrillaCompletadas?: boolean;
+                /** @description Estado final del terreno informado por la cuadrilla al cierre (HU-68) */
+                estadoTerrenoFinal?: string | null;
+                /** @description Horas hombre invertidas reportadas en el último cierre de cuadrilla (HU-68) */
+                horasHombreRegistradas?: number | null;
+                /**
+                 * @description Último dictamen técnico emitido por la patrulla verificadora (HU-39)
+                 * @enum {string|null}
+                 */
+                dictamenTerreno?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
                 /**
                  * @description Indica si fue verificado o reclasificado en terreno
                  * @default false
@@ -12579,6 +12822,18 @@ export interface components {
                 reclasificadoEnTerreno: boolean;
                 /** @description Justificación técnica en terreno */
                 justificacionReclasificacion?: string | null;
+                /**
+                 * @description Indica si una unidad en terreno solicitó apoyo adicional (HU-44)
+                 * @default false
+                 */
+                apoyoSolicitado: boolean;
+                /**
+                 * @description Indica si la solicitud de apoyo activa requiere despachar una cuadrilla adicional (HU-44)
+                 * @default false
+                 */
+                requiereCuadrillaAdicional: boolean;
+                /** @description Detalle del último apoyo adicional solicitado desde terreno (HU-44) */
+                detalleApoyoRequerido?: string | null;
                 /** @description Detalle de la última reclasificación de tipología en terreno si hubo cambio */
                 reclasificacionTipologia?: {
                     /** Format: uuid */
@@ -12609,6 +12864,13 @@ export interface components {
                     dictamen?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
                     motivoNoAbordable?: string | null;
                     tipoReporte?: string | null;
+                    estadoTerreno?: string | null;
+                    etiquetaReporte?: string | null;
+                    horasHombre?: number | null;
+                    requiereApoyoAdicional?: boolean;
+                    requiereCuadrillaAdicional?: boolean;
+                    detalleApoyoRequerido?: string | null;
+                    materialesConsumidos?: components["schemas"]["MaterialConsumidoDetalle"][] | null;
                     versionReporte: number | null;
                     esRectificacion: boolean;
                 } | null;
@@ -13093,6 +13355,11 @@ export interface components {
              */
             misionId: string;
             /**
+             * @description Naturaleza del reporte de terreno
+             * @example EVALUACION_PRIORIDAD
+             */
+            tipoReporte?: string;
+            /**
              * @description Número correlativo de envío del reporte dentro de la misión (1 = inicial, 2+ = rectificaciones)
              * @example 1
              */
@@ -13331,6 +13598,16 @@ export interface components {
                     accionesRealizadas: string | null;
                     /** @description Indica si se requiere escalamiento logístico o relevo */
                     requiereApoyoAdicional: boolean;
+                    /**
+                     * @description Indica si el apoyo adicional solicitado requiere despachar una cuadrilla adicional con una misión distinta (HU-44)
+                     * @example true
+                     */
+                    requiereCuadrillaAdicional?: boolean;
+                    /**
+                     * @description Detalle de los recursos materiales o humanos adicionales solicitados desde terreno (HU-44)
+                     * @example Se solicita motoniveladora y cuadrilla adicional de despeje
+                     */
+                    detalleApoyoRequerido?: string | null;
                     /** @description Descripción o estimación preliminar de daños observados */
                     danosEstimados: string | null;
                     /** @description Observaciones de seguridad o condiciones de terreno */
@@ -13445,13 +13722,13 @@ export interface components {
              */
             hito: string;
             /**
-             * @description Glosa descriptiva del hito operativo
-             * @example Misión Aceptada por Patrulla
+             * @description Glosa descriptiva del hito operativo ('Asignación Aceptada por Cuadrilla' en HU-40 o 'Misión Aceptada por Patrulla' en HU-36)
+             * @example Asignación Aceptada por Cuadrilla
              */
             descripcion: string;
             /**
              * Format: uuid
-             * @description UUID del funcionario de patrulla en sesión que confirmó la salida
+             * @description UUID del funcionario en sesión (Delegado de Cuadrilla o líder de patrulla) que confirmó la aceptación
              */
             registradoPorId: string | null;
             /** @description Latitud reportada al momento del hito */
@@ -13637,6 +13914,16 @@ export interface components {
                     accionesRealizadas: string | null;
                     /** @description Indica si se requiere escalamiento logístico o relevo */
                     requiereApoyoAdicional: boolean;
+                    /**
+                     * @description Indica si el apoyo adicional solicitado requiere despachar una cuadrilla adicional con una misión distinta (HU-44)
+                     * @example true
+                     */
+                    requiereCuadrillaAdicional?: boolean;
+                    /**
+                     * @description Detalle de los recursos materiales o humanos adicionales solicitados desde terreno (HU-44)
+                     * @example Se solicita motoniveladora y cuadrilla adicional de despeje
+                     */
+                    detalleApoyoRequerido?: string | null;
                     /** @description Descripción o estimación preliminar de daños observados */
                     danosEstimados: string | null;
                     /** @description Observaciones de seguridad o condiciones de terreno */
@@ -14638,9 +14925,24 @@ export interface components {
                     misionId: string;
                     /**
                      * Format: uuid
-                     * @description Identificador de la patrulla destinataria
+                     * @description Identificador del incidente asociado si aplica
                      */
-                    patrullaId: string;
+                    incidenteId?: string | null;
+                    /**
+                     * Format: uuid
+                     * @description Identificador de la patrulla destinataria (null si corresponde a cuadrilla)
+                     */
+                    patrullaId: string | null;
+                    /**
+                     * Format: uuid
+                     * @description Identificador de la cuadrilla destinataria (null si corresponde a patrulla)
+                     */
+                    cuadrillaId?: string | null;
+                    /**
+                     * @description Tipo de unidad operativa destinataria (PATRULLA o CUADRILLA)
+                     * @enum {string}
+                     */
+                    tipoUnidad?: "PATRULLA" | "CUADRILLA";
                     /**
                      * @description Estado actual del ciclo de vida de la notificación
                      * @enum {string}
@@ -14700,7 +15002,7 @@ export interface components {
             tipoMision: "ATENCION_CUADRILLA";
             /**
              * Format: uuid
-             * @description UUID del incidente en estado REPORTADO o VERIFICANDO a atender
+             * @description UUID del incidente en estado REPORTADO, VERIFICANDO o EN_ATENCION a atender
              * @example 30000000-0000-4000-8000-000000000001
              */
             incidenteId: string;
@@ -14726,6 +15028,22 @@ export interface components {
              * @enum {string}
              */
             prioridad?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+            /** @description Recursos logísticos adicionales a incorporar permanentemente en la dotación activa de la cuadrilla al momento del despacho */
+            recursosAdicionales?: components["schemas"]["RecursoAdicionalDespachoInput"][];
+        };
+        RecursoAdicionalDespachoInput: {
+            /**
+             * Format: uuid
+             * @description UUID del recurso logístico adicional a incorporar en la cuadrilla
+             * @example b0000000-0000-4000-8000-000000000010
+             */
+            recursoId: string;
+            /**
+             * @description Cantidad física adicional a asignar a la cuadrilla
+             * @default 1
+             * @example 1
+             */
+            cantidad: number;
         };
         AsignarCuadrillaMisionResponse: {
             /** @example Cuadrilla asignada y despachada exitosamente al incidente. Patrulla verificadora liberada. */
@@ -14770,6 +15088,68 @@ export interface components {
                     descripcion: string;
                     creadoEn: string;
                 } | null;
+                /**
+                 * NotificacionMisionDetalle
+                 * @description Registro inicial de trazabilidad de notificación para la cuadrilla destinataria (HU-35 / HU-40)
+                 */
+                notificacion?: {
+                    /**
+                     * Format: uuid
+                     * @description Identificador único de la notificación
+                     */
+                    id: string;
+                    /**
+                     * Format: uuid
+                     * @description Identificador de la misión asociada
+                     */
+                    misionId: string;
+                    /**
+                     * Format: uuid
+                     * @description Identificador del incidente asociado si aplica
+                     */
+                    incidenteId?: string | null;
+                    /**
+                     * Format: uuid
+                     * @description Identificador de la patrulla destinataria (null si corresponde a cuadrilla)
+                     */
+                    patrullaId: string | null;
+                    /**
+                     * Format: uuid
+                     * @description Identificador de la cuadrilla destinataria (null si corresponde a patrulla)
+                     */
+                    cuadrillaId?: string | null;
+                    /**
+                     * @description Tipo de unidad operativa destinataria (PATRULLA o CUADRILLA)
+                     * @enum {string}
+                     */
+                    tipoUnidad?: "PATRULLA" | "CUADRILLA";
+                    /**
+                     * @description Estado actual del ciclo de vida de la notificación
+                     * @enum {string}
+                     */
+                    estado: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
+                    /**
+                     * @description Contador de emisiones hacia la patrulla
+                     * @example 1
+                     */
+                    intentosEnvio: number;
+                    /** @description Marca temporal UTC de registro en base de datos */
+                    creadaAt: string;
+                    /** @description Marca temporal UTC de emisión hacia la sala de la patrulla */
+                    enviadaAt: string | null;
+                    /** @description Marca temporal UTC del acuse de recibo técnico automático */
+                    recibidaAt: string | null;
+                    /** @description Marca temporal UTC del acuse de lectura operativa */
+                    leidaAt: string | null;
+                };
+                recursosAdicionalesAsignados?: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    cantidadAsignada: number;
+                    cantidadEnUsoActual: number;
+                    estado: string;
+                }[];
             };
         };
         /** @description Datos de la patrulla verificadora previa que fue liberada automáticamente (null si no había patrulla) */
@@ -15038,17 +15418,17 @@ export interface components {
                     /** Format: uuid */
                     patrullaId: string | null;
                     /** Format: uuid */
-                    cuadrillaId: string | null;
+                    cuadrillaId?: string | null;
                     /** @description Timestamp ISO 8601 fijado al momento de aceptar la misión */
                     fechaInicio: string;
                     actualizadoEn: string;
                 };
-                cuadrilla: {
+                cuadrilla?: {
                     /** Format: uuid */
                     id: string;
                     nombre: string;
                     /**
-                     * @description Estado actualizado de la cuadrilla al aceptar la asignación
+                     * @description Actualizado a EN_MISION al aceptar la asignación (HU-40)
                      * @example EN_MISION
                      */
                     estado: string;
@@ -15070,12 +15450,11 @@ export interface components {
                     id: string;
                     codigo: string;
                     /**
-                     * @description Estado operativo del incidente tras aceptar la misión (VERIFICANDO o EN_ATENCION)
-                     * @example VERIFICANDO
+                     * @description EN_ATENCION cuando acepta una cuadrilla (HU-40) o VERIFICANDO cuando acepta una patrulla (HU-36)
+                     * @example EN_ATENCION
                      */
                     estado: string;
-                    /** @enum {string} */
-                    prioridad?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+                    prioridad?: string;
                 } | null;
                 hito: components["schemas"]["MisionHitoRegistrado"];
             };
@@ -16623,333 +17002,39 @@ export interface components {
             /** Format: date-time */
             creadoEn: string;
         };
-        /** @description Datos de la patrulla verificadora previa que fue liberada automáticamente (null si no había patrulla) */
-        PatrullaLiberada: {
-            /** Format: uuid */
-            id: string;
-            nombre: string;
-            /** @example DISPONIBLE */
-            estado: string;
-            /** Format: uuid */
-            misionPreviaId?: string | null;
-        } | null;
-        AsignarCuadrillaMisionInput: {
-            /**
-             * @description Tipo de misión táctica a despachar
-             * @example ATENCION_CUADRILLA
-             * @enum {string}
-             */
-            tipoMision: "ATENCION_CUADRILLA";
-            /**
-             * Format: uuid
-             * @description UUID del incidente en estado REPORTADO o VERIFICANDO a atender
-             * @example 30000000-0000-4000-8000-000000000001
-             */
-            incidenteId: string;
-            /**
-             * Format: uuid
-             * @description UUID de la cuadrilla operativa disponible a despachar
-             * @example 50000000-0000-4000-8000-000000000001
-             */
-            cuadrillaId: string;
-            /**
-             * @description Título descriptivo de la misión operativa (se autogenera si se omite)
-             * @example Atención y despeje táctico - Incidente INC-2026-001
-             */
-            titulo?: string;
-            /**
-             * @description Instrucciones tácticas u observaciones impartidas a la cuadrilla
-             * @example Despejar ramas caídas sobre tendido eléctrico en sector Las Ánimas.
-             */
-            descripcion?: string;
-            /**
-             * @description Nivel de prioridad. Si se omite, se hereda de la misión de verificación activa de la patrulla o del incidente.
-             * @example ALTA
-             * @enum {string}
-             */
-            prioridad?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
-        };
-        CrearMisionResponse: {
-            /** @example Misión de verificación creada y patrulla despachada exitosamente. */
+        SolicitarApoyoMisionResponse: {
+            /** @example Solicitud de apoyo adicional registrada y alertada al Centro de Mando exitosamente. */
             message: string;
             data: {
-                mision: components["schemas"]["MisionCreadaResumen"];
-                incidente: {
-                    /** Format: uuid */
-                    id: string;
-                    codigo: string;
-                    estado: string;
-                };
-                patrulla: {
-                    /** Format: uuid */
-                    id: string;
-                    nombre: string;
-                    estado: string;
-                };
-                hitoInicial: {
-                    /** Format: uuid */
-                    id: string;
-                    hito: string;
-                    descripcion: string;
-                    creadoEn: string;
-                };
-                /**
-                 * NotificacionMisionDetalle
-                 * @description Trazabilidad completa de la notificación de misión despachada
-                 */
-                notificacion?: {
-                    /**
-                     * Format: uuid
-                     * @description Identificador único de la notificación
-                     */
-                    id: string;
-                    /**
-                     * Format: uuid
-                     * @description Identificador de la misión asociada
-                     */
-                    misionId: string;
-                    /**
-                     * Format: uuid
-                     * @description Identificador de la patrulla destinataria
-                     */
-                    patrullaId: string;
-                    /**
-                     * @description Estado actual del ciclo de vida de la notificación
-                     * @enum {string}
-                     */
-                    estado: "PENDIENTE_ENVIO" | "ENVIADA" | "RECIBIDA" | "LEIDA";
-                    /**
-                     * @description Contador de emisiones hacia la patrulla
-                     * @example 1
-                     */
-                    intentosEnvio: number;
-                    /** @description Marca temporal UTC de registro en base de datos */
-                    creadaAt: string;
-                    /** @description Marca temporal UTC de emisión hacia la sala de la patrulla */
-                    enviadaAt: string | null;
-                    /** @description Marca temporal UTC del acuse de recibo técnico automático */
-                    recibidaAt: string | null;
-                    /** @description Marca temporal UTC del acuse de lectura operativa */
-                    leidaAt: string | null;
-                };
+                /** Format: uuid */
+                reporteId: string;
+                /** Format: uuid */
+                misionId: string;
+                misionCodigo: string;
+                /** Format: uuid */
+                incidenteId: string | null;
+                requiereApoyoAdicional: boolean;
+                requiereCuadrillaAdicional: boolean;
+                detalleApoyoRequerido: string | null;
+                hito: components["schemas"]["MisionHitoRegistrado"] & unknown;
+                alertaEmitida: boolean;
+                creadoEn: string;
             };
         };
-        CrearMisionVerificacionInput: {
-            /**
-             * Format: uuid
-             * @description Identificador único UUID del incidente a verificar
-             * @example 50000000-0000-4000-8000-000000000001
-             */
-            incidenteId: string;
-            /**
-             * Format: uuid
-             * @description Identificador único UUID de la patrulla verificadora disponible
-             * @example f1000000-0000-4000-8000-000000000001
-             */
-            patrullaId: string;
-            /**
-             * @description Tipo de misión operativa a despachar (fijo en VERIFICACION para evaluación preliminar)
-             * @default VERIFICACION
-             * @example VERIFICACION
-             * @enum {string}
-             */
-            tipoMision: "VERIFICACION";
-            /**
-             * @description Título descriptivo opcional para la misión de verificación
-             * @example Verificación en terreno: Aniego en Las Ánimas
-             */
-            titulo?: string;
-            /**
-             * @description Instrucciones tácticas preliminares para la patrulla
-             * @example Evaluar anegamiento en calzada y riesgo de ingreso a viviendas.
-             */
-            descripcion?: string | null;
-            /**
-             * @description Nivel de prioridad o urgencia táctica (si se omite, hereda la del incidente)
-             * @example ALTA
-             * @enum {string}
-             */
-            prioridad?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
-        };
-        RechazarMisionResponse: {
-            /** @example Misión rechazada exitosamente. La cuadrilla ha vuelto a estado DISPONIBLE y el incidente ha retornado a VERIFICANDO para su reasignación. */
-            message: string;
-            data: {
-                mision: {
-                    /** Format: uuid */
-                    id: string;
-                    codigo: string;
-                    /** @enum {string} */
-                    tipoMision: "VERIFICACION" | "ATENCION_CUADRILLA" | "PREVENCION" | "RECUPERACION" | "ASISTENCIA_SOCIAL";
-                    /**
-                     * @example RECHAZADA
-                     * @enum {string}
-                     */
-                    estado: "PLANIFICADA" | "DESPACHADA" | "EN_CURSO" | "COMPLETADA" | "CANCELADA" | "RECHAZADA";
-                    justificacionRechazo: string;
-                    fechaCierre: string;
-                    actualizadoEn: string;
-                };
-                cuadrilla: {
-                    /** Format: uuid */
-                    id: string;
-                    nombre: string;
-                    /** @example DISPONIBLE */
-                    estado: string;
-                    /** Format: uuid */
-                    delegacionId?: string | null;
-                    /** Format: uuid */
-                    usuarioDelegadoId?: string | null;
-                };
-                incidente: {
-                    /** Format: uuid */
-                    id: string;
-                    codigo: string;
-                    /** @example VERIFICANDO */
-                    estado: string;
-                    prioridad: string;
-                } | null;
-                hito: components["schemas"]["MisionHitoRegistrado"];
-            };
-        };
-        RechazarMisionBody: {
-            /**
-             * @description Justificación técnica obligatoria del rechazo de la misión (mínimo 5 caracteres según Regla §3.3)
-             * @example Camión tolva presenta falla hidráulica en ruta de salida desde base.
-             */
-            justificacion_rechazo: string;
-            /**
-             * @description Latitud WGS84 opcional de la cuadrilla al momento del rechazo (-90 a 90)
-             * @example -39.81422
-             */
-            latitud?: number;
-            /**
-             * @description Longitud WGS84 opcional de la cuadrilla al momento del rechazo (-180 a 180)
-             * @example -73.24589
-             */
-            longitud?: number;
-        };
-        AdjuntoCreadoResponse: {
-            /**
-             * Format: uuid
-             * @description UUID del registro en tabla adjunto
-             */
-            id: string;
-            /** @example evidencia_terreno.jpg */
-            nombreArchivo: string;
-            /** @example /uploads/evidencia/a1b2c3d4.webp */
-            url: string;
-            /** @example image/webp */
-            tipoMime: string;
-            /** @example 145820 */
-            tamanoBytes: number;
-            /** Format: uuid */
-            incidenteId: string | null;
-            /** Format: uuid */
-            reporteTerrenoId: string | null;
-            /** Format: date-time */
-            creadoEn: string;
-        };
-        SolicitarApoyoBody: {
-            /**
-             * @description Indica si se requiere apoyo logístico o humano adicional en terreno
-             * @example true
-             */
+        SolicitarApoyoMisionInput: {
             requiereApoyoAdicional?: boolean;
+            requiere_apoyo_adicional?: boolean;
             /**
-             * @description Indica si el apoyo adicional requiere el despacho de una cuadrilla adicional
+             * @description Indica si el apoyo adicional solicitado requiere despachar una cuadrilla adicional con una misión distinta a la original (HU-44)
              * @example true
              */
             requiereCuadrillaAdicional?: boolean;
-            /**
-             * @description Especificación de los recursos materiales o humanos requeridos (mínimo 5 caracteres cuando requiereApoyoAdicional es true)
-             * @example Se solicita motoniveladora y cuadrilla adicional de despeje
-             */
-            detalleApoyoRequerido?: string;
-            /** @description Alias snake_case tolerado por el backend */
-            requiere_apoyo_adicional?: boolean;
-            /** @description Alias snake_case tolerado por el backend */
             requiere_cuadrilla_adicional?: boolean;
-            /** @description Alias snake_case tolerado por el backend */
-            detalle_apoyo_requerido?: string;
-            /** @description Contexto breve opcional de la faena en curso */
+            detalleApoyoRequerido?: string | null;
+            detalle_apoyo_requerido?: string | null;
             resumenTecnico?: string;
-            /** @description Observaciones adicionales opcionales */
-            observaciones?: string;
-        };
-        SolicitarApoyoResponse: {
-            /** @example Solicitud de apoyo adicional registrada y notificada al Centro de Mando. */
-            message: string;
-            data: {
-                /** Format: uuid */
-                reporteId?: string;
-                /** Format: uuid */
-                misionId?: string;
-                misionCodigo?: string;
-                /** Format: uuid */
-                incidenteId?: string | null;
-                requiereApoyoAdicional?: boolean;
-                requiereCuadrillaAdicional?: boolean;
-                detalleApoyoRequerido?: string | null;
-                alertaEmitida?: boolean;
-                /** Format: date-time */
-                creadoEn?: string;
-                reporteTerreno?: {
-                    /** Format: uuid */
-                    id: string;
-                    /** Format: uuid */
-                    misionId?: string;
-                    tipoReporte?: string;
-                    requiereApoyoAdicional?: boolean;
-                    requiere_apoyo_adicional?: boolean;
-                    requiereCuadrillaAdicional?: boolean;
-                    requiere_cuadrilla_adicional?: boolean;
-                    detalleApoyoRequerido?: string | null;
-                    detalle_apoyo_requerido?: string | null;
-                    resumenTecnico?: string | null;
-                    observaciones?: string | null;
-                    evaluador?: {
-                        /** Format: uuid */
-                        id?: string;
-                        nombre?: string;
-                        email?: string;
-                        rut?: string | null;
-                    } | null;
-                    /** Format: date-time */
-                    creadoEn?: string;
-                };
-                reporte?: {
-                    /** Format: uuid */
-                    id: string;
-                    /** Format: uuid */
-                    misionId?: string;
-                    tipoReporte?: string;
-                    requiereApoyoAdicional?: boolean;
-                    requiere_apoyo_adicional?: boolean;
-                    requiereCuadrillaAdicional?: boolean;
-                    requiere_cuadrilla_adicional?: boolean;
-                    detalleApoyoRequerido?: string | null;
-                    detalle_apoyo_requerido?: string | null;
-                    resumenTecnico?: string | null;
-                    observaciones?: string | null;
-                    evaluador?: {
-                        /** Format: uuid */
-                        id?: string;
-                        nombre?: string;
-                        email?: string;
-                        rut?: string | null;
-                    } | null;
-                    /** Format: date-time */
-                    creadoEn?: string;
-                };
-                incidente?: {
-                    /** Format: uuid */
-                    id: string;
-                    codigo?: string;
-                    requiereApoyoAdicional?: boolean;
-                    requiereCuadrillaAdicional?: boolean;
-                } | null;
-            };
+            resumen_tecnico?: string;
+            observaciones?: string | null;
         };
     };
     responses: never;

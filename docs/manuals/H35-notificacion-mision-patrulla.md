@@ -1,7 +1,7 @@
-# Manual de Usuario: Notificación de Misión Asignada a Patrulla en Terreno y Trazabilidad de ACK (H35)
+# Manual de Usuario: Notificación de Misión Asignada en Terreno y Trazabilidad de ACK (H35)
 
-**Historia de Usuario:** HU-35 — Notificación de misión asignada a patrulla en terreno y trazabilidad de ACK  
-**Rol:** Patrulla Verificadora  
+**Historia de Usuario:** HU-35 — Notificación estandarizada de misión asignada en terreno y trazabilidad de ACK  
+**Roles:** Patrulla Verificadora (`PATRULLA_VERIFICADORA`) y Delegado de Cuadrilla (`DELEGADO_CUADRILLA`)  
 **Aplicación:** SGRAI — PWA Terreno (`/terreno`)  
 
 ---
@@ -18,8 +18,8 @@ El módulo provee una alerta flotante de alto contraste con señalética sensori
 
 ### 2.1. Credenciales y Rol Institucional
 
-- El usuario debe haber iniciado sesión con una cuenta activa que posea el rol **Patrulla Verificadora** (`PATRULLA_VERIFICADORA`) y el permiso **`misiones:terreno:verificar`**.
-- La patrulla asignada al operador debe encontrarse activa en el sistema.
+- El usuario debe haber iniciado sesión con una cuenta activa que posea el rol **Patrulla Verificadora** (`PATRULLA_VERIFICADORA`, permiso **`misiones:terreno:verificar`**) o **Delegado de Cuadrilla** (`DELEGADO_CUADRILLA`, permiso **`misiones:terreno:ejecutar`**).
+- La unidad asignada (patrulla o cuadrilla) debe encontrarse activa en el sistema.
 
 ### 2.2. Permisos de Sonido y Reproducción en el Navegador Móvil
 
@@ -69,8 +69,8 @@ Los botones interactivos del banner cuentan con un tamaño táctil mínimo de 48
 
 - **Botón "Ver Misión":**
   1. Presione el botón verde menta con borde oscuro institucional.
-  2. La aplicación emite inmediatamente el **Acuse de Lectura Operativa (`LEIDA`)** hacia el servidor, informando a la Central que el patrullero leyó la orden.
-  3. El banner se cierra automáticamente y la pantalla redirige a la vista de detalle de la misión (`/patrulla/misiones/[id]`), donde el líder puede aceptar la salida y revisar el mapa de acceso.
+  2. La aplicación emite inmediatamente el **Acuse de Lectura Operativa (`LEIDA`)** hacia el servidor, informando al Centro de Mando que el operador leyó la orden.
+  3. El banner se cierra automáticamente y la pantalla redirige a la vista de detalle de la misión (`/patrulla/misiones/[id]` o `/cuadrilla/misiones/[id]`), donde también se confirma automáticamente la lectura (`LEIDA`) si la orden se abrió desde la bandeja o mediante enlace directo.
 - **Botón "Cerrar":**
   1. Presione el botón secundario para ocultar temporalmente la alerta emergente sin navegar.
   2. La orden permanecerá registrada y accesible en la pestaña **Misiones** de la barra inferior de navegación.

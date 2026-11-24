@@ -3,6 +3,8 @@ import {
   procesarMisionAsignada,
   emitirAckLectura,
   consultarMisionesPendientes,
+  confirmarLecturaMisionAbierta,
+  esUuidNotificacionValido,
   limpiarCacheNotificacionesMemoria,
   mapearAlertaAMisionLocal,
 } from '../notificacionesService';
@@ -30,15 +32,19 @@ vi.mock('@/services/offlineQueue', async () => {
     ...actual,
     guardarNotificacionLocal: vi.fn().mockResolvedValue(undefined),
     obtenerNotificacionLocal: vi.fn().mockResolvedValue(undefined),
+    obtenerNotificacionLocalPorMisionId: vi.fn().mockResolvedValue(undefined),
     guardarMisionLocal: vi.fn().mockResolvedValue(undefined),
     encolarAccionOutbox: vi.fn().mockResolvedValue({ id: 'outbox-1' }),
   };
 });
 
+const NOTIF_UUID = '80000000-0000-4000-8000-000000001234';
+const MISION_UUID = '60000000-0000-4000-8000-000000005678';
+
 describe('notificacionesService (HU-35)', () => {
   const alerta: MisionAsignadaAlerta = {
-    notificacionId: 'notif-uuid-1234',
-    misionId: 'mision-uuid-5678',
+    notificacionId: NOTIF_UUID,
+    misionId: MISION_UUID,
     codigo: 'MIS-2026-0099',
     tipoMision: 'VERIFICACION',
     patrullaId: 'pat-001',
@@ -66,16 +72,16 @@ describe('notificacionesService (HU-35)', () => {
     const resultado = await procesarMisionAsignada(alerta);
 
     expect(resultado.esDuplicado).toBe(false);
-    expect(resultado.mision.id).toBe('mision-uuid-5678');
+    expect(resultado.mision.id).toBe(MISION_UUID);
     expect(offlineQueue.guardarMisionLocal).toHaveBeenCalled();
     expect(offlineQueue.guardarNotificacionLocal).toHaveBeenCalledWith({
-      notificacionId: 'notif-uuid-1234',
-      misionId: 'mision-uuid-5678',
+      notificacionId: NOTIF_UUID,
+      misionId: MISION_UUID,
       estado: 'RECIBIDA',
       procesadoEn: expect.any(String),
     });
     expect(socketClient.emitirAckNotificacionSocket).toHaveBeenCalledWith(
-      'notif-uuid-1234',
+      NOTIF_UUID,
       'RECIBIDA'
     );
   });
@@ -101,16 +107,16 @@ describe('notificacionesService (HU-35)', () => {
   it('CP-H35-PWA-05: emite el ACK LEIDA al interactuar y actualiza la persistencia', async () => {
     vi.mocked(socketClient.emitirAckNotificacionSocket).mockResolvedValue({ ok: true });
 
-    await emitirAckLectura('notif-uuid-1234', 'mision-uuid-5678');
+    await emitirAckLectura(NOTIF_UUID, MISION_UUID);
 
     expect(offlineQueue.guardarNotificacionLocal).toHaveBeenCalledWith({
-      notificacionId: 'notif-uuid-1234',
-      misionId: 'mision-uuid-5678',
+      notificacionId: NOTIF_UUID,
+      misionId: MISION_UUID,
       estado: 'LEIDA',
       procesadoEn: expect.any(String),
     });
     expect(socketClient.emitirAckNotificacionSocket).toHaveBeenCalledWith(
-      'notif-uuid-1234',
+      NOTIF_UUID,
       'LEIDA'
     );
   });
@@ -125,8 +131,8 @@ describe('notificacionesService (HU-35)', () => {
       data: {
         message: 'Actualizado',
         data: {
-          id: 'notif-uuid-1234',
-          misionId: 'mision-uuid-5678',
+          id: NOTIF_UUID,
+          misionId: MISION_UUID,
           patrullaId: 'pat-001',
           estado: 'RECIBIDA',
           intentosEnvio: 1,
@@ -145,7 +151,7 @@ describe('notificacionesService (HU-35)', () => {
     expect(apiClient.PATCH).toHaveBeenCalledWith(
       '/api/terreno/notificaciones/{id}/estado',
       {
-        params: { path: { id: 'notif-uuid-1234' } },
+        params: { path: { id: NOTIF_UUID } },
         body: { estado: 'RECIBIDA' },
       }
     );
@@ -162,17 +168,28 @@ describe('notificacionesService (HU-35)', () => {
 
     expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith({
       tipo: 'ACK_NOTIFICACION',
-      url: '/api/terreno/notificaciones/notif-uuid-1234/estado',
+      url: `/api/terreno/notificaciones/${NOTIF_UUID}/estado`,
       metodo: 'PATCH',
       payload: { estado: 'RECIBIDA' },
     });
   });
 
-  it('consultarMisionesPendientes invoca el endpoint GET /api/terreno/misiones/pendientes', async () => {
+  it('rechaza IDs sintéticos no-UUID sin emitir WebSocket, REST ni outbox', async () => {
+    expect(esUuidNotificacionValido('notif-mis-1-123456')).toBe(false);
+    expect(esUuidNotificacionValido(NOTIF_UUID)).toBe(true);
+
+    await emitirAckLectura('notif-mis-1-123456', MISION_UUID);
+
+    expect(socketClient.emitirAckNotificacionSocket).not.toHaveBeenCalled();
+    expect(apiClient.PATCH).not.toHaveBeenCalled();
+    expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+  });
+
+  it('consultarMisionesPendientes invoca el endpoint GET /api/terreno/misiones/pendientes para patrulla o cuadrilla', async () => {
     const mockMisionesPendientes = [
       {
-        notificacionId: 'notif-1',
-        misionId: 'mis-1',
+        notificacionId: NOTIF_UUID,
+        misionId: MISION_UUID,
         codigoMision: 'MIS-2026-0001',
         titulo: 'Árbol caído',
         descripcion: null,
@@ -181,6 +198,8 @@ describe('notificacionesService (HU-35)', () => {
         estadoMision: 'DESPACHADA',
         estadoNotificacion: 'PENDIENTE_ENVIO' as const,
         patrullaId: 'pat-1',
+        cuadrillaId: null,
+        tipoUnidad: 'PATRULLA' as const,
         incidenteId: 'inc-1',
         incidenteCodigo: 'INC-1',
         incidenteFolio: 'FOL-1',
@@ -203,17 +222,66 @@ describe('notificacionesService (HU-35)', () => {
       response: { ok: true } as Response,
     });
 
-    const pendientes = await consultarMisionesPendientes('pat-1');
+    const pendientes = await consultarMisionesPendientes({ cuadrillaId: 'cuad-1' });
     expect(pendientes).toHaveLength(1);
-    expect(pendientes[0].codigoMision).toBe('MIS-2026-0001');
+    expect(apiClient.GET).toHaveBeenCalledWith('/api/terreno/misiones/pendientes', {
+      params: { query: { cuadrillaId: 'cuad-1' } },
+    });
+  });
+
+  it('confirmarLecturaMisionAbierta resuelve notificacionId remoto y emite ACK LEIDA automático', async () => {
+    vi.mocked(socketClient.emitirAckNotificacionSocket).mockResolvedValue({ ok: true });
+    vi.mocked(apiClient.GET).mockResolvedValue({
+      data: {
+        message: 'OK',
+        total: 1,
+        data: [
+          {
+            notificacionId: NOTIF_UUID,
+            misionId: MISION_UUID,
+            codigoMision: 'MIS-2026-0040',
+            titulo: 'Despeje',
+            descripcion: null,
+            tipoMision: 'ATENCION_CUADRILLA',
+            prioridad: 'ALTA',
+            estadoMision: 'DESPACHADA',
+            estadoNotificacion: 'ENVIADA',
+            patrullaId: null,
+            cuadrillaId: 'cuad-1',
+            tipoUnidad: 'CUADRILLA',
+            incidenteId: 'inc-1',
+            incidenteCodigo: 'INC-1',
+            incidenteFolio: 'FOL-1',
+            tipoAfectacion: 'Anegamiento',
+            direccion: 'Picarte 100',
+            latitud: null,
+            longitud: null,
+            creadaAt: '2026-11-10T12:00:00Z',
+            enviadaAt: '2026-11-10T12:00:01Z',
+          },
+        ],
+      },
+      error: undefined,
+      response: { ok: true } as Response,
+    });
+
+    const confirmada = await confirmarLecturaMisionAbierta({
+      misionId: MISION_UUID,
+      unidadId: 'cuad-1',
+      esCuadrilla: true,
+    });
+
+    expect(confirmada).toBe(true);
+    expect(socketClient.emitirAckNotificacionSocket).toHaveBeenCalledWith(NOTIF_UUID, 'LEIDA');
   });
 
   it('mapearAlertaAMisionLocal soporta alertas ATENCION_CUADRILLA con cuadrillaId (H40)', () => {
     const mision = mapearAlertaAMisionLocal({
-      notificacionId: 'notif-cuad-1',
+      notificacionId: NOTIF_UUID,
       misionId: 'mis-cuad-1',
       codigo: 'MIS-2026-0040',
       tipoMision: 'ATENCION_CUADRILLA',
+      tipoUnidad: 'CUADRILLA',
       patrullaId: null,
       cuadrillaId: 'cuad-1',
       incidenteId: 'inc-1',

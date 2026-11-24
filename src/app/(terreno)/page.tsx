@@ -9,14 +9,9 @@ import { TerrenoResumenOperativo } from '@/components/terreno/TerrenoResumenOper
 import { TerrenoMisionesPendientes } from '@/components/terreno/TerrenoMisionesPendientes';
 import { TerrenoSiguienteMision } from '@/components/terreno/TerrenoSiguienteMision';
 import { PWAInstallBanner } from '@/components/pwa/PWAInstallBanner';
-import { NuevaMisionBanner } from '@/components/misiones/NuevaMisionBanner';
-import { useMisionesSocket } from '@/hooks/useMisionesSocket';
 
 export default function TerrenoHomePage() {
-  const { autenticado, cargando, esPatrulla } = useAuth();
-  const { ultimaMisionAsignada, descartarUltimaMision } = useMisionesSocket({
-    habilitado: autenticado,
-  });
+  const { autenticado, cargando } = useAuth();
 
   useEffect(() => {
     if (cargando) return;
@@ -61,18 +56,6 @@ export default function TerrenoHomePage() {
         width: '100%',
       }}
     >
-      {ultimaMisionAsignada && (
-        <NuevaMisionBanner
-          codigoMision={ultimaMisionAsignada.codigo}
-          misionId={ultimaMisionAsignada.misionId}
-          urlDetalle={
-            esPatrulla
-              ? `/patrulla/misiones/${ultimaMisionAsignada.misionId}`
-              : `/cuadrilla/misiones/${ultimaMisionAsignada.misionId}`
-          }
-          alCerrar={descartarUltimaMision}
-        />
-      )}
       <TerrenoWelcomeBanner />
       <TerrenoSyncCompactCard />
       <PWAInstallBanner />

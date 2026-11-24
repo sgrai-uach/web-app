@@ -20,8 +20,6 @@ describe('PatrullaMisionesPage — Modo Histórico y Filtro por Patrulla (H85 / 
     vi.mocked(misionesService.sincronizarMisiones).mockResolvedValue([]);
     vi.mocked(socketHook.useMisionesSocket).mockReturnValue({
       conectado: false,
-      ultimaMisionAsignada: null,
-      descartarUltimaMision: vi.fn(),
     });
   });
 
@@ -155,7 +153,7 @@ describe('PatrullaMisionesPage — Modo Histórico y Filtro por Patrulla (H85 / 
     expect(screen.getByRole('heading', { level: 1, name: /^misiones$/i })).toBeInTheDocument();
   });
 
-  it('actualiza la lista automáticamente y muestra NuevaMisionBanner ante nueva asignación (H35)', async () => {
+  it('sincroniza misiones sin renderizar el banner obsoleto NuevaMisionBanner (H35)', async () => {
     vi.mocked(AuthContextModule.useAuth).mockReturnValue({
       usuario: {
         id: 'u-pat-1',
@@ -203,20 +201,14 @@ describe('PatrullaMisionesPage — Modo Histórico y Filtro por Patrulla (H85 / 
 
     vi.mocked(socketHook.useMisionesSocket).mockReturnValue({
       conectado: true,
-      ultimaMisionAsignada: {
-        misionId: 'mis-101',
-        codigo: 'INC-2026-00101',
-        tipoMision: 'VERIFICACION',
-        patrullaId: 'pat-1',
-        asignadoEn: '2026-11-09T10:00:00Z',
-      },
-      descartarUltimaMision: vi.fn(),
     });
 
     render(<PatrullaMisionesPage />);
 
-    expect(screen.getByText('Nueva Misión Despachada')).toBeInTheDocument();
-    expect(screen.getByText('INC-2026-00101')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('INC-2026-00101')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Nueva Misión Despachada')).not.toBeInTheDocument();
   });
 
 });

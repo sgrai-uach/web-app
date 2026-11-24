@@ -16,7 +16,6 @@ import {
   type ConteoFiltros,
 } from '@/components/misiones/MisionFiltrosChips';
 import { MisionCard } from '@/components/misiones/MisionCard';
-import { NuevaMisionBanner } from '@/components/misiones/NuevaMisionBanner';
 import { useMisionesSocket } from '@/hooks/useMisionesSocket';
 import type { MisionLocal } from '@/types/offline';
 import styles from '@/components/misiones/MisionesBandeja.module.css';
@@ -62,7 +61,7 @@ function CuadrillaMisionesContenido() {
     cargarMisiones();
   }, [cargarMisiones]);
 
-  const { ultimaMisionAsignada, descartarUltimaMision } = useMisionesSocket({
+  useMisionesSocket({
     onNuevaMision: () => {
       void cargarMisiones();
     },
@@ -148,15 +147,6 @@ function CuadrillaMisionesContenido() {
 
   return (
     <div className={styles.container}>
-      {ultimaMisionAsignada && (
-        <NuevaMisionBanner
-          codigoMision={ultimaMisionAsignada.codigo}
-          misionId={ultimaMisionAsignada.misionId}
-          urlDetalle={`/terreno/cuadrilla/misiones/${ultimaMisionAsignada.misionId}`}
-          alCerrar={descartarUltimaMision}
-        />
-      )}
-
       {!tieneUnidadAsignada ? (
         <SinUnidadBanner
           tipoUnidad="cuadrilla"

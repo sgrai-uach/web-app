@@ -67,7 +67,12 @@ export const MisionAsignadaBanner: React.FC<MisionAsignadaBannerProps> = ({
         </div>
 
         <div className={styles.afectacionTitulo} data-testid="afectacion-banner">
-          {alerta.tipoAfectacion || 'Verificación operativa de incidente'}
+          {alerta.tipoAfectacion ||
+            (alerta.tipoUnidad === 'CUADRILLA' ||
+            alerta.tipoMision === 'ATENCION_CUADRILLA' ||
+            Boolean(alerta.cuadrillaId)
+              ? 'Atención operativa de incidente'
+              : 'Verificación operativa de incidente')}
         </div>
 
         {alerta.direccion && (

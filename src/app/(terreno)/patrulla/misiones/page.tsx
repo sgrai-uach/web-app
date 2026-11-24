@@ -16,7 +16,6 @@ import {
   type ConteoFiltros,
 } from '@/components/misiones/MisionFiltrosChips';
 import { MisionCard } from '@/components/misiones/MisionCard';
-import { NuevaMisionBanner } from '@/components/misiones/NuevaMisionBanner';
 import { useMisionesSocket } from '@/hooks/useMisionesSocket';
 import type { MisionLocal } from '@/types/offline';
 import styles from '@/components/misiones/MisionesBandeja.module.css';
@@ -74,7 +73,7 @@ function PatrullaMisionesContenido() {
     };
   }, [cargarMisiones]);
 
-  const { ultimaMisionAsignada, descartarUltimaMision } = useMisionesSocket({
+  useMisionesSocket({
     onNuevaMision: () => {
       void cargarMisiones();
     },
@@ -157,15 +156,6 @@ function PatrullaMisionesContenido() {
 
   return (
     <div className={styles.container}>
-      {ultimaMisionAsignada && (
-        <NuevaMisionBanner
-          codigoMision={ultimaMisionAsignada.codigo}
-          misionId={ultimaMisionAsignada.misionId}
-          urlDetalle={`/patrulla/misiones/${ultimaMisionAsignada.misionId}`}
-          alCerrar={descartarUltimaMision}
-        />
-      )}
-
       {!tieneUnidadAsignada ? (
         <SinUnidadBanner
           tipoUnidad="patrulla"

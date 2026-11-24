@@ -30,11 +30,17 @@ vi.mock('@/lib/socket/socketClient', () => ({
   emitirAckNotificacionSocket: vi.fn(),
 }));
 
-vi.mock('@/services/notificacionesService', () => ({
-  procesarMisionAsignada: vi.fn(),
-  emitirAckLectura: vi.fn(),
-  consultarMisionesPendientes: vi.fn(),
-}));
+vi.mock('@/services/notificacionesService', async () => {
+  const actual = await vi.importActual<typeof import('@/services/notificacionesService')>(
+    '@/services/notificacionesService'
+  );
+  return {
+    ...actual,
+    procesarMisionAsignada: vi.fn(),
+    emitirAckLectura: vi.fn(),
+    consultarMisionesPendientes: vi.fn(),
+  };
+});
 
 vi.mock('@/lib/utils/alertaSonora', () => ({
   activarAlertaSensorialMision: vi.fn(),
@@ -147,10 +153,11 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
 
     await act(async () => {
       socketHandler({
-        notificacionId: 'notif-100',
+        notificacionId: '80000000-0000-4000-8000-000000000100',
         misionId: 'mis-100',
         codigo: 'MIS-2026-0042',
         tipoMision: 'VERIFICACION',
+        tipoUnidad: 'PATRULLA',
         patrullaId: 'patrulla-uuid-999',
         cuadrillaId: null,
         incidenteId: 'inc-100',
@@ -178,10 +185,11 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
 
     await act(async () => {
       socketHandler({
-        notificacionId: 'notif-100',
+        notificacionId: '80000000-0000-4000-8000-000000000100',
         misionId: 'mis-100',
         codigo: 'MIS-2026-0042',
         tipoMision: 'VERIFICACION',
+        tipoUnidad: 'PATRULLA',
         patrullaId: 'patrulla-uuid-999',
         cuadrillaId: null,
         incidenteId: 'inc-100',
@@ -199,7 +207,10 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
       fireEvent.click(btnVer);
     });
 
-    expect(notificacionesService.emitirAckLectura).toHaveBeenCalledWith('notif-100', 'mis-100');
+    expect(notificacionesService.emitirAckLectura).toHaveBeenCalledWith(
+      '80000000-0000-4000-8000-000000000100',
+      'mis-100'
+    );
     expect(mockPush).toHaveBeenCalledWith('/patrulla/misiones/mis-100');
     expect(screen.queryByTestId('codigo-mision-banner')).not.toBeInTheDocument();
   });
@@ -208,7 +219,7 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
   it('CP-H35-PWA-07: reconectar la red consulta misiones pendientes y despliega alertas no vistas', async () => {
     vi.mocked(notificacionesService.consultarMisionesPendientes).mockResolvedValue([
       {
-        notificacionId: 'notif-offline-99',
+        notificacionId: '80000000-0000-4000-8000-000000000099',
         misionId: 'mis-offline-99',
         codigoMision: 'MIS-2026-0077',
         titulo: 'Árbol caído sobre cableado',
@@ -218,6 +229,8 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
         estadoMision: 'DESPACHADA',
         estadoNotificacion: 'PENDIENTE_ENVIO',
         patrullaId: 'patrulla-uuid-999',
+        cuadrillaId: null,
+        tipoUnidad: 'PATRULLA',
         incidenteId: 'inc-99',
         incidenteCodigo: 'INC-99',
         incidenteFolio: 'FOL-99',
@@ -243,20 +256,20 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
     });
 
     await waitFor(() => {
-      expect(notificacionesService.consultarMisionesPendientes).toHaveBeenCalledWith(
-        'patrulla-uuid-999'
-      );
+      expect(notificacionesService.consultarMisionesPendientes).toHaveBeenCalledWith({
+        patrullaId: 'patrulla-uuid-999',
+      });
     });
     expect(notificacionesService.procesarMisionAsignada).toHaveBeenCalledWith(
       expect.objectContaining({
-        notificacionId: 'notif-offline-99',
+        notificacionId: '80000000-0000-4000-8000-000000000099',
         misionId: 'mis-offline-99',
         codigo: 'MIS-2026-0077',
       })
     );
   });
 
-  it('H40: suscribe a sala cuadrilla:{id}, despliega MisionAsignadaBanner y navega a /cuadrilla/misiones/{id} al pulsar Ver Misión', async () => {
+  it('H40: suscribe a sala cuadrilla:{id}, reconcilia por cuadrillaId, despliega MisionAsignadaBanner y navega a /cuadrilla/misiones/{id} al pulsar Ver Misión', async () => {
     vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
       usuario: {
         ...usuarioPatrulla,
@@ -291,13 +304,34 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
     expect(socketClient.conectarSocket).toHaveBeenCalledWith('jwt-mock-cuadrilla');
     expect(socketClient.unirseASalaCuadrilla).toHaveBeenCalledWith('cuadrilla-uuid-555');
     expect(socketClient.unirseASalaPatrulla).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(notificacionesService.consultarMisionesPendientes).toHaveBeenCalledWith({
+        cuadrillaId: 'cuadrilla-uuid-555',
+      });
+    });
+
+    // Debe ignorar eventos dirigidos a otra unidad o patrullas
+    await act(async () => {
+      socketHandler({
+        notificacionId: '80000000-0000-4000-8000-000000000999',
+        misionId: '70000000-0000-4000-8000-000000000999',
+        codigo: 'MIS-2026-0999',
+        tipoMision: 'VERIFICACION',
+        tipoUnidad: 'PATRULLA',
+        patrullaId: 'patrulla-ajena',
+        cuadrillaId: null,
+        asignadoEn: '2026-11-22T13:54:00Z',
+      });
+    });
+    expect(notificacionesService.procesarMisionAsignada).not.toHaveBeenCalled();
 
     await act(async () => {
       socketHandler({
-        notificacionId: 'notif-cuad-1',
+        notificacionId: '80000000-0000-4000-8000-000000000040',
         misionId: '70000000-0000-4000-8000-000000000001',
         codigo: 'MIS-2026-0005',
         tipoMision: 'ATENCION_CUADRILLA',
+        tipoUnidad: 'CUADRILLA',
         patrullaId: null,
         cuadrillaId: 'cuadrilla-uuid-555',
         incidenteId: '30000000-0000-4000-8000-000000000001',
@@ -320,7 +354,7 @@ describe('NotificacionesTerrenoContext (HU-35)', () => {
     });
 
     expect(notificacionesService.emitirAckLectura).toHaveBeenCalledWith(
-      'notif-cuad-1',
+      '80000000-0000-4000-8000-000000000040',
       '70000000-0000-4000-8000-000000000001'
     );
     expect(mockPush).toHaveBeenCalledWith(

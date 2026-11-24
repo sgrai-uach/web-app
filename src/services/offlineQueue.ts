@@ -476,6 +476,17 @@ export async function obtenerNotificacionesLocales(): Promise<NotificacionLocal[
   return db.getAll('notificaciones');
 }
 
+export async function obtenerNotificacionLocalPorMisionId(
+  misionId: string
+): Promise<NotificacionLocal | undefined> {
+  const todas = await obtenerNotificacionesLocales();
+  const coincidencias = todas.filter((n) => n.misionId === misionId);
+  if (coincidencias.length === 0) return undefined;
+  return coincidencias.sort((a, b) =>
+    (b.procesadoEn || '').localeCompare(a.procesadoEn || '')
+  )[0];
+}
+
 // ==========================================
 // ADJUNTOS LOCALES EN MISIÓN (H43)
 // ==========================================
