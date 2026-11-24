@@ -424,3 +424,31 @@ Esto notifica de inmediato al Encargado del Centro de Mando en `sgrai-web` para 
        "timestamp": "2026-10-27T16:05:00Z"
      }
      ```
+
+---
+
+### 2.6 Solicitud de Apoyo Adicional en Terreno (H44)
+- **Historia:** H44
+- **Método:** `POST`
+- **Ruta:** `/api/misiones/{id}/apoyo`
+- **Permiso RBAC requerido:** `reportes:crear`
+- **Precondición operativa:** Misión en estado `EN_CURSO` asignada a la cuadrilla del delegado autenticado (`403`/`409` en caso contrario).
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+#### Request Body
+```json
+{
+  "requiereApoyoAdicional": true,
+  "detalleApoyoRequerido": "Se solicita motoniveladora y cuadrilla adicional de despeje",
+  "resumenTecnico": "Árbol de gran envergadura bloqueando ambas pistas",
+  "observaciones": "Acceso habilitado por calle lateral sur"
+}
+```
+> El backend tolera además los alias `requiere_apoyo_adicional` y `detalle_apoyo_requerido`. Si `requiereApoyoAdicional` es verdadero, exige `detalleApoyoRequerido` con mínimo 5 caracteres (de lo contrario responde `400 Bad Request`).
+
+#### Respuesta Exitosa (`200 OK` / `201 Created`)
+- Persiste en `reporte_terreno` los campos `requiere_apoyo_adicional = true` y `detalle_apoyo_requerido`.
+- Emite alerta visual prioritaria en tiempo real hacia la sala `encargado` del Centro de Mando y habilita el indicador **Apoyo Solicitado** en la tarjeta Kanban del incidente sin cerrar la misión (`EN_CURSO`).
+
+#### Comportamiento Offline
+- Si el dispositivo no posee cobertura o ocurre un error de red / `5xx`, la solicitud validada con `solicitudApoyoSchema` se almacena en `IndexedDB` (`outbox`, tipo `SOLICITAR_APOYO`) y se sincroniza automáticamente al recuperar conexión.

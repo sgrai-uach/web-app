@@ -25,7 +25,7 @@
 | **TC-12** | H41 | `RechazoMisionModal` | Online / Offline | Rechazo motivado de cuadrilla con justificación $\ge 5$ caracteres. | Encola rechazo en `outbox`, remueve de bandeja de faenas activas. | APROBADO |
 | **TC-13** | H42 | `cuadrilla/misiones/[id]` | Online / Offline | Presionar "Llegada a Terreno" tras aceptar la asignación (`EN_CURSO`). | Captura coordenadas GPS (o contingencia), estampa `LLEGADA_TERRENO`, emite Toast y muestra panel "En Trabajos de Terreno". | APROBADO |
 | **TC-14** | H43 | `CargaEvidenciaCard` | Online / Offline | Capturar foto (4 MB), grabar video (MP4/WebM/MOV $\le 10$ MB) o adjuntar PDF; probar rechazo $> 10$ MB o MIME inválido. | Comprime fotos en cliente a JPEG $\le 1280$px; videos/PDF pasan íntegros; valida MIME/10 MB; encola `SUBIR_EVIDENCIA` en `outbox` si offline y sincroniza vía `FormData` (`file`, `incidente_id`, `reporte_terreno_id`). | APROBADO |
-| **TC-15** | H44 | `SolicitudApoyoModal` | Online / Offline | Solicitar maquinaria pesada con motivo de 10 caracteres. | Modal valida $\ge 5$ caracteres, encola solicitud estructurada (`POST /misiones/{id}/apoyo`). | APROBADO |
+| **TC-15** | H44 | `SolicitudApoyoCuadrillaCard` | Online / Offline | Marcar casilla "Requiere apoyo adicional", validar detalle $< 5$ chars y enviar detalle $\ge 5$ chars ("Se solicita motoniveladora y cuadrilla adicional de despeje"). | Bloquea envío si detalle $< 5$ chars; con detalle válido envía a `POST /api/misiones/{id}/apoyo`, confirma alerta a central y mantiene misión `EN_CURSO`. Si offline, encola `SOLICITAR_APOYO` en `outbox`. | APROBADO |
 | **TC-16** | H68 | `CierreFaenaForm` | Online / Offline | Registrar observaciones y rendir 2 materiales consumidos (combustible, sacos). | Encola cierre en `outbox`, transiciona a `FINALIZADA` y libera cuadrilla. | APROBADO |
 | **TC-17** | H70 | `useTelemetry` | Online | Misión activa en curso. | Activa `watchPosition` de alta precisión, transmite coordenadas cada 15 segundos. | APROBADO |
 | **TC-18** | Core | `offlineQueue` / `useConnectivity` | Transición Offline $\to$ Online | Desconectar red celular, ejecutar acciones, reconectar red. | Badge muestra pendientes en gris carbón; al volver señal, sincroniza cola y cambia a verde sage. | APROBADO |
@@ -34,9 +34,9 @@
 
 ## 2. Resumen de Ejecución Automatizada
 
-- **Total de Suites de Prueba (Test Files):** 62
-- **Total de Pruebas Unitarias e Integración:** 300
-- **Tasa de Aprobación:** 100% (300 aprobadas, 0 fallidas)
+- **Total de Suites de Prueba (Test Files):** 73
+- **Total de Pruebas Unitarias e Integración:** 394
+- **Tasa de Aprobación:** 100% (394 aprobadas, 0 fallidas)
 - **Cobertura de Requerimientos y Reglas de Negocio:**
   - Prohibición de emojis en UI / uso exclusivo de `lucide-react`: Cumplido.
   - Esquinas rectas en botones, modales e inputs (`--radius-none: 0px`): Cumplido.
