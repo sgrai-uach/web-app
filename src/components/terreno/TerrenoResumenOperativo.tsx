@@ -97,14 +97,31 @@ export function TerrenoResumenOperativo() {
     const handleActualizar = () => {
       void cargarResumenMisiones();
     };
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void cargarResumenMisiones();
+      }
+    };
 
     window.addEventListener('sgrai:mision_asignada', handleActualizar);
     window.addEventListener('sgrai:mision_actualizada', handleActualizar);
+    window.addEventListener('sgrai:mision-sincronizada', handleActualizar);
+    window.addEventListener('sgrai:mision-rechazada', handleActualizar);
+    window.addEventListener('sgrai:outbox-synced', handleActualizar);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibility);
+    }
 
     return () => {
       cancelado = true;
       window.removeEventListener('sgrai:mision_asignada', handleActualizar);
       window.removeEventListener('sgrai:mision_actualizada', handleActualizar);
+      window.removeEventListener('sgrai:mision-sincronizada', handleActualizar);
+      window.removeEventListener('sgrai:mision-rechazada', handleActualizar);
+      window.removeEventListener('sgrai:outbox-synced', handleActualizar);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibility);
+      }
     };
   }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId, actualizarUnidadAsignada]);
 

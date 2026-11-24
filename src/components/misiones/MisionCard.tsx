@@ -15,6 +15,12 @@ interface MisionCardProps {
 }
 
 export function MisionCard({ mision, href, esInactiva = false }: MisionCardProps) {
+  const codigoMision =
+    typeof mision.datosAdicionales?.codigoMision === 'string' &&
+    mision.datosAdicionales.codigoMision !== mision.codigoIncidente
+      ? mision.datosAdicionales.codigoMision
+      : null;
+
   return (
     <Link href={href} className={styles.card} tabIndex={0}>
       <div className={styles.headerRow}>
@@ -38,7 +44,10 @@ export function MisionCard({ mision, href, esInactiva = false }: MisionCardProps
       </div>
 
       <div className={styles.footerRow}>
-        <span>Despachada: {formatearFechaHora24h(mision.fechaDespacho)}</span>
+        <span>
+          {codigoMision ? `${codigoMision} · ` : ''}
+          Despachada: {formatearFechaHora24h(mision.fechaDespacho)}
+        </span>
         {esInactiva && (
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Archive size={13} aria-hidden="true" />

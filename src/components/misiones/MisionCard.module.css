@@ -51,39 +51,6 @@
   color: var(--color-primary-teal, #1B6F7D);
 }
 
-.priorityChip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-family-base);
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 0;
-  border: 1px solid transparent;
-  line-height: 1;
-  white-space: nowrap;
-  letter-spacing: 0.02em;
-}
-
-.priorityCritica {
-  background-color: var(--color-danger-bg, #FFEBEE);
-  color: var(--color-danger, #D32F2F);
-  border-color: var(--color-danger, #D32F2F);
-}
-
-.priorityAlta {
-  background-color: var(--color-warning-bg, #FFF3E0);
-  color: var(--color-warning, #E65100);
-  border-color: var(--color-warning, #E65100);
-}
-
-.priorityNeutro {
-  background-color: var(--color-bg-light, #ECEFF3);
-  color: var(--color-text-muted, #5F676E);
-  border-color: var(--color-border, #CBD5E1);
-}
-
 .statusAndChevron {
   display: flex;
   align-items: center;

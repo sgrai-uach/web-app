@@ -1,7 +1,8 @@
 .banner {
   background-color: var(--color-bg-light);
   border: 1px solid var(--border-color-neutral, #DFE3E8);
-  border-left: 3px solid var(--color-primary-teal);
+  border-left-width: 4px;
+  border-left-style: solid;
   color: var(--color-text-dark);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-none);
@@ -12,13 +13,28 @@
   font-family: var(--font-family-base);
 }
 
+.bannerSinAsignacion {
+  border-left-color: var(--color-primary-teal);
+}
+
+.bannerDesactivada {
+  border-left-color: var(--color-warning);
+}
+
 .iconWrapper {
-  color: var(--color-primary-teal);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-top: 2px;
+}
+
+.iconSinAsignacion {
+  color: var(--color-primary-teal);
+}
+
+.iconDesactivada {
+  color: var(--color-warning);
 }
 
 .content {
@@ -47,4 +63,3 @@
   font-weight: 600;
   color: var(--color-text-dark);
 }
-

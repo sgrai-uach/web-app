@@ -31,7 +31,6 @@
   border: 1px solid var(--border-color-neutral, #DFE3E8);
   border-radius: var(--radius-none, 0px);
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .cardHeaderBanner {

@@ -9,7 +9,6 @@
   background-color: var(--color-white, #FFFFFF);
   border: 3px solid var(--color-primary-teal-dark, #14505A);
   border-radius: 0;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   animation: slideDown 0.25s ease-out;
