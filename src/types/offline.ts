@@ -305,5 +305,32 @@ export interface ReporteCierreCuadrillaLocal extends CierreMisionCuadrillaForm {
   sincronizado: boolean;
 }
 
+// ========================================================
+// HU-44: Solicitud de Apoyo Adicional en Terreno (Cuadrilla)
+// ========================================================
+
+export type SolicitarApoyoPayload = NonNullable<
+  paths['/api/misiones/{id}/apoyo']['post']['requestBody']
+>['content']['application/json'];
+
+export type SolicitarApoyoResponseData =
+  paths['/api/misiones/{id}/apoyo']['post']['responses'][201]['content']['application/json']['data'];
+
+export interface SolicitudApoyoCuadrillaForm {
+  requiereApoyoAdicional: boolean;
+  detalleApoyoRequerido: string;
+  resumenTecnico: string;
+  observaciones: string;
+}
+
+export interface SolicitudApoyoLocal extends SolicitudApoyoCuadrillaForm {
+  id?: string;
+  localId?: string;
+  misionId: string;
+  evaluador?: EvaluadorReporteTerreno;
+  creadoEn: string;
+  sincronizado: boolean;
+}
+
 
 

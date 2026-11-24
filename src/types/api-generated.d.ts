@@ -1993,6 +1993,8 @@ export interface paths {
                                     observaciones: string | null;
                                     personasAfectadas: number;
                                     requiereApoyoAdicional: boolean;
+                                    detalleApoyoRequerido?: string | null;
+                                    detalle_apoyo_requerido?: string | null;
                                     horasHombre?: number | null;
                                     materialesConsumidos?: components["schemas"]["MaterialConsumidoDetalle"][];
                                     evaluacion: {
@@ -4040,6 +4042,9 @@ export interface paths {
                                     accionesRealizadas: string | null;
                                     /** @description Indica si se requiere escalamiento logístico o relevo */
                                     requiereApoyoAdicional: boolean;
+                                    /** @description Detalle específico del apoyo material o humano solicitado en terreno (HU-44) */
+                                    detalleApoyoRequerido?: string | null;
+                                    detalle_apoyo_requerido?: string | null;
                                     /** @description Descripción o estimación preliminar de daños observados */
                                     danosEstimados: string | null;
                                     /** @description Observaciones de seguridad o condiciones de terreno */
@@ -9734,6 +9739,104 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/misiones/{id}/apoyo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solicitar apoyo adicional de recursos materiales o humanos en terreno (HU-44)
+         * @description Permite al Delegado de Cuadrilla indicar en el reporte de terreno que se requiere apoyo adicional, especificando las necesidades (`detalleApoyoRequerido`, mínimo 5 caracteres) para alertar en tiempo real a la sala `encargado` del Centro de Mando sin interrumpir la faena en curso (`EN_CURSO`). Requiere permiso RBAC `reportes:crear`.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identificador único UUID de la misión */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Detalle de recursos materiales o humanos adicionales requeridos en terreno */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SolicitarApoyoBody"];
+                };
+            };
+            responses: {
+                /** @description Solicitud de apoyo registrada y alerta emitida hacia la sala encargado */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SolicitarApoyoResponse"];
+                    };
+                };
+                /** @description Solicitud de apoyo creada, persistida en reporte_terreno y alerta emitida hacia la sala encargado */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SolicitarApoyoResponse"];
+                    };
+                };
+                /** @description Datos inválidos (ej. requiereApoyoAdicional = true con detalleApoyoRequerido menor a 5 caracteres) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token inválido */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Requiere permiso 'reportes:crear' y pertenecer a la cuadrilla asignada */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Misión no encontrada */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto: la misión no se encuentra en estado EN_CURSO */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/misiones/{id}/cerrar": {
         parameters: {
             query?: never;
@@ -10741,6 +10844,7 @@ export interface components {
             message: string;
             /**
              * CuadrillaResponse
+             * @description Información detallada de la cuadrilla operativa y su dotación
              * @description Información detallada de la cuadrilla operativa y su dotación
              */
             data: {
@@ -16745,6 +16849,82 @@ export interface components {
             reporteTerrenoId: string | null;
             /** Format: date-time */
             creadoEn: string;
+        };
+        SolicitarApoyoBody: {
+            /**
+             * @description Indica si se requiere apoyo logístico o humano adicional en terreno
+             * @example true
+             */
+            requiereApoyoAdicional?: boolean;
+            /**
+             * @description Especificación de los recursos materiales o humanos requeridos (mínimo 5 caracteres cuando requiereApoyoAdicional es true)
+             * @example Se solicita motoniveladora y cuadrilla adicional de despeje
+             */
+            detalleApoyoRequerido?: string;
+            /** @description Alias snake_case tolerado por el backend */
+            requiere_apoyo_adicional?: boolean;
+            /** @description Alias snake_case tolerado por el backend */
+            detalle_apoyo_requerido?: string;
+            /** @description Contexto breve opcional de la faena en curso */
+            resumenTecnico?: string;
+            /** @description Observaciones adicionales opcionales */
+            observaciones?: string;
+        };
+        SolicitarApoyoResponse: {
+            /** @example Solicitud de apoyo adicional registrada y notificada al Centro de Mando. */
+            message: string;
+            data: {
+                reporteTerreno?: {
+                    /** Format: uuid */
+                    id: string;
+                    /** Format: uuid */
+                    misionId?: string;
+                    tipoReporte?: string;
+                    requiereApoyoAdicional?: boolean;
+                    requiere_apoyo_adicional?: boolean;
+                    detalleApoyoRequerido?: string | null;
+                    detalle_apoyo_requerido?: string | null;
+                    resumenTecnico?: string | null;
+                    observaciones?: string | null;
+                    evaluador?: {
+                        /** Format: uuid */
+                        id?: string;
+                        nombre?: string;
+                        email?: string;
+                        rut?: string | null;
+                    } | null;
+                    /** Format: date-time */
+                    creadoEn?: string;
+                };
+                reporte?: {
+                    /** Format: uuid */
+                    id: string;
+                    /** Format: uuid */
+                    misionId?: string;
+                    tipoReporte?: string;
+                    requiereApoyoAdicional?: boolean;
+                    requiere_apoyo_adicional?: boolean;
+                    detalleApoyoRequerido?: string | null;
+                    detalle_apoyo_requerido?: string | null;
+                    resumenTecnico?: string | null;
+                    observaciones?: string | null;
+                    evaluador?: {
+                        /** Format: uuid */
+                        id?: string;
+                        nombre?: string;
+                        email?: string;
+                        rut?: string | null;
+                    } | null;
+                    /** Format: date-time */
+                    creadoEn?: string;
+                };
+                incidente?: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo?: string;
+                    requiereApoyoAdicional?: boolean;
+                } | null;
+            };
         };
     };
     responses: never;
