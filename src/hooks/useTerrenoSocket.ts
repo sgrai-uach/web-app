@@ -58,11 +58,18 @@ export function useTerrenoSocket(): void {
       }
     };
 
-    const manejarMisionRechazada = (data?: { misionId?: string; cuadrillaId?: string }) => {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('sgrai:mision-rechazada', { detail: data })
-        );
+    const manejarMisionRechazada = (data?: {
+      misionId?: string;
+      cuadrillaId?: string | null;
+      patrullaId?: string | null;
+    }) => {
+      const unidadPayloadId = esCuadrilla ? data?.cuadrillaId : data?.patrullaId;
+      if (!unidadPayloadId || unidadPayloadId === usuario.unidadId) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('sgrai:mision-rechazada', { detail: data })
+          );
+        }
       }
     };
 

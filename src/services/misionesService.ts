@@ -385,8 +385,12 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
           d.incidente?.descripcion ||
           'Sin instrucciones adicionales especificadas.',
         titulo: d.titulo,
-        estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION',
+        ...(d.patrulla?.estado ? { estadoPatrulla: d.patrulla.estado } : {}),
+        ...(d.cuadrilla?.estado ? { estadoCuadrilla: d.cuadrilla.estado } : {}),
         estadoIncidente: d.incidente?.estado || 'VERIFICANDO',
+        ...(d.justificacionRechazo
+          ? { justificacionRechazo: d.justificacionRechazo }
+          : {}),
         reportesTerreno: reportesRemotos,
         tipologiaEvaluada,
         esReclasificacion:
@@ -666,16 +670,27 @@ export async function rechazarMision(
   const persistirRechazoLocal = async (
     sincronizacionPendiente: boolean,
     actualizadoEn?: string
-  ): Promise<MisionLocal | null> => {
+  ): Promise<MisionLocal> => {
     const local = await obtenerMisionLocalPorId(id);
-    if (!local) return null;
+    const ahoraIso = actualizadoEn || new Date().toISOString();
+    const base: MisionLocal = local || {
+      id,
+      incidenteId: '',
+      codigoIncidente: id,
+      tipologia: 'Atención de cuadrilla',
+      direccion: 'Valdivia',
+      prioridad: 'ALTA',
+      estado: 'DESPACHADA',
+      fechaDespacho: ahoraIso,
+      actualizadoEn: ahoraIso,
+    };
     const actualizado: MisionLocal = {
-      ...local,
+      ...base,
       estado: 'RECHAZADA',
       sincronizacionPendiente,
-      actualizadoEn: actualizadoEn || new Date().toISOString(),
+      actualizadoEn: ahoraIso,
       datosAdicionales: {
-        ...local.datosAdicionales,
+        ...(base.datosAdicionales || {}),
         justificacionRechazo: datosValidados.justificacion_rechazo,
       },
     };

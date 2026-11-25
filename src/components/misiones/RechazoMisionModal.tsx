@@ -42,13 +42,17 @@ export function RechazoMisionModal({
       setCargando(false);
       setTocado(false);
       setCoordenadas(undefined);
+      setObteniendoGps(false);
       return;
     }
+
+    let cancelado = false;
 
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       setObteniendoGps(true);
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          if (cancelado) return;
           setCoordenadas({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
@@ -56,12 +60,17 @@ export function RechazoMisionModal({
           setObteniendoGps(false);
         },
         () => {
+          if (cancelado) return;
           // Si el GPS falla o el usuario no da permiso, se continúa sin coordenadas
           setObteniendoGps(false);
         },
         { timeout: 5000, enableHighAccuracy: true }
       );
     }
+
+    return () => {
+      cancelado = true;
+    };
   }, [abierto]);
 
   // Manejador para cerrar con Escape

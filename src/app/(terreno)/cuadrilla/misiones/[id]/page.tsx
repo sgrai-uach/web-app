@@ -145,9 +145,9 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
 
   const esRechazable = Boolean(
     unidadActiva &&
-      esCuadrilla &&
-      tienePermisoEjecutar &&
-      estadoNormalizado === 'DESPACHADA'
+    esCuadrilla &&
+    tienePermisoEjecutar &&
+    estadoNormalizado === 'DESPACHADA'
   );
 
   const trabajoTexto =
@@ -176,21 +176,25 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     setMision((prev) =>
       prev
         ? {
-            ...prev,
-            estado: 'RECHAZADA',
-            sincronizacionPendiente: Boolean(res.modoOffline),
-            actualizadoEn: new Date().toISOString(),
-            datosAdicionales: {
-              ...prev.datosAdicionales,
-              justificacionRechazo: motivo,
-            },
-          }
+          ...prev,
+          estado: 'RECHAZADA',
+          sincronizacionPendiente: Boolean(res.modoOffline),
+          actualizadoEn: new Date().toISOString(),
+          datosAdicionales: {
+            ...prev.datosAdicionales,
+            justificacionRechazo: motivo,
+          },
+        }
         : null
     );
     setMensajeConfirmacion(res.mensaje);
     setModalRechazoAbierto(false);
     await actualizarPendientes();
-    router.push('/cuadrilla/misiones');
+    const params = new URLSearchParams({
+      rechazo: res.modoOffline ? 'offline' : 'ok',
+      msg: res.mensaje,
+    });
+    router.push(`/cuadrilla/misiones?${params.toString()}`);
   };
 
   return (

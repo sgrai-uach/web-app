@@ -14104,17 +14104,17 @@ export interface components {
         };
         RechazarMisionBody: {
             /**
-             * @description Motivo obligatorio del rechazo de la misión (mínimo 5 caracteres según Regla Crítica §3.3)
-             * @example Desperfecto mecánico en el neumático delantero del vehículo institucional.
+             * @description Justificación técnica obligatoria del rechazo de la misión (mínimo 5 caracteres según Regla §3.3)
+             * @example Camión tolva presenta falla hidráulica en ruta de salida desde base.
              */
             justificacion_rechazo: string;
             /**
-             * @description Latitud WGS84 de la patrulla (-90 a 90)
+             * @description Latitud WGS84 opcional de la unidad al momento del rechazo (-90 a 90)
              * @example -39.81422
              */
             latitud?: number;
             /**
-             * @description Longitud WGS84 de la patrulla (-180 a 180)
+             * @description Longitud WGS84 opcional de la unidad al momento del rechazo (-180 a 180)
              * @example -73.24589
              */
             longitud?: number;
@@ -14164,6 +14164,7 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     codigo: string;
+                    /** @example VERIFICANDO */
                     estado: string;
                     prioridad?: string;
                 } | null;
