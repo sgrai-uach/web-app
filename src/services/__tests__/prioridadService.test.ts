@@ -8,7 +8,15 @@ import {
 } from '../prioridadService';
 import { VALORES_INICIALES_EVALUACION_PRIORIDAD } from '@/lib/validations/prioridad';
 import * as offlineQueue from '../offlineQueue';
+import apiClient from '@/lib/api/client';
 import type { MisionLocal } from '@/types/offline';
+
+vi.mock('@/lib/api/client', () => ({
+  default: {
+    POST: vi.fn(),
+    PATCH: vi.fn(),
+  },
+}));
 
 describe('prioridadService (H38)', () => {
   const misionMock: MisionLocal = {
@@ -24,7 +32,7 @@ describe('prioridadService (H38)', () => {
   };
 
   beforeEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
     vi.spyOn(offlineQueue, 'encolarAccionOutbox').mockResolvedValue({
       id: 'outbox-prio-1',
       tipo: 'AJUSTAR_PRIORIDAD',
@@ -41,21 +49,71 @@ describe('prioridadService (H38)', () => {
     vi.unstubAllGlobals();
   });
 
-  describe('solicitarCalculoPrioridad', () => {
-    it('retorna el cálculo del servidor cuando responde 200 OK', async () => {
-      vi.stubGlobal('navigator', { onLine: true });
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({
-            data: {
+  describe('obtenerReportesPrioridadMision', () => {
+    it('hidrata contadores y riesgos desde reportesTerreno[].detallesEvaluacion y riesgosActivos', () => {
+      const misionConRemoto: MisionLocal = {
+        ...misionMock,
+        sincronizacionPendiente: false,
+        datosAdicionales: {
+          reportesTerreno: [
+            {
+              id: 'rep-remoto-1',
+              versionReporte: 1,
               prioridadSugerida: 'CRITICA',
-              factoresGatillantes: ['Riesgo eléctrico confirmado por servidor'],
+              prioridadAsignada: 'CRITICA',
+              justificacionPrioridad: 'Electrodependiente en vivienda',
+              detallesEvaluacion: {
+                nucleoFamiliarTotal: 4,
+                cantidadNinos: 1,
+                personasElectrodependientes: 1,
+                nivelCompromisoVivienda: 'MODERADO',
+                riesgosActivos: {
+                  riesgoElectrico: true,
+                  riesgoEstructural: false,
+                  riesgoQuimicoSanitario: false,
+                  aislamientoVial: true,
+                },
+                familias: [
+                  {
+                    id: 'fam-1',
+                    referencia: 'Casa 1',
+                    nucleoFamiliarTotal: 4,
+                    cantidadNinos: 1,
+                    personasElectrodependientes: 1,
+                    nivelCompromisoVivienda: 'MODERADO',
+                  },
+                ],
+              },
             },
-          }),
-        })
-      );
+          ],
+        },
+      };
+
+      const reportes = obtenerReportesPrioridadMision(misionConRemoto);
+      expect(reportes).toHaveLength(1);
+      expect(reportes[0].evaluacion.nucleoFamiliarTotal).toBe(4);
+      expect(reportes[0].evaluacion.personasElectrodependientes).toBe(1);
+      expect(reportes[0].evaluacion.riesgoElectrico).toBe(true);
+      expect(reportes[0].evaluacion.aislamientoVial).toBe(true);
+      expect(reportes[0].evaluacion.nivelCompromisoVivienda).toBe('MODERADO');
+      expect(reportes[0].evaluacion.familias[0].referencia).toBe('Casa 1');
+    });
+  });
+
+  describe('solicitarCalculoPrioridad', () => {
+    it('retorna el cálculo del servidor vía apiClient cuando responde 200 OK', async () => {
+      vi.stubGlobal('navigator', { onLine: true });
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: {
+          message: 'OK',
+          data: {
+            prioridadSugerida: 'CRITICA',
+            factoresGatillantes: ['Riesgo eléctrico confirmado por servidor'],
+          },
+        },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
 
       const res = await solicitarCalculoPrioridad(misionMock.incidenteId, {
         ...VALORES_INICIALES_EVALUACION_PRIORIDAD,
@@ -73,13 +131,12 @@ describe('prioridadService (H38)', () => {
 
       const res = await solicitarCalculoPrioridad(misionMock.incidenteId, {
         ...VALORES_INICIALES_EVALUACION_PRIORIDAD,
-        personasDiscapacitadas: 2,
+        familias: [],
+        personasDiscapacitadas: 3,
       });
 
       expect(res.prioridadSugerida).toBe('ALTA');
-      expect(res.factoresGatillantes[0]).toMatch(
-        /Personas con discapacidad afectadas/i
-      );
+      expect(res.factoresGatillantes[0]).toMatch(/discapacidad/i);
     });
   });
 
@@ -99,28 +156,26 @@ describe('prioridadService (H38)', () => {
       ).rejects.toThrow(/al menos 5 caracteres/i);
     });
 
-    it('envía petición PATCH online exitosa, actualiza la prioridad de la misión y registra Reporte #1', async () => {
+    it('envía petición PATCH online exitosa vía apiClient incluyendo familias y lee data.reporteTerreno.id', async () => {
       vi.stubGlobal('navigator', { onLine: true });
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({
-            message: 'Prioridad actualizada y reporte registrado en el Centro de Mando.',
-            data: {
-              incidente: {
-                id: misionMock.incidenteId,
-                prioridad: 'CRITICA',
-                actualizadoEn: '2026-11-11T12:00:00Z',
-              },
-              reporte: {
-                id: 'rep-100',
-                versionReporte: 1,
-              },
+      vi.mocked(apiClient.PATCH).mockResolvedValue({
+        data: {
+          message: 'Prioridad actualizada y reporte registrado en el Centro de Mando.',
+          data: {
+            incidente: {
+              id: misionMock.incidenteId,
+              prioridad: 'CRITICA',
+              actualizadoEn: '2026-11-11T12:00:00Z',
             },
-          }),
-        })
-      );
+            reporteTerreno: {
+              id: 'rep-100',
+              versionReporte: 1,
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
 
       const resultado = await asignarPrioridadEnTerreno(
         misionMock.incidenteId,
@@ -139,27 +194,39 @@ describe('prioridadService (H38)', () => {
       expect(resultado.ok).toBe(true);
       expect(resultado.offline).toBe(false);
       expect(resultado.versionReporte).toBe(1);
+      expect(resultado.reporte.id).toBe('rep-100');
       expect(resultado.mision?.prioridad).toBe('CRITICA');
       expect(resultado.mision?.datosAdicionales?.prioridadEvaluada).toBe(true);
+      expect(apiClient.PATCH).toHaveBeenCalledWith(
+        '/api/incidentes/{id}/prioridad',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            familias: expect.any(Array),
+          }),
+        })
+      );
       expect(offlineQueue.guardarMisionLocal).toHaveBeenCalled();
     });
 
     it('incrementa la versión a Reporte #2 cuando la misión ya posee un reporte previo', async () => {
       vi.stubGlobal('navigator', { onLine: true });
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({
-            data: {
-              incidente: {
-                id: misionMock.incidenteId,
-                prioridad: 'CRITICA',
-              },
+      vi.mocked(apiClient.PATCH).mockResolvedValue({
+        data: {
+          message: undefined,
+          data: {
+            incidente: {
+              id: misionMock.incidenteId,
+              prioridad: 'CRITICA',
             },
-          }),
-        })
-      );
+            reporteTerreno: {
+              id: 'rep-2',
+              versionReporte: 2,
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
 
       const misionConReportePrevio: MisionLocal = {
         ...misionMock,
@@ -235,16 +302,11 @@ describe('prioridadService (H38)', () => {
 
     it('lanza error descriptivo ante 403 Forbidden (falta permiso misiones:terreno:verificar)', async () => {
       vi.stubGlobal('navigator', { onLine: true });
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: false,
-          status: 403,
-          json: async () => ({
-            message: 'Se requiere el permiso misiones:terreno:verificar.',
-          }),
-        })
-      );
+      vi.mocked(apiClient.PATCH).mockResolvedValue({
+        data: undefined,
+        error: { message: 'Se requiere el permiso misiones:terreno:verificar.' },
+        response: new Response(null, { status: 403 }),
+      } as never);
 
       await expect(
         asignarPrioridadEnTerreno(
@@ -319,4 +381,3 @@ describe('prioridadService (H38)', () => {
     });
   });
 });
-

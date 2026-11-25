@@ -12,6 +12,7 @@ import {
   Tag,
   CheckCircle,
   CheckCircle2,
+  XCircle,
   Navigation,
   ClipboardCheck,
   WifiOff,
@@ -34,9 +35,11 @@ import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
 import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
 import { EvaluacionPrioridadCard } from '@/components/misiones/EvaluacionPrioridadCard';
 import { EvaluacionReporteCierreCard } from '@/components/misiones/EvaluacionReporteCierreCard';
+import { RechazoMisionModal, type CoordenadasGPS } from '@/components/misiones/RechazoMisionModal';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
+  rechazarMision,
 } from '@/services/misionesService';
 import { obtenerReportesPrioridadMision } from '@/services/prioridadService';
 import { obtenerReporteVerificacionMision } from '@/services/reporteVerificacionService';
@@ -58,6 +61,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     tieneUnidadAsignada,
     estadoAsignacion,
     tienePermiso,
+    esPatrulla,
   } = useAuth();
   const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
   const [mision, setMision] = useState<MisionLocal | null>(null);
@@ -68,7 +72,13 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
   const [seccionCategorizacionAbierta, setSeccionCategorizacionAbierta] = useState<boolean>(true);
   const [seccionPrioridadAbierta, setSeccionPrioridadAbierta] = useState<boolean>(false);
+  const [prioridadMontada, setPrioridadMontada] = useState<boolean>(false);
   const [seccionReporteCierreAbierta, setSeccionReporteCierreAbierta] = useState<boolean>(false);
+  const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
+  const [feedbackMensaje, setFeedbackMensaje] = useState<{
+    tipo: 'success' | 'offline';
+    texto: string;
+  } | null>(null);
 
   const cargarDetalle = useCallback(
     async (silencioso = false) => {
@@ -85,7 +95,8 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           const yaCerrada =
             estadoNorm === 'FINALIZADA' ||
             estadoNorm === 'COMPLETADA' ||
-            estadoNorm === 'CERRADA';
+            estadoNorm === 'CERRADA' ||
+            estadoNorm === 'RECHAZADA';
           const tipologiaYaEvaluada = Boolean(
             encontrada.datosAdicionales?.tipologiaEvaluada
           );
@@ -96,14 +107,18 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             Boolean(reporteCierre) ||
             Boolean(encontrada.datosAdicionales?.reporteVerificacionEnviado);
 
+          const abrirPrioridad =
+            tipologiaYaEvaluada && !prioridadYaEvaluada && !yaCerrada;
           setSeccionCategorizacionAbierta(!tipologiaYaEvaluada && !yaCerrada);
-          setSeccionPrioridadAbierta(
-            tipologiaYaEvaluada && !prioridadYaEvaluada && !yaCerrada
-          );
+          setSeccionPrioridadAbierta(abrirPrioridad);
+          if (abrirPrioridad) {
+            setPrioridadMontada(true);
+          }
           setSeccionReporteCierreAbierta(
-            (tipologiaYaEvaluada && prioridadYaEvaluada) ||
+            ((tipologiaYaEvaluada && prioridadYaEvaluada) ||
               yaCerrada ||
-              cierreYaEnviado
+              cierreYaEnviado) &&
+              estadoNorm !== 'RECHAZADA'
           );
         } else {
           setMision(null);
@@ -196,12 +211,32 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             Misión no encontrada
           </p>
           <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: 0 }}>
-            La misión solicitada no existe, fue removida o no se encuentra disponible en caché local.
+            La misión solicitada no existe o no se encuentra asignada a su unidad operativa, o no
+            está disponible en caché local.
           </p>
+          <Link
+            href="/patrulla/misiones"
+            style={{
+              display: 'inline-block',
+              marginTop: 'var(--space-4)',
+              padding: 'var(--space-2) var(--space-4)',
+              background: 'var(--color-primary-teal)',
+              color: 'var(--color-white)',
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              borderRadius: 0,
+              minHeight: '48px',
+              lineHeight: '48px',
+            }}
+          >
+            Volver a la bandeja
+          </Link>
         </div>
       </div>
     );
   }
+
   const estadoNormalizado = mision.estado?.toUpperCase() || '';
   const esDespachada = estadoNormalizado === 'DESPACHADA';
   const esEnCurso =
@@ -227,10 +262,67 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const esFinalizada =
     estadoNormalizado === 'FINALIZADA' ||
     estadoNormalizado === 'COMPLETADA' ||
-    estadoNormalizado === 'CERRADA';
+    estadoNormalizado === 'CERRADA' ||
+    estadoNormalizado === 'RECHAZADA';
   const esSoloLectura = !unidadActiva || esFinalizada;
   const mostrarFormulariosTecnicos =
-    (unidadActiva && esEnCurso) || (tieneUnidadAsignada && esFinalizada);
+    (unidadActiva && esEnCurso) ||
+    (tieneUnidadAsignada && esFinalizada && estadoNormalizado !== 'RECHAZADA');
+
+  const esRechazable =
+    unidadActiva &&
+    esPatrulla &&
+    tienePermisoVerificar &&
+    (estadoNormalizado === 'DESPACHADA' ||
+      estadoNormalizado === 'ASIGNADA' ||
+      estadoNormalizado === 'PENDIENTE');
+
+  const handleConfirmarRechazo = async (
+    motivo: string,
+    coordenadas?: CoordenadasGPS
+  ) => {
+    try {
+      const res = await rechazarMision(mision.id, {
+        justificacion_rechazo: motivo,
+        latitud: coordenadas?.lat,
+        longitud: coordenadas?.lng,
+      });
+
+      setMision((prev) =>
+        prev
+          ? {
+              ...prev,
+              estado: 'RECHAZADA',
+              sincronizacionPendiente: Boolean(res.modoOffline),
+              actualizadoEn: res.mision?.actualizadoEn || new Date().toISOString(),
+              datosAdicionales: {
+                ...prev.datosAdicionales,
+                justificacionRechazo: motivo,
+              },
+            }
+          : prev
+      );
+
+      setModalRechazoAbierto(false);
+      await actualizarPendientes();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
+      }
+      setFeedbackMensaje({
+        tipo: res.modoOffline ? 'offline' : 'success',
+        texto: res.mensaje,
+      });
+    } catch (err) {
+      setModalRechazoAbierto(false);
+      setFeedbackMensaje({
+        tipo: 'offline',
+        texto:
+          err instanceof Error
+            ? err.message
+            : 'No se pudo registrar el rechazo de la misión.',
+      });
+    }
+  };
 
   return (
     <div className={styles.container}>
@@ -257,6 +349,39 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           nombreUnidad={usuario?.unidadNombre}
         />
       ) : null}
+
+      {feedbackMensaje && (
+        <div
+          className={`${styles.feedbackBanner} ${
+            feedbackMensaje.tipo === 'offline'
+              ? styles.feedbackOffline
+              : styles.feedbackSuccess
+          }`}
+          role="status"
+        >
+          {feedbackMensaje.tipo === 'offline' ? (
+            <AlertCircle size={18} aria-hidden="true" />
+          ) : (
+            <CheckCircle size={18} aria-hidden="true" />
+          )}
+          <span>{feedbackMensaje.texto}</span>
+        </div>
+      )}
+
+      {estadoNormalizado === 'RECHAZADA' && (
+        <div className={styles.rejectedBanner} role="status">
+          <div className={styles.rejectedHeader}>
+            <XCircle size={18} aria-hidden="true" />
+            <span>Misión Rechazada por Patrulla Verificadora</span>
+          </div>
+          {Boolean(mision.datosAdicionales?.justificacionRechazo) && (
+            <p className={styles.rejectedReason}>
+              <strong>Motivo documentado:</strong>{' '}
+              {String(mision.datosAdicionales?.justificacionRechazo)}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
@@ -331,17 +456,15 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Acción principal: Confirmar y Aceptar Misión (HU-36) */}
-      {mostrarBotonAceptar && (
+      {/* Acciones Operativas de Despacho (H36 / H69) */}
+      {(mostrarBotonAceptar || esRechazable) && (
         <section
-          className={styles.acceptCard}
-          aria-label="Confirmación de salida de patrulla"
+          className={styles.dispatchActionsCard}
+          aria-label="Acciones operativas de despacho"
         >
-          <h2 className={styles.acceptTitle}>Confirmación de salida a terreno</h2>
-          <p className={styles.acceptDescription}>
-            Presione el botón para informar al Centro de Mando que la patrulla ha
-            tomado conocimiento de la emergencia y se dirige al lugar para iniciar
-            la evaluación.
+          <h2 className={styles.dispatchActionsTitle}>Acciones de Despacho</h2>
+          <p className={styles.dispatchActionsDesc}>
+            Confirme la salida a terreno para evaluar o fundamente el rechazo si no es posible concurrir.
           </p>
 
           {errorAceptacion && (
@@ -350,21 +473,38 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             </div>
           )}
 
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={aceptando}
-            icon={<CheckCircle size={20} />}
-            onClick={handleAceptarMision}
-            className={styles.acceptButton}
-          >
-            Aceptar Misión
-          </Button>
+          <div className={styles.dispatchButtonsGroup}>
+            {mostrarBotonAceptar && (
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={aceptando}
+                icon={<CheckCircle size={20} />}
+                onClick={handleAceptarMision}
+                className={styles.acceptButton}
+              >
+                Aceptar Misión
+              </Button>
+            )}
+
+            {esRechazable && (
+              <Button
+                variant="destructive"
+                size="md"
+                fullWidth
+                icon={<XCircle size={18} />}
+                onClick={() => setModalRechazoAbierto(true)}
+                disabled={aceptando}
+              >
+                Rechazar Misión
+              </Button>
+            )}
+          </div>
         </section>
       )}
 
-      {/* Vista activa: En Trayecto / Evaluación (HU-36) */}
+{/* Vista activa: En Trayecto / Evaluación (HU-36) */}
       {unidadActiva && esEnCurso && (
         <section
           className={styles.enTrayectoCard}
@@ -391,9 +531,9 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               <div className={styles.offlineQueueBanner} role="status">
                 <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
                 <span>
-                  Pendiente de sincronizar: La aceptación fue guardada en la cola
-                  local del dispositivo y se enviará automáticamente al recuperar
-                  conexión.
+                  Pendiente de sincronizar: Los cambios de esta misión fueron guardados
+                  en la cola local del dispositivo y se enviarán automáticamente al
+                  recuperar conexión.
                 </span>
               </div>
             ) : (
@@ -483,11 +623,21 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                       ) : null
                     }
                   >
+                    {!tienePermisoVerificar && (
+                      <div
+                        className={styles.permissionWarning}
+                        role="note"
+                        style={{ marginBottom: '12px' }}
+                      >
+                        Su perfil no cuenta con el permiso misiones:terreno:verificar para
+                        categorizar incidentes.
+                      </div>
+                    )}
                     <EvaluacionTipologiaCard
                       incidenteId={mision.incidenteId}
                       misionActual={mision}
                       usuarioActualId={usuario?.id}
-                      deshabilitado={esSoloLectura}
+                      deshabilitado={esSoloLectura || !tienePermisoVerificar}
                       onTipologiaActualizada={(resultado) => {
                         if (resultado.mision) {
                           setMision(resultado.mision);
@@ -495,6 +645,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                         setSeccionCategorizacionAbierta(false);
                         if (!prioridadCompletada) {
                           setSeccionPrioridadAbierta(true);
+                          setPrioridadMontada(true);
                         } else if (!cierreCompletado) {
                           setSeccionReporteCierreAbierta(true);
                         }
@@ -506,7 +657,12 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                     titulo="Evaluación en terreno y prioridad"
                     icono={<ShieldAlert size={18} />}
                     abierto={seccionPrioridadAbierta}
-                    onToggle={(abierto) => setSeccionPrioridadAbierta(abierto)}
+                    onToggle={(abierto) => {
+                      setSeccionPrioridadAbierta(abierto);
+                      if (abierto) {
+                        setPrioridadMontada(true);
+                      }
+                    }}
                     indicador={
                       prioridadCompletada ? (
                         <Chip
@@ -526,12 +682,12 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                       ) : null
                     }
                   >
-                    {seccionPrioridadAbierta && (
+                    {(prioridadMontada || seccionPrioridadAbierta) && (
                       <EvaluacionPrioridadCard
                         incidenteId={mision.incidenteId}
                         misionActual={mision}
                         usuarioActualId={usuario?.id}
-                        deshabilitado={esSoloLectura}
+                        deshabilitado={esSoloLectura || !tienePermisoVerificar}
                         onPrioridadActualizada={(resultado) => {
                           if (resultado.mision) {
                             setMision(resultado.mision);
@@ -623,6 +779,13 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         longitud={mision.coordenadas?.lng}
         titulo={mision.tipologia || mision.codigoIncidente}
         direccion={mision.direccion}
+      />
+
+      <RechazoMisionModal
+        abierto={modalRechazoAbierto}
+        codigoMision={mision.codigoIncidente}
+        alConfirmar={handleConfirmarRechazo}
+        alCancelar={() => setModalRechazoAbierto(false)}
       />
     </div>
   );

@@ -247,19 +247,79 @@ export function getDB(): Promise<IDBPDatabase<SgraiDB>> {
 
 export async function guardarMisionesLocales(misiones: MisionLocal[]): Promise<void> {
   const db = await getDB();
+  const [existentes, outbox] = await Promise.all([
+    db.getAll('misiones'),
+    db.getAll('outbox'),
+  ]);
+
+  const existentesPorId = new Map<string, MisionLocal>(
+    existentes.map((m) => [m.id, m])
+  );
+
+  const misionesConOutbox = new Set<string>();
+  const incidentesConOutbox = new Set<string>();
+  for (const accion of outbox) {
+    const payloadMisionId = accion.payload?.misionId;
+    if (typeof payloadMisionId === 'string' && payloadMisionId) {
+      misionesConOutbox.add(payloadMisionId);
+    }
+    const matchMision = accion.url.match(/\/api\/misiones\/([^/]+)/);
+    if (matchMision?.[1]) {
+      misionesConOutbox.add(matchMision[1]);
+    }
+    const matchIncidente = accion.url.match(/\/api\/incidentes\/([^/]+)/);
+    if (matchIncidente?.[1]) {
+      incidentesConOutbox.add(matchIncidente[1]);
+    }
+  }
+
+  const idsEntrantes = new Set(misiones.map((m) => m.id));
   const tx = db.transaction('misiones', 'readwrite');
+  for (const existente of existentes) {
+    if (idsEntrantes.has(existente.id)) continue;
+    const tienePendienteExistente =
+      Boolean(existente.sincronizacionPendiente) ||
+      misionesConOutbox.has(existente.id) ||
+      (Boolean(existente.incidenteId) && incidentesConOutbox.has(existente.incidenteId));
+    if (!tienePendienteExistente) {
+      await tx.store.delete(existente.id);
+    }
+  }
+
   for (const mision of misiones) {
-    const previa = await tx.store.get(mision.id);
-    const fusionada = fusionarDatosAdicionalesMision(mision, previa?.datosAdicionales);
-    if (tieneDatosEvaluacion(fusionada.datosAdicionales)) {
-      guardarEvaluacionMisionCache(fusionada.id, {
-        ...fusionada.datosAdicionales,
-        ...(fusionada.datosAdicionales?.tipologiaEvaluada && fusionada.tipologia
-          ? { tipologiaConstatada: fusionada.tipologia }
+    const local = existentesPorId.get(mision.id);
+    const tienePendiente =
+      Boolean(local?.sincronizacionPendiente) ||
+      misionesConOutbox.has(mision.id) ||
+      (Boolean(mision.incidenteId) && incidentesConOutbox.has(mision.incidenteId));
+
+    const baseFusionada = fusionarDatosAdicionalesMision(
+      mision,
+      local?.datosAdicionales
+    );
+
+    const misionGuardar: MisionLocal =
+      local && tienePendiente
+        ? {
+            ...baseFusionada,
+            tipologia: local.tipologia || baseFusionada.tipologia,
+            estado: local.estado || baseFusionada.estado,
+            fechaInicio: local.fechaInicio ?? baseFusionada.fechaInicio,
+            sincronizacionPendiente: true,
+            actualizadoEn: local.actualizadoEn || baseFusionada.actualizadoEn,
+          }
+        : baseFusionada;
+
+    if (tieneDatosEvaluacion(misionGuardar.datosAdicionales)) {
+      guardarEvaluacionMisionCache(misionGuardar.id, {
+        ...misionGuardar.datosAdicionales,
+        ...(misionGuardar.datosAdicionales?.tipologiaEvaluada && misionGuardar.tipologia
+          ? { tipologiaConstatada: misionGuardar.tipologia }
           : {}),
       });
     }
-    await tx.store.put(fusionada);
+
+    await tx.store.put(misionGuardar);
   }
   await tx.done;
 }
@@ -345,11 +405,19 @@ export async function encolarAccionOutbox(
     (item) => item.tipo === accion.tipo && item.url === accion.url
   );
 
+  const maxTimestampMs = existentes.reduce((max, item) => {
+    const ms = Date.parse(item.timestamp);
+    return Number.isFinite(ms) && ms > max ? ms : max;
+  }, 0);
+  const timestampIso = new Date(
+    Math.max(Date.now(), maxTimestampMs + 1)
+  ).toISOString();
+
   if (duplicada) {
     const actualizada: AccionOutbox = {
       ...duplicada,
       payload: accion.payload,
-      timestamp: new Date().toISOString(),
+      timestamp: timestampIso,
     };
     await db.put('outbox', actualizada);
     return actualizada;
@@ -358,7 +426,7 @@ export async function encolarAccionOutbox(
   const nuevaAccion: AccionOutbox = {
     ...accion,
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `outbox-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    timestamp: new Date().toISOString(),
+    timestamp: timestampIso,
     intentos: 0,
   };
 
@@ -395,8 +463,26 @@ export async function contarAccionesPendientes(): Promise<number> {
   }
 }
 
+function obtenerClaveCausalAccion(accion: AccionOutbox): string | null {
+  const payloadMisionId = accion.payload?.misionId;
+  if (typeof payloadMisionId === 'string' && payloadMisionId) {
+    return `mision:${payloadMisionId}`;
+  }
+  const matchMision = accion.url.match(/\/api\/misiones\/([^/]+)/);
+  if (matchMision?.[1]) {
+    return `mision:${matchMision[1]}`;
+  }
+  const matchIncidente = accion.url.match(/\/api\/incidentes\/([^/]+)/);
+  if (matchIncidente?.[1]) {
+    return `incidente:${matchIncidente[1]}`;
+  }
+  return null;
+}
+
 /**
- * Procesa y sincroniza la cola de acciones pendientes con el servidor.
+ * Procesa y sincroniza la cola de acciones pendientes con el servidor,
+ * respetando el orden causal por misión para evitar ejecutar acciones dependientes
+ * cuando una mutación previa falla.
  */
 export async function sincronizarColaOutbox(
   ejecutorHttp: (accion: AccionOutbox) => Promise<boolean>
@@ -404,18 +490,27 @@ export async function sincronizarColaOutbox(
   const acciones = await obtenerAccionesOutbox();
   let exitosas = 0;
   let fallidas = 0;
+  const clavesBloqueadas = new Set<string>();
 
   for (const accion of acciones) {
+    const claveCausal = obtenerClaveCausalAccion(accion);
+    if (claveCausal && clavesBloqueadas.has(claveCausal)) {
+      fallidas += 1;
+      continue;
+    }
+
     try {
       const ok = await ejecutorHttp(accion);
       if (ok) {
         await eliminarAccionOutbox(accion.id);
         exitosas += 1;
       } else {
+        if (claveCausal) clavesBloqueadas.add(claveCausal);
         await incrementarIntentoOutbox(accion.id, 'Respuesta HTTP no exitosa');
         fallidas += 1;
       }
     } catch (err) {
+      if (claveCausal) clavesBloqueadas.add(claveCausal);
       const errorMsg = err instanceof Error ? err.message : 'Error desconocido al enviar mutación';
       await incrementarIntentoOutbox(accion.id, errorMsg);
       fallidas += 1;

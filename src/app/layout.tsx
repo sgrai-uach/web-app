@@ -1,15 +1,46 @@
 import type { Metadata, Viewport } from 'next';
-import { Noto_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
 import { AuthProvider } from '@/context/AuthContext';
 import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
 
-const notoSans = Noto_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
+/**
+ * Noto Sans auto-alojada (next/font/local).
+ * Evita la descarga de Google Fonts durante el build en CI/Docker, que provoca el
+ * error "An error occurred in next/font" cuando no hay salida a Internet.
+ */
+const notoSans = localFont({
+  src: [
+    {
+      path: '../fonts/noto-sans/NotoSans-Latin-400.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/noto-sans/NotoSans-Latin-500.woff2',
+      weight: '500',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/noto-sans/NotoSans-Latin-600.woff2',
+      weight: '600',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/noto-sans/NotoSans-Latin-700.woff2',
+      weight: '700',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/noto-sans/NotoSans-Latin-800.woff2',
+      weight: '800',
+      style: 'normal',
+    },
+  ],
   variable: '--font-noto-sans',
   display: 'swap',
+  fallback: ['system-ui', 'arial', 'sans-serif'],
 });
 
 export const viewport: Viewport = {

@@ -2,7 +2,7 @@
 
 Este documento detalla los contratos HTTP y WebSocket consumidos por la aplicación de terreno (`sgrai-pwa`) desde el backend `sgrai-api`.
 
-Todos los tipos TypeScript de estos endpoints se derivan estrictamente de [src/types/api-generated.d.ts](file:///home/zetastormy/Development/SGRAI/web-app/src/types/api-generated.d.ts).
+Todos los tipos TypeScript de estos endpoints se derivan estrictamente de [`src/types/api-generated.d.ts`](../../src/types/api-generated.d.ts).
 
 ---
 
@@ -218,6 +218,66 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 - `requiere_asistencia_social`: casilla Ficha FIBE (trasladada desde HU-38); si es `true`, marca `incidente.requiere_asistencia_social = true`.
 - `adjuntoIds` / `adjuntos`: sección preparada para integración con evidencia fotográfica (HU-43).
 - Al recibir `201 Created`, la misión pasa a `COMPLETADA` (`fecha_cierre`), la patrulla pasa a `DISPONIBLE` y se emiten los eventos WebSocket `mision:actualizada`, `incidente:actualizado` y `patrulla:actualizada` / `patrulla:liberada`, sincronizando el estado y autoría (`evaluador`) para todo el personal de la patrulla.
+
+---
+
+### 2.4 Rechazo Motivado de Misión por Patrulla Verificadora (H41, H69)
+- **Historia:** H41, H69
+- **Método:** `POST`
+- **Ruta:** `/api/misiones/{id}/rechazar`
+- **Permiso RBAC requerido:** `misiones:terreno:verificar` (Patrulla Verificadora) / `misiones:terreno:atender` (Delegado de Cuadrilla)
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+#### Request Body
+```json
+{
+  "justificacion_rechazo": "Desperfecto mecánico severo en vehículo de traslado.",
+  "latitud": -39.819588,
+  "longitud": -73.245209
+}
+```
+
+> **Regla de Negocio Crítica §3.3:** La justificación es obligatoria y debe contar con un mínimo de **5 caracteres** útiles (tras remover espacios en blanco circundantes). Las coordenadas GPS son opcionales y no bloqueantes.
+
+#### Response Exitosa (200 OK)
+```json
+{
+  "message": "Misión rechazada exitosamente.",
+  "data": {
+    "mision": {
+      "id": "60000000-0000-4000-8000-000000000001",
+      "codigo": "MIS-2026-0001",
+      "estado": "RECHAZADA",
+      "justificacionRechazo": "Desperfecto mecánico severo en vehículo de traslado.",
+      "actualizadoEn": "2026-11-01T21:05:00.000Z"
+    }
+  }
+}
+```
+
+#### Códigos de Error HTTP
+- `400 Bad Request`: Formato de carga inválido o justificación menor a 5 caracteres (`VALIDATION_ERROR`).
+- `401 Unauthorized`: Token de sesión ausente, inválido o expirado.
+- `403 Forbidden`: Operador sin rol o sin permiso `misiones:terreno:verificar`, o unidad operativa en estado desactivada.
+- `404 Not Found`: Identificador de misión no registrado en el sistema.
+- `409 Conflict`: La misión ya no se encuentra en estado `DESPACHADA` o `ASIGNADA` (ej. ya aceptada previamente o cancelada por despacho).
+
+#### Efectos Colaterales en Tiempo Real (Socket.io)
+Al procesar exitosamente el rechazo, el backend emite el evento `mision:rechazada` hacia la sala `encargado`:
+```json
+{
+  "misionId": "60000000-0000-4000-8000-000000000001",
+  "codigo": "MIS-2026-0001",
+  "unidadId": "f1000000-0000-4000-8000-000000000001",
+  "motivo": "Desperfecto mecánico severo en vehículo de traslado.",
+  "timestamp": "2026-11-01T21:05:00.000Z"
+}
+```
+Esto notifica de inmediato al Encargado del Centro de Mando en `sgrai-web` para reasignar la misión a otra unidad disponible.
+
+#### Comportamiento Offline-First
+- En caso de pérdida de señal o error de red, la PWA valida localmente con Zod (`rechazoMisionSchema`), persiste el estado `RECHAZADA` con `sincronizacionPendiente: true` en IndexedDB y almacena la mutación `RECHAZAR_MISION` en `outbox`.
+- El badge de conectividad refleja de inmediato `1 pendiente` y el worker/hook `useConnectivity` reintenta la mutación al recuperar la conexión.
 
 ---
 

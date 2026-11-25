@@ -208,43 +208,6 @@ export function consolidarEvaluacionFamilias(
     return evaluacion;
   }
 
-  // Si solo hay 1 familia pero los contadores globales en la raíz son mayores (ej: llamadas directas o fixtures con ...VALORES_INICIALES),
-  // respetamos los valores globales y los reflejamos en la familia.
-  const soloUnaFamilia = evaluacion.familias.length === 1;
-  const f0 = evaluacion.familias[0];
-  const sumaFamilias =
-    f0.nucleoFamiliarTotal +
-    f0.cantidadNinos +
-    f0.cantidadAdultosMayores +
-    f0.personasDiscapacitadas +
-    f0.personasElectrodependientes +
-    f0.mascotasAfectadas;
-  const sumaGlobal =
-    (evaluacion.nucleoFamiliarTotal || 0) +
-    (evaluacion.cantidadNinos || 0) +
-    (evaluacion.cantidadAdultosMayores || 0) +
-    (evaluacion.personasDiscapacitadas || 0) +
-    (evaluacion.personasElectrodependientes || 0) +
-    (evaluacion.mascotasAfectadas || 0);
-
-  if (soloUnaFamilia && sumaGlobal > sumaFamilias) {
-    return {
-      ...evaluacion,
-      familias: [
-        {
-          ...f0,
-          nucleoFamiliarTotal: evaluacion.nucleoFamiliarTotal,
-          cantidadNinos: evaluacion.cantidadNinos,
-          cantidadAdultosMayores: evaluacion.cantidadAdultosMayores,
-          personasDiscapacitadas: evaluacion.personasDiscapacitadas,
-          personasElectrodependientes: evaluacion.personasElectrodependientes,
-          mascotasAfectadas: evaluacion.mascotasAfectadas,
-          nivelCompromisoVivienda: evaluacion.nivelCompromisoVivienda,
-        },
-      ],
-    };
-  }
-
   let totalPersonas = 0;
   let totalNinos = 0;
   let totalAdultosMayores = 0;
@@ -287,130 +250,160 @@ export function consolidarEvaluacionFamilias(
 
 /**
  * Calcula en vivo la prioridad sugerida y sus factores gatillantes a partir
- * de los datos constatados por la Patrulla Verificadora en terreno (HU-38).
+ * de los datos constatados por la Patrulla Verificadora en terreno (HU-38),
+ * homologado 1:1 con `sgrai-api` (`prioridad.utils.ts`).
  */
 export function calcularPrioridadSugerida(
   evaluacionRaw: EvaluacionTerrenoPrioridadForm
 ): ResultadoCalculoPrioridad {
   const evaluacion = consolidarEvaluacionFamilias(evaluacionRaw);
-  const factoresCriticos: string[] = [];
-  const factoresAltos: string[] = [];
-  const factoresMedios: string[] = [];
+  let puntajeTotal = 0;
+  const factoresGatillantes: string[] = [];
+  let forzarCritica = false;
 
-  // 1. Factores de nivel CRÍTICO
-  if (evaluacion.personasElectrodependientes > 0) {
-    factoresCriticos.push(
-      `Personas electrodependientes afectadas (${evaluacion.personasElectrodependientes})`
+  // 1. Tamaño del núcleo familiar afectado
+  if (evaluacion.nucleoFamiliarTotal >= 8) {
+    puntajeTotal += 20;
+    factoresGatillantes.push(
+      `Núcleo familiar numeroso afectado: ${evaluacion.nucleoFamiliarTotal} personas (+20 pts)`
+    );
+  } else if (evaluacion.nucleoFamiliarTotal >= 4) {
+    puntajeTotal += 12;
+    factoresGatillantes.push(
+      `Núcleo familiar afectado: ${evaluacion.nucleoFamiliarTotal} personas (+12 pts)`
+    );
+  } else if (evaluacion.nucleoFamiliarTotal >= 1) {
+    puntajeTotal += 5;
+    factoresGatillantes.push(
+      `Personas afectadas en el núcleo: ${evaluacion.nucleoFamiliarTotal} (+5 pts)`
     );
   }
-  if (evaluacion.requiereEvacuacion) {
-    factoresCriticos.push('Requiere evacuación inmediata del sector');
+
+  // 2. Niños, niñas y adolescentes (< 14 años)
+  if (evaluacion.cantidadNinos > 0) {
+    const ptsNinos = Math.min(24, evaluacion.cantidadNinos * 6);
+    puntajeTotal += ptsNinos;
+    factoresGatillantes.push(`Niños afectados: ${evaluacion.cantidadNinos} (+${ptsNinos} pts)`);
   }
+
+  // 3. Adultos mayores (>= 65 años)
+  if (evaluacion.cantidadAdultosMayores > 0) {
+    const ptsMayores = Math.min(28, evaluacion.cantidadAdultosMayores * 7);
+    puntajeTotal += ptsMayores;
+    factoresGatillantes.push(
+      `Adultos mayores afectados: ${evaluacion.cantidadAdultosMayores} (+${ptsMayores} pts)`
+    );
+  }
+
+  // 4. Personas con discapacidad o movilidad reducida
+  if (evaluacion.personasDiscapacitadas > 0) {
+    const ptsDiscapacidad = Math.min(36, evaluacion.personasDiscapacitadas * 12);
+    puntajeTotal += ptsDiscapacidad;
+    factoresGatillantes.push(
+      `Personas con discapacidad o movilidad reducida: ${evaluacion.personasDiscapacitadas} (+${ptsDiscapacidad} pts)`
+    );
+  }
+
+  // 5. Personas electrodependientes (Disparo directo a CRITICA)
+  if (evaluacion.personasElectrodependientes > 0) {
+    const ptsElectro = evaluacion.personasElectrodependientes * 50;
+    puntajeTotal += ptsElectro;
+    forzarCritica = true;
+    factoresGatillantes.push(
+      `Pacientes electrodependientes en riesgo vital: ${evaluacion.personasElectrodependientes} (+${ptsElectro} pts — Prioridad CRÍTICA directa)`
+    );
+  }
+
+  // 6. Mascotas o animales afectados
+  if (evaluacion.mascotasAfectadas >= 4) {
+    const ptsMascotas = Math.min(10, 5 + (evaluacion.mascotasAfectadas - 4));
+    puntajeTotal += ptsMascotas;
+    factoresGatillantes.push(
+      `Mascotas/animales afectados: ${evaluacion.mascotasAfectadas} (+${ptsMascotas} pts)`
+    );
+  } else if (evaluacion.mascotasAfectadas >= 1) {
+    const ptsMascotas = evaluacion.mascotasAfectadas * 2;
+    puntajeTotal += ptsMascotas;
+    factoresGatillantes.push(
+      `Mascotas afectadas: ${evaluacion.mascotasAfectadas} (+${ptsMascotas} pts)`
+    );
+  }
+
+  // 7. Nivel de compromiso habitacional y cantidad de viviendas
   if (evaluacion.nivelCompromisoVivienda === 'GRAVE_INHABITABLE') {
-    factoresCriticos.push('Vivienda con daño grave o inhabitable');
+    puntajeTotal += 45;
+    factoresGatillantes.push('Compromiso de vivienda GRAVE / INHABITABLE (+45 pts)');
+  } else if (evaluacion.nivelCompromisoVivienda === 'MODERADO') {
+    puntajeTotal += 22;
+    factoresGatillantes.push('Compromiso de vivienda MODERADO (+22 pts)');
+  } else if (evaluacion.nivelCompromisoVivienda === 'LEVE') {
+    puntajeTotal += 8;
+    factoresGatillantes.push('Compromiso de vivienda LEVE (+8 pts)');
+  }
+
+  if (evaluacion.viviendasAfectadas >= 6) {
+    puntajeTotal += 20;
+    factoresGatillantes.push(
+      `Afectación multi-vivienda severa: ${evaluacion.viviendasAfectadas} inmuebles (+20 pts)`
+    );
+  } else if (evaluacion.viviendasAfectadas >= 3) {
+    puntajeTotal += 10;
+    factoresGatillantes.push(
+      `Múltiples viviendas afectadas: ${evaluacion.viviendasAfectadas} inmuebles (+10 pts)`
+    );
+  }
+
+  // 8. Evacuación y riesgos activos en el sitio
+  if (evaluacion.requiereEvacuacion) {
+    puntajeTotal += 35;
+    factoresGatillantes.push('Requiere evacuación inmediata de residentes (+35 pts)');
+    if (
+      evaluacion.personasDiscapacitadas > 0 ||
+      evaluacion.cantidadAdultosMayores > 0 ||
+      evaluacion.cantidadNinos > 0 ||
+      evaluacion.nivelCompromisoVivienda === 'GRAVE_INHABITABLE'
+    ) {
+      forzarCritica = true;
+    }
+  }
+
+  if (evaluacion.riesgoEstructural) {
+    puntajeTotal += 25;
+    factoresGatillantes.push('Riesgo estructural / peligro de colapso activo (+25 pts)');
   }
   if (evaluacion.riesgoElectrico) {
-    factoresCriticos.push('Peligro eléctrico activo en terreno');
-  }
-  if (evaluacion.riesgoEstructural) {
-    factoresCriticos.push('Riesgo de colapso estructural o remoción');
+    puntajeTotal += 20;
+    factoresGatillantes.push('Riesgo eléctrico activo en el lugar (+20 pts)');
   }
   if (evaluacion.riesgoQuimicoSanitario) {
-    factoresCriticos.push('Peligro químico o sanitario activo');
-  }
-
-  // 2. Factores de nivel ALTO
-  if (evaluacion.personasDiscapacitadas > 0) {
-    factoresAltos.push(
-      `Personas con discapacidad afectadas (${evaluacion.personasDiscapacitadas})`
-    );
-  }
-  if (evaluacion.cantidadAdultosMayores > 0) {
-    factoresAltos.push(
-      `Adultos mayores afectados (${evaluacion.cantidadAdultosMayores})`
-    );
-  }
-  if (evaluacion.cantidadNinos >= 2) {
-    factoresAltos.push(`Múltiples niños afectados (${evaluacion.cantidadNinos})`);
+    puntajeTotal += 15;
+    factoresGatillantes.push('Riesgo químico o sanitario activo (+15 pts)');
   }
   if (evaluacion.aislamientoVial) {
-    factoresAltos.push('Aislamiento vial o corte de ruta de acceso');
+    puntajeTotal += 15;
+    factoresGatillantes.push('Aislamiento vial / bloqueo de accesos (+15 pts)');
   }
-  if (evaluacion.nivelCompromisoVivienda === 'MODERADO') {
-    factoresAltos.push('Vivienda con compromiso estructural moderado');
-  }
-  if (evaluacion.viviendasAfectadas >= 3) {
-    factoresAltos.push(
-      `Múltiples viviendas afectadas (${evaluacion.viviendasAfectadas})`
-    );
-  }
-  if (evaluacion.nucleoFamiliarTotal >= 6) {
-    factoresAltos.push(
-      `Núcleo familiar extenso afectado (${evaluacion.nucleoFamiliarTotal} integrantes)`
+
+  if (factoresGatillantes.length === 0) {
+    factoresGatillantes.push(
+      'Sin afectación humana directa ni riesgos críticos detectados (0 pts)'
     );
   }
 
-  // 3. Factores de nivel MEDIO
-  if (evaluacion.cantidadNinos === 1) {
-    factoresMedios.push('Presencia de 1 niño en el núcleo afectado');
-  }
-  if (evaluacion.nucleoFamiliarTotal > 0 && evaluacion.nucleoFamiliarTotal < 6) {
-    factoresMedios.push(
-      `Núcleo familiar afectado (${evaluacion.nucleoFamiliarTotal} personas)`
-    );
-  }
-  const tieneDanoOCompromiso =
-    evaluacion.nivelCompromisoVivienda !== 'SIN_DANO' ||
-    evaluacion.nucleoFamiliarTotal > 0 ||
-    evaluacion.personasElectrodependientes > 0 ||
-    evaluacion.personasDiscapacitadas > 0 ||
-    evaluacion.cantidadAdultosMayores > 0 ||
-    evaluacion.cantidadNinos > 0;
-
-  if (evaluacion.viviendasAfectadas > 0 && evaluacion.viviendasAfectadas < 3 && tieneDanoOCompromiso) {
-    factoresMedios.push(
-      `Viviendas afectadas (${evaluacion.viviendasAfectadas})`
-    );
-  }
-  if (evaluacion.nivelCompromisoVivienda === 'LEVE') {
-    factoresMedios.push('Vivienda con daño leve');
-  }
-  if (evaluacion.mascotasAfectadas > 0) {
-    factoresMedios.push(`Mascotas afectadas (${evaluacion.mascotasAfectadas})`);
-  }
-
-  const todosLosFactores = [
-    ...factoresCriticos,
-    ...factoresAltos,
-    ...factoresMedios,
-  ];
-
-  if (factoresCriticos.length > 0) {
-    return {
-      prioridadSugerida: 'CRITICA',
-      factoresGatillantes: todosLosFactores,
-    };
-  }
-
-  if (factoresAltos.length > 0) {
-    return {
-      prioridadSugerida: 'ALTA',
-      factoresGatillantes: todosLosFactores,
-    };
-  }
-
-  if (factoresMedios.length > 0) {
-    return {
-      prioridadSugerida: 'MEDIA',
-      factoresGatillantes: todosLosFactores,
-    };
+  let prioridadSugerida: PrioridadIncidente;
+  if (forzarCritica || puntajeTotal >= 60) {
+    prioridadSugerida = 'CRITICA';
+  } else if (puntajeTotal >= 35) {
+    prioridadSugerida = 'ALTA';
+  } else if (puntajeTotal >= 15) {
+    prioridadSugerida = 'MEDIA';
+  } else {
+    prioridadSugerida = 'BAJA';
   }
 
   return {
-    prioridadSugerida: 'BAJA',
-    factoresGatillantes: [
-      'Sin personas vulnerables, sin daños habitacionales ni peligros activos constatados',
-    ],
+    prioridadSugerida,
+    factoresGatillantes,
   };
 }
 
