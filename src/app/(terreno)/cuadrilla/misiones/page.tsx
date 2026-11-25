@@ -138,7 +138,7 @@ function CuadrillaMisionesContenido() {
         <NuevaMisionBanner
           codigoMision={ultimaMisionAsignada.codigo}
           misionId={ultimaMisionAsignada.misionId}
-          urlDetalle={`/terreno/cuadrilla/misiones/${ultimaMisionAsignada.misionId}`}
+          urlDetalle={`/cuadrilla/misiones/${ultimaMisionAsignada.misionId}`}
           alCerrar={descartarUltimaMision}
         />
       )}
