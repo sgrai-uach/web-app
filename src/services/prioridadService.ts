@@ -1,9 +1,4 @@
-import { getAuthCookie } from '@/lib/utils/cookieUtils';
-import {
-  DEV_PATRULLA_TOKEN,
-  DEV_PATRULLA_USER_ID,
-  handleUnauthorizedSession,
-} from '@/lib/api/client';
+import apiClient from '@/lib/api/client';
 import {
   encolarAccionOutbox,
   guardarMisionLocal,
@@ -18,6 +13,8 @@ import {
   type ResultadoCalculoPrioridad,
 } from '@/lib/validations/prioridad';
 import type {
+  AsignarPrioridadPayload,
+  CalcularPrioridadPayload,
   EvaluacionTerrenoPrioridadForm,
   EvaluadorReporteTerreno,
   MisionLocal,
@@ -25,24 +22,6 @@ import type {
   PrioridadIncidente,
   ReportePrioridadTerrenoLocal,
 } from '@/types/offline';
-
-function resolveApiUrl(): string {
-  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
-    return '';
-  }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
-}
-
-function buildAuthHeaders(): Record<string, string> {
-  const token = getAuthCookie();
-  if (token === DEV_PATRULLA_TOKEN) {
-    return { 'x-user-id': DEV_PATRULLA_USER_ID };
-  }
-  if (token) {
-    return { Authorization: `Bearer ${token}` };
-  }
-  return {};
-}
 
 function esPrioridadValida(val: unknown): val is PrioridadIncidente {
   return (
@@ -81,6 +60,18 @@ function obtenerEvaluadorSesionLocal(): EvaluadorReporteTerreno | undefined {
   } catch {
     return undefined;
   }
+}
+
+function extraerMensajeError(errorBody: unknown, fallback: string): string {
+  if (
+    typeof errorBody === 'object' &&
+    errorBody !== null &&
+    'message' in errorBody &&
+    typeof (errorBody as { message?: unknown }).message === 'string'
+  ) {
+    return (errorBody as { message: string }).message;
+  }
+  return fallback;
 }
 
 /**
@@ -130,7 +121,6 @@ export function obtenerReportesPrioridadMision(
           ? r.riesgosActivos
           : undefined
     ) as Record<string, unknown> | undefined;
-
     const version =
       typeof r.versionReporte === 'number' && r.versionReporte > 0
         ? r.versionReporte
@@ -408,8 +398,8 @@ export function obtenerPersonasAfectadasPrevias(
 
 /**
  * Calcula la prioridad sugerida y sus factores gatillantes (HU-38).
- * Ejecuta primero el motor determinista local y, si hay conexión, consulta opcionalmente
- * `POST /api/incidentes/{id}/prioridad/calcular` sin bloquear la experiencia en terreno.
+ * Ejecuta primero el motor determinista local y, si hay conexión, consulta
+ * `POST /api/incidentes/{id}/prioridad/calcular` vía `apiClient`.
  */
 export async function solicitarCalculoPrioridad(
   incidenteId: string,
@@ -423,33 +413,17 @@ export async function solicitarCalculoPrioridad(
   }
 
   try {
-    const apiUrl = resolveApiUrl();
-    const res = await fetch(
-      `${apiUrl}/api/incidentes/${incidenteId}/prioridad/calcular`,
+    const { data, error } = await apiClient.POST(
+      '/api/incidentes/{id}/prioridad/calcular',
       {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...buildAuthHeaders(),
-        },
-        body: JSON.stringify(evaluacion),
+        params: { path: { id: incidenteId } },
+        body: evaluacion as unknown as CalcularPrioridadPayload,
       }
     );
 
-    if (res.ok) {
-      const body = (await res.json().catch(() => ({}))) as {
-        data?: {
-          prioridadSugerida?: string;
-          factoresGatillantes?: string[];
-        };
-        prioridadSugerida?: string;
-        factoresGatillantes?: string[];
-      };
-
-      const prioRaw =
-        body?.data?.prioridadSugerida || body?.prioridadSugerida;
-      const factoresRaw =
-        body?.data?.factoresGatillantes || body?.factoresGatillantes;
+    if (!error && data?.data) {
+      const prioRaw = data.data.prioridadSugerida;
+      const factoresRaw = data.data.factoresGatillantes;
 
       if (esPrioridadValida(prioRaw)) {
         return {
@@ -480,9 +454,6 @@ export interface ResultadoAsignacionPrioridad {
 
 /**
  * Envía el reporte de evaluación en terreno y asigna o modifica la prioridad del incidente (HU-38).
- * - Valida que si `prioridad !== prioridadSugerida`, `justificacionPrioridad` tenga al menos 5 caracteres.
- * - Incrementa automáticamente `versionReporte` cuando existen reportes previos para dejar trazabilidad en el Centro de Mando.
- * - En modo offline o ante caída de red, encola la mutación `AJUSTAR_PRIORIDAD` en IndexedDB (`outbox`).
  */
 export async function asignarPrioridadEnTerreno(
   incidenteId: string,
@@ -519,7 +490,7 @@ export async function asignarPrioridadEnTerreno(
       ? misionActual.id
       : undefined);
 
-  const payloadMutacion: Record<string, unknown> = {
+  const payloadMutacion: AsignarPrioridadPayload = {
     prioridad: validado.prioridad,
     prioridadSugerida: validado.prioridadSugerida,
     justificacionPrioridad: justificacionFinal,
@@ -539,9 +510,7 @@ export async function asignarPrioridadEnTerreno(
     requiereEvacuacion: validado.requiereEvacuacion,
     requiereApoyoAdicional: validado.requiereApoyoAdicional,
     detallesAdicionales: validado.detallesAdicionales,
-    factoresGatillantes: factoresCalculados,
-    versionReporte,
-    misionId: misionUuidValido,
+    ...(misionUuidValido ? { misionId: misionUuidValido } : {}),
   };
 
   const ahoraIso = new Date().toISOString();
@@ -550,12 +519,14 @@ export async function asignarPrioridadEnTerreno(
   const construirReporteLocal = (
     sincronizado: boolean,
     idRemoto?: string,
-    evaluadorRemoto?: EvaluadorReporteTerreno
+    evaluadorRemoto?: EvaluadorReporteTerreno,
+    versionConfirmada?: number
   ): ReportePrioridadTerrenoLocal => {
     const evaluadorFinal = evaluadorRemoto ?? evaluadorSesion;
+    const versionFinal = versionConfirmada ?? versionReporte;
     return {
-      id: idRemoto || `rep-prio-v${versionReporte}-${Date.now()}`,
-      versionReporte,
+      id: idRemoto || `rep-prio-v${versionFinal}-${Date.now()}`,
+      versionReporte: versionFinal,
       evaluacion: {
         familias: validado.familias || [],
         nucleoFamiliarTotal: validado.nucleoFamiliarTotal,
@@ -601,7 +572,7 @@ export async function asignarPrioridadEnTerreno(
         prioridadEvaluada: true,
         prioridadSugerida: validado.prioridadSugerida,
         justificacionPrioridad: justificacionFinal,
-        versionReportePrioridad: versionReporte,
+        versionReportePrioridad: reporte.versionReporte,
         ultimoReportePrioridad: reporte,
         reportesPrioridad: nuevaListaReportes,
       },
@@ -615,7 +586,7 @@ export async function asignarPrioridadEnTerreno(
       tipo: 'AJUSTAR_PRIORIDAD',
       url: `/api/incidentes/${incidenteId}/prioridad`,
       metodo: 'PATCH',
-      payload: payloadMutacion,
+      payload: payloadMutacion as Record<string, unknown>,
     });
 
     const reporteOffline = construirReporteLocal(false);
@@ -635,108 +606,75 @@ export async function asignarPrioridadEnTerreno(
   }
 
   try {
-    const apiUrl = resolveApiUrl();
-    const res = await fetch(`${apiUrl}/api/incidentes/${incidenteId}/prioridad`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...buildAuthHeaders(),
-      },
-      body: JSON.stringify(payloadMutacion),
-    });
+    const { data, error, response } = await apiClient.PATCH(
+      '/api/incidentes/{id}/prioridad',
+      {
+        params: { path: { id: incidenteId } },
+        body: payloadMutacion,
+      }
+    );
 
-    const body = (await res.json().catch(() => ({}))) as {
-      message?: string;
-      data?: {
-        incidente?: {
-          id?: string;
-          prioridad?: string;
-          actualizadoEn?: string;
-        };
-        reporte?: {
-          id?: string;
-          versionReporte?: number;
-          evaluador?: unknown;
-        };
-        reporteTerreno?: {
-          id?: string;
-          versionReporte?: number;
-          evaluador?: unknown;
-        };
-        hito?: unknown;
-      };
-    };
-
-    if (res.ok) {
-      const reporteRemotoObj = body?.data?.reporteTerreno ?? body?.data?.reporte;
+    if (!error && data) {
+      const reporteRemotoObj = data.data?.reporteTerreno as
+        | { id?: string; versionReporte?: number; evaluador?: unknown }
+        | undefined;
       const evaluadorRemoto = extraerEvaluadorDeObjeto(reporteRemotoObj?.evaluador);
+      const versionConfirmada = reporteRemotoObj?.versionReporte ?? versionReporte;
       const reporteOnline = construirReporteLocal(
         true,
         reporteRemotoObj?.id,
-        evaluadorRemoto
+        evaluadorRemoto,
+        versionConfirmada
       );
       const misionActualizada = await actualizarMisionConReporte(
         reporteOnline,
         false,
-        body?.data?.incidente?.actualizadoEn
+        data.data?.incidente?.actualizadoEn
       );
 
       return {
         ok: true,
         offline: false,
-        versionReporte,
+        versionReporte: versionConfirmada,
         reporte: reporteOnline,
         mision: misionActualizada,
-        data: body?.data,
+        data: data.data,
         mensaje:
-          body?.message ||
-          (versionReporte > 1
-            ? `Actualización enviada al Centro de Mando (Reporte #${versionReporte}) y prioridad actualizada exitosamente.`
+          data.message ||
+          (versionConfirmada > 1
+            ? `Actualización enviada al Centro de Mando (Reporte #${versionConfirmada}) y prioridad actualizada exitosamente.`
             : 'Evaluación de terreno enviada al Centro de Mando y prioridad actualizada exitosamente.'),
       };
     }
 
-    // Soporte para modo demostración local (DEV_PATRULLA_TOKEN) cuando el backend local no tiene el incidente cargado
-    const tokenActual = typeof window !== 'undefined' ? getAuthCookie() : null;
-    const esModoDemoLocal =
-      Boolean(tokenActual) && tokenActual === (DEV_PATRULLA_TOKEN || 'dev-patrulla-token');
-    if (esModoDemoLocal && (res.status === 401 || res.status === 403 || res.status === 404)) {
-      const reporteDemo = construirReporteLocal(true);
-      const misionActualizada = await actualizarMisionConReporte(reporteDemo, false);
-      return {
-        ok: true,
-        offline: false,
-        versionReporte,
-        reporte: reporteDemo,
-        mision: misionActualizada,
-        mensaje:
-          versionReporte > 1
-            ? `Actualización enviada al Centro de Mando (Reporte #${versionReporte}) y prioridad actualizada exitosamente.`
-            : 'Evaluación de terreno enviada al Centro de Mando y prioridad actualizada exitosamente.',
-      };
-    }
-
-    if (res.status === 401) {
-      handleUnauthorizedSession();
+    const status = response?.status ?? 500;
+    if (status === 401) {
       throw new Error('Sesión expirada o no autorizada.');
     }
 
-    if (res.status === 403) {
+    if (status === 403) {
       throw new Error(
-        body?.message ||
+        extraerMensajeError(
+          error,
           'No posee los permisos requeridos (misiones:terreno:verificar) para asignar o modificar la prioridad.'
+        )
       );
     }
 
-    if (res.status === 409) {
+    if (status === 409) {
       throw new Error(
-        body?.message ||
+        extraerMensajeError(
+          error,
           'La misión debe haber sido aceptada previamente (en curso) para evaluar y asignar prioridad.'
+        )
       );
     }
 
     throw new Error(
-      body?.message || `Error del servidor (${res.status}) al actualizar la prioridad del incidente.`
+      extraerMensajeError(
+        error,
+        `Error del servidor (${status}) al actualizar la prioridad del incidente.`
+      )
     );
   } catch (err) {
     if (err instanceof TypeError || (err instanceof Error && err.message.includes('fetch'))) {
@@ -744,7 +682,7 @@ export async function asignarPrioridadEnTerreno(
         tipo: 'AJUSTAR_PRIORIDAD',
         url: `/api/incidentes/${incidenteId}/prioridad`,
         metodo: 'PATCH',
-        payload: payloadMutacion,
+        payload: payloadMutacion as Record<string, unknown>,
       });
 
       const reporteOffline = construirReporteLocal(false);
@@ -766,4 +704,3 @@ export async function asignarPrioridadEnTerreno(
     throw err;
   }
 }
-

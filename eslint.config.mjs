@@ -16,6 +16,18 @@ const eslintConfig = defineConfig([
   {
     rules: {
       "react-hooks/set-state-in-effect": "off",
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "next/font/google",
+              message:
+                "Prohibido next/font/google: el build Docker/CI no tiene salida a Internet y falla en next/font. Usa next/font/local con src/fonts/noto-sans (ver AGENTS.md, seccion Build y Fuentes).",
+            },
+          ],
+        },
+      ],
     },
   },
 ]);

@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import PatrullaMisionDetailPage from '../page';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
@@ -300,10 +300,11 @@ describe('PatrullaMisionDetailPage — Informe Técnico de Verificación y Cierr
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('resumen-reporte-cierre')).toBeInTheDocument();
+      const resumen = screen.getByTestId('resumen-reporte-cierre');
+      expect(resumen).toBeInTheDocument();
       expect(screen.queryByTestId('aviso-autor-cierre')).not.toBeInTheDocument();
-      expect(screen.getByText(/^Registrado por$/i)).toBeInTheDocument();
-      expect(screen.getAllByText(/Personal 1 \(p1@valdivia\.cl\) ·/i)).toHaveLength(1);
+      expect(within(resumen).getByText(/^Registrado por$/i)).toBeInTheDocument();
+      expect(within(resumen).getAllByText(/Personal 1 \(p1@valdivia\.cl\) ·/i)).toHaveLength(1);
     });
   });
 });

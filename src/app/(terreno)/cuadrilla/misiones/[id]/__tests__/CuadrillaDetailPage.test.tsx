@@ -77,7 +77,7 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
   });
 
   it('muestra el botón Rechazar Misión cuando la misión está DESPACHADA y el delegado tiene permiso', async () => {
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id }} />);
+    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />);
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
       tienePermiso: () => false,
     } as never);
 
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id }} />);
+    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />);
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();
@@ -115,7 +115,7 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
       mensaje: 'Misión rechazada exitosamente.',
     });
 
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id }} />);
+    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />);
 
     await waitFor(() => {
       expect(
@@ -179,7 +179,7 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
       estado: 'EN_CURSO',
     });
 
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id }} />);
+    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />);
 
     await waitFor(() => {
       expect(screen.getByText('Evidencia Multimedia')).toBeInTheDocument();
@@ -189,7 +189,7 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
   });
 
   it('oculta los controles de carga de evidencia si la misión está DESPACHADA o falta permiso reportes:crear', async () => {
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id }} />);
+    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />);
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();

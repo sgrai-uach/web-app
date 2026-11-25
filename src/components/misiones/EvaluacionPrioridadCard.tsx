@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useId, useMemo } from 'react';
+import React, { useState, useEffect, useId, useMemo, useRef } from 'react';
 import {
   CheckCircle,
   AlertTriangle,
@@ -242,28 +242,70 @@ export function EvaluacionPrioridadCard({
     }
   }, [ultimoReporte]);
 
-  // Consulta no bloqueante al endpoint de cálculo si está disponible
+  const evaluacionCalculoRef = useRef(evaluacion);
+  useEffect(() => {
+    evaluacionCalculoRef.current = evaluacion;
+  }, [evaluacion]);
+
+  const claveCalculo = useMemo(
+    () =>
+      JSON.stringify({
+        nucleoFamiliarTotal: evaluacion.nucleoFamiliarTotal,
+        cantidadNinos: evaluacion.cantidadNinos,
+        cantidadAdultosMayores: evaluacion.cantidadAdultosMayores,
+        personasDiscapacitadas: evaluacion.personasDiscapacitadas,
+        personasElectrodependientes: evaluacion.personasElectrodependientes,
+        mascotasAfectadas: evaluacion.mascotasAfectadas,
+        viviendasAfectadas: evaluacion.viviendasAfectadas,
+        nivelCompromisoVivienda: evaluacion.nivelCompromisoVivienda,
+        riesgoElectrico: evaluacion.riesgoElectrico,
+        riesgoEstructural: evaluacion.riesgoEstructural,
+        riesgoQuimicoSanitario: evaluacion.riesgoQuimicoSanitario,
+        aislamientoVial: evaluacion.aislamientoVial,
+        requiereEvacuacion: evaluacion.requiereEvacuacion,
+        requiereApoyoAdicional: evaluacion.requiereApoyoAdicional,
+        familias: (evaluacion.familias || []).map((fam) => ({
+          id: fam.id,
+          nucleoFamiliarTotal: fam.nucleoFamiliarTotal,
+          cantidadNinos: fam.cantidadNinos,
+          cantidadAdultosMayores: fam.cantidadAdultosMayores,
+          personasDiscapacitadas: fam.personasDiscapacitadas,
+          personasElectrodependientes: fam.personasElectrodependientes,
+          mascotasAfectadas: fam.mascotasAfectadas,
+          nivelCompromisoVivienda: fam.nivelCompromisoVivienda,
+        })),
+      }),
+    [evaluacion]
+  );
+
+  // Consulta no bloqueante con debounce al endpoint de cálculo (excluyendo textos libres)
   useEffect(() => {
     let cancelado = false;
     setPrioridadSugeridaRemota(null);
     setFactoresRemotos(null);
 
-    void (async () => {
-      try {
-        const res = await solicitarCalculoPrioridad(incidenteId, evaluacion);
-        if (!cancelado) {
-          setPrioridadSugeridaRemota(res.prioridadSugerida);
-          setFactoresRemotos(res.factoresGatillantes);
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await solicitarCalculoPrioridad(
+            incidenteId,
+            evaluacionCalculoRef.current
+          );
+          if (!cancelado) {
+            setPrioridadSugeridaRemota(res.prioridadSugerida);
+            setFactoresRemotos(res.factoresGatillantes);
+          }
+        } catch {
+          // Fallback local ya está activo en calculoLocal
         }
-      } catch {
-        // Fallback local ya está activo en calculoLocal
-      }
-    })();
+      })();
+    }, 350);
 
     return () => {
       cancelado = true;
+      clearTimeout(timer);
     };
-  }, [incidenteId, evaluacion]);
+  }, [incidenteId, claveCalculo]);
 
   const mostrarResumen = yaEvaluada && !modoEdicion;
   const siguienteVersionReporte = (ultimoReporte?.versionReporte || 0) + 1;
@@ -347,12 +389,14 @@ export function EvaluacionPrioridadCard({
       const familiasActualizadas = (prev.familias || []).map((fam) =>
         fam.id === familiaId ? { ...fam, nivelCompromisoVivienda: nivel } : fam
       );
-      return {
+      const consolidado = consolidarEvaluacionFamilias({
         ...prev,
         familias: familiasActualizadas,
-        ...(familiasActualizadas.length === 1
-          ? { nivelCompromisoVivienda: nivel }
-          : {}),
+      });
+      return {
+        ...prev,
+        ...consolidado,
+        familias: familiasActualizadas,
       };
     });
     setErrorValidacion(null);
@@ -661,6 +705,7 @@ export function EvaluacionPrioridadCard({
                         <input
                           type="text"
                           className={styles.familiaRefInput}
+                          maxLength={100}
                           placeholder="Referencia (ej: Familia Pérez, Casa 2)"
                           value={fam.referencia || ''}
                           disabled={deshabilitado || guardando}

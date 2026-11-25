@@ -143,11 +143,12 @@ describe('EvaluacionPrioridadCard (H38)', () => {
       />
     );
 
-    // Activar switch de riesgo eléctrico
+    // Activar switch de riesgo eléctrico y compromiso Grave / Inhabitable (20 + 45 = 65 pts -> Crítica)
     const switchElectrico = screen.getByRole('switch', {
       name: /Riesgo eléctrico activo/i,
     });
     fireEvent.click(switchElectrico);
+    fireEvent.click(screen.getByRole('radio', { name: /Grave \/ Inhabitable/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId('badge-prioridad-sugerida')).toHaveTextContent(
@@ -406,6 +407,51 @@ describe('EvaluacionPrioridadCard (H38)', () => {
 
     expect(screen.queryByText('Familia #2')).not.toBeInTheDocument();
     expect(screen.getByText('1 Hogar / Vivienda')).toBeInTheDocument();
+  });
+
+  it('consolida compromiso habitacional máximo entre múltiples familias y respeta maxLength=100 en referencia', () => {
+    render(
+      <EvaluacionPrioridadCard
+        incidenteId={misionMock.incidenteId}
+        misionActual={misionMock}
+      />
+    );
+
+    const refInput = screen.getByLabelText(/Referencia para Familia #1/i);
+    expect(refInput).toHaveAttribute('maxlength', '100');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Añadir otra familia afectada/i })
+    );
+
+    const botonesGrave = screen.getAllByRole('radio', { name: /Grave \/ Inhabitable/i });
+    fireEvent.click(botonesGrave[1]);
+
+    expect(screen.getByTestId('badge-prioridad-sugerida')).toHaveTextContent(/MEDIA|ALTA|CRITICA/i);
+    expect(screen.getByText(/Compromiso de vivienda GRAVE \/ INHABITABLE/i)).toBeInTheDocument();
+  });
+
+  it('aplica debounce y no dispara solicitarCalculoPrioridad al escribir en detalles adicionales', async () => {
+    vi.useFakeTimers();
+    const spyCalculo = vi.mocked(prioridadService.solicitarCalculoPrioridad);
+    spyCalculo.mockClear();
+
+    render(
+      <EvaluacionPrioridadCard
+        incidenteId={misionMock.incidenteId}
+        misionActual={misionMock}
+      />
+    );
+
+    await vi.advanceTimersByTimeAsync(400);
+    const llamadasIniciales = spyCalculo.mock.calls.length;
+
+    const detalles = screen.getByLabelText(/Detalles adicionales del reporte/i);
+    fireEvent.change(detalles, { target: { value: 'Texto libre de observación' } });
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(spyCalculo.mock.calls.length).toBe(llamadasIniciales);
+    vi.useRealTimers();
   });
 });
 

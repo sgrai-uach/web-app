@@ -411,4 +411,36 @@ describe('EvaluacionTipologiaCard (H37)', () => {
 
     expect(screen.getByRole('button', { name: /Confirmar Tipología/i })).toBeDisabled();
   });
+
+  it('carga el catálogo una sola vez al montar y muestra placeholder neutro sin coincidencia exacta', async () => {
+    const misionSinCoincidencia: MisionLocal = {
+      ...misionMock,
+      tipologia: 'Tipología Desconocida',
+    };
+
+    const { rerender } = render(
+      <EvaluacionTipologiaCard
+        incidenteId={misionSinCoincidencia.incidenteId}
+        misionActual={misionSinCoincidencia}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).not.toBeDisabled();
+    });
+
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    expect(select.value).toBe('');
+    expect(select.options[0].text).toBe('Seleccione un tipo de incidente...');
+    expect(screen.getByRole('button', { name: /Confirmar Tipología/i })).toBeDisabled();
+
+    rerender(
+      <EvaluacionTipologiaCard
+        incidenteId={misionSinCoincidencia.incidenteId}
+        misionActual={{ ...misionSinCoincidencia, tipologia: 'Inundación' }}
+      />
+    );
+
+    expect(tipologiaService.obtenerCatalogoTiposIncidente).toHaveBeenCalledTimes(1);
+  });
 });

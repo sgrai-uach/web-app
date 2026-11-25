@@ -171,7 +171,9 @@ describe('PatrullaMisionDetailPage — Categorización de Tipología en Terreno 
     const select = screen.getByRole('combobox');
     fireEvent.change(select, { target: { value: '40000000-0000-4000-8000-000000000001' } });
 
-    const textarea = screen.getByRole('textbox');
+    const textarea = screen.getByRole('textbox', {
+      name: /Justificación del cambio/i,
+    });
     fireEvent.change(textarea, {
       target: {
         value: 'Evaluación presencial constata desborde de río con afectación a viviendas.',
@@ -252,6 +254,29 @@ describe('PatrullaMisionDetailPage — Categorización de Tipología en Terreno 
     await waitFor(() => {
       expect(screen.getByText('Completado')).toBeInTheDocument();
     });
+  });
+
+  it('bloquea la categorización y muestra aviso cuando falta el permiso misiones:terreno:verificar', async () => {
+    configurarAuth(true, false);
+
+    await act(async () => {
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <PatrullaMisionDetailPage
+            params={Promise.resolve({ id: misionEnCursoMock.id })}
+          />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no cuenta con el permiso misiones:terreno:verificar/i)
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('combobox')).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Confirmar Tipología/i })).toBeDisabled();
   });
 });
 

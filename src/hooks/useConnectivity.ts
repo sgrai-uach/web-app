@@ -9,6 +9,7 @@ import {
   guardarMisionLocal,
   reemplazarAdjuntoLocalEnMision,
   marcarErrorAdjuntoLocalEnMision,
+  eliminarAccionOutbox,
 } from '@/services/offlineQueue';
 import {
   construirFormDataEvidencia,
@@ -20,6 +21,12 @@ import { obtenerDetalleMision } from '@/services/misionesService';
 import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge';
 import type { EvidenciaOutboxPayload } from '@/types/offline';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
+import {
+  DEV_PATRULLA_TOKEN,
+  DEV_PATRULLA_USER_ID,
+  extractUserIdFromJwt,
+  handleUnauthorizedSession,
+} from '@/lib/api/client';
 
 export function useConnectivity() {
   const [online, setOnline] = useState<boolean>(() => {
@@ -60,9 +67,16 @@ export function useConnectivity() {
           : process.env.NEXT_PUBLIC_API_URL || '';
 
       await sincronizarColaOutbox(async (accion) => {
-        const authHeaders: Record<string, string> = token
-          ? { Authorization: `Bearer ${token}` }
-          : {};
+        const authHeaders: Record<string, string> = {};
+        if (token === DEV_PATRULLA_TOKEN) {
+          authHeaders['x-user-id'] = DEV_PATRULLA_USER_ID;
+        } else if (token) {
+          authHeaders['Authorization'] = `Bearer ${token}`;
+          const userId = extractUserIdFromJwt(token);
+          if (userId) {
+            authHeaders['x-user-id'] = userId;
+          }
+        }
 
         let res: Response;
         if (accion.tipo === 'SUBIR_EVIDENCIA') {
@@ -90,20 +104,29 @@ export function useConnectivity() {
           });
         }
 
+        if (res.status === 401) {
+          handleUnauthorizedSession();
+          return false;
+        }
+
         const esExito = res.ok;
         let esIdempotenteEnCurso = false;
         let esConflictoTerminal = false;
 
         if (res.status === 409) {
-          try {
-            const errJson = await res.clone().json();
-            const msg = typeof errJson?.message === 'string' ? errJson.message : '';
-            if (/EN_CURSO/i.test(msg)) {
-              esIdempotenteEnCurso = true;
-            } else {
+          if (accion.tipo === 'ACEPTAR_MISION') {
+            try {
+              const errJson = await res.clone().json();
+              const msg = typeof errJson?.message === 'string' ? errJson.message : '';
+              if (/EN_CURSO/i.test(msg)) {
+                esIdempotenteEnCurso = true;
+              } else {
+                esConflictoTerminal = true;
+              }
+            } catch {
               esConflictoTerminal = true;
             }
-          } catch {
+          } else {
             esConflictoTerminal = true;
           }
         }
@@ -119,25 +142,114 @@ export function useConnectivity() {
         const procesada =
           esExito || esIdempotenteEnCurso || esConflictoTerminal || esErrorIrrecuperable;
 
-        if (procesada && accion.tipo === 'ACTUALIZAR_TIPOLOGIA') {
+        if (accion.tipo === 'ACTUALIZAR_TIPOLOGIA') {
           const match = accion.url.match(/\/api\/incidentes\/([^/]+)\/tipologia/);
           const incidenteId = match?.[1];
+          const misionId =
+            typeof accion.payload?.misionId === 'string' && accion.payload.misionId
+              ? accion.payload.misionId
+              : undefined;
+
+          if (esExito) {
+            try {
+              let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+              if (!local && incidenteId) {
+                const todas = (await obtenerMisionesLocales()) || [];
+                local = todas.find((m) => m.incidenteId === incidenteId);
+              }
+              if (local) {
+                await guardarMisionLocal({
+                  ...local,
+                  sincronizacionPendiente: false,
+                  actualizadoEn: new Date().toISOString(),
+                });
+              }
+            } catch {
+              // Ignorar fallos de persistencia secundaria
+            }
+          } else if (esConflictoTerminal || esErrorIrrecuperable) {
+            try {
+              let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+              if (!local && incidenteId) {
+                const todas = (await obtenerMisionesLocales()) || [];
+                local = todas.find((m) => m.incidenteId === incidenteId);
+              }
+              const targetMisionId = local?.id || misionId;
+              if (local) {
+                const datosRestaurados = { ...(local.datosAdicionales || {}) };
+                delete datosRestaurados.tipologiaEvaluada;
+                delete datosRestaurados.tipoIncidenteId;
+                delete datosRestaurados.justificacionTipologia;
+                delete datosRestaurados.fechaEvaluacionTipologia;
+                delete datosRestaurados.esReclasificacion;
+
+                await guardarMisionLocal({
+                  ...local,
+                  sincronizacionPendiente: false,
+                  datosAdicionales: datosRestaurados,
+                  actualizadoEn: new Date().toISOString(),
+                });
+              }
+              if (typeof eliminarAccionOutbox === 'function') {
+                await eliminarAccionOutbox(accion.id);
+              }
+              if (targetMisionId) {
+                await obtenerDetalleMision(targetMisionId);
+              }
+            } catch {
+              // Ignorar fallos al refrescar estado real
+            }
+          }
+        }
+
+        if (accion.tipo === 'AJUSTAR_PRIORIDAD') {
+          const match = accion.url.match(/\/api\/incidentes\/([^/]+)\/prioridad/);
+          const incidenteId = match?.[1];
           const misionId = accion.payload?.misionId as string | undefined;
-          try {
-            let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
-            if (!local && incidenteId) {
-              const todas = await obtenerMisionesLocales();
-              local = todas.find((m) => m.incidenteId === incidenteId);
+          if (esExito || esConflictoTerminal || esErrorIrrecuperable) {
+            try {
+              let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+              if (!local && incidenteId) {
+                const todas = await obtenerMisionesLocales();
+                local = todas.find((m) => m.incidenteId === incidenteId);
+              }
+              if (local) {
+                let prioridadServidor = local.prioridad;
+                if (esExito) {
+                  try {
+                    const bodyJson = await res.clone().json();
+                    if (bodyJson?.data?.incidente?.prioridad) {
+                      prioridadServidor = bodyJson.data.incidente.prioridad;
+                    }
+                  } catch {
+                    // Ignorar si no hay JSON
+                  }
+                }
+                const reportesPrevios = Array.isArray(local.datosAdicionales?.reportesPrioridad)
+                  ? (local.datosAdicionales.reportesPrioridad as Array<Record<string, unknown>>).map(
+                      (rep) => ({
+                        ...rep,
+                        sincronizado: esExito ? true : rep.sincronizado,
+                      })
+                    )
+                  : local.datosAdicionales?.reportesPrioridad;
+
+                await guardarMisionLocal({
+                  ...local,
+                  prioridad: prioridadServidor,
+                  sincronizacionPendiente: false,
+                  actualizadoEn: new Date().toISOString(),
+                  datosAdicionales: {
+                    ...local.datosAdicionales,
+                    ...(reportesPrevios !== undefined
+                      ? { reportesPrioridad: reportesPrevios }
+                      : {}),
+                  },
+                });
+              }
+            } catch {
+              // Ignorar fallos de persistencia secundaria
             }
-            if (local) {
-              await guardarMisionLocal({
-                ...local,
-                sincronizacionPendiente: false,
-                actualizadoEn: new Date().toISOString(),
-              });
-            }
-          } catch {
-            // Ignorar fallos de persistencia secundaria
           }
         }
         if (accion.tipo === 'ACEPTAR_MISION') {
@@ -180,6 +292,9 @@ export function useConnectivity() {
                     sincronizacionPendiente: false,
                     actualizadoEn: new Date().toISOString(),
                   });
+                }
+                if (typeof eliminarAccionOutbox === 'function') {
+                  await eliminarAccionOutbox(accion.id);
                 }
                 await obtenerDetalleMision(misionId);
               } catch {
@@ -249,27 +364,6 @@ export function useConnectivity() {
             );
           }
         }
-        if (procesada && accion.tipo === 'AJUSTAR_PRIORIDAD') {
-          const misionId = accion.payload?.misionId as string | undefined;
-          const match = accion.url.match(/\/api\/incidentes\/([^/]+)\/prioridad/);
-          const incidenteId = match?.[1];
-          try {
-            let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
-            if (!local && incidenteId) {
-              const todas = await obtenerMisionesLocales();
-              local = todas.find((m) => m.incidenteId === incidenteId);
-            }
-            if (local) {
-              await guardarMisionLocal({
-                ...local,
-                sincronizacionPendiente: false,
-                actualizadoEn: new Date().toISOString(),
-              });
-            }
-          } catch {
-            // Ignorar fallos de persistencia secundaria
-          }
-        }
         if (procesada && accion.tipo === 'ENVIAR_REPORTE') {
           const match = accion.url.match(/\/api\/misiones\/([^/]+)\/reporte/);
           const misionId = match?.[1];
@@ -295,6 +389,7 @@ export function useConnectivity() {
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('sgrai:outbox-synced'));
+        window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
       }
     } catch (err) {
       console.warn('[OfflineQueue] Error durante la sincronización:', err);
