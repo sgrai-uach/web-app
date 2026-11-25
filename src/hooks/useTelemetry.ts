@@ -22,6 +22,32 @@ export type {
 };
 
 const INTERVALO_DEFAULT_MS = 30000; // 30 segundos (eficiencia de batería y sondeo controlado HU-70)
+const INTERVALO_MIN_MS = 1000;
+
+function esCoordenadaWGS84Valida(lat: number, lng: number): boolean {
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  );
+}
+
+function sanitizarRumbo(heading: number | null): number | null {
+  if (typeof heading === 'number' && Number.isFinite(heading) && heading >= 0 && heading <= 360) {
+    return heading;
+  }
+  return null;
+}
+
+function sanitizarNoNegativo(valor: number | null): number | null {
+  if (typeof valor === 'number' && Number.isFinite(valor) && valor >= 0) {
+    return valor;
+  }
+  return null;
+}
 
 /**
  * Hook para la captura y transmisión automática de telemetría GPS en segundo plano (HU-70).
@@ -42,7 +68,18 @@ export function useTelemetry({
   const [ultimaPosicion, setUltimaPosicion] = useState<TelemetriaPosicionPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const unidadIdLimpia = unidadId?.trim() || null;
+  const habilitada = Boolean(activa && unidadIdLimpia && tipoUnidad);
+  const intervaloSeguroMs =
+    typeof intervaloMs === 'number' &&
+    Number.isFinite(intervaloMs) &&
+    intervaloMs >= INTERVALO_MIN_MS
+      ? intervaloMs
+      : INTERVALO_DEFAULT_MS;
+
   const ultimaPosicionRef = useRef<TelemetriaPosicionPayload | null>(null);
+  const activoRef = useRef<boolean>(false);
+  const solicitudSeqRef = useRef<number>(0);
 
   useEffect(() => {
     ultimaPosicionRef.current = ultimaPosicion;
@@ -66,7 +103,7 @@ export function useTelemetry({
   }, [customSocket, token]);
 
   const capturarYEmitir = useCallback(() => {
-    if (!activa || !unidadId || !tipoUnidad) {
+    if (!habilitada || !unidadIdLimpia || !tipoUnidad) {
       setEstado('INACTIVO');
       return;
     }
@@ -88,26 +125,32 @@ export function useTelemetry({
       maximumAge: 30000,
     };
 
+    const seqActual = ++solicitudSeqRef.current;
+
     try {
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          if (!activoRef.current || seqActual !== solicitudSeqRef.current) {
+            return;
+          }
+
           const { latitude, longitude, heading, accuracy, speed } = position.coords;
 
-          if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          if (!esCoordenadaWGS84Valida(latitude, longitude)) {
             setEstado('ERROR_GPS');
-            setError('Coordenadas GPS no válidas.');
+            setError('Coordenadas GPS fuera de rango WGS84.');
             return;
           }
 
           const payload: TelemetriaPosicionPayload = {
-            unidadId,
+            unidadId: unidadIdLimpia,
             tipoUnidad,
             lat: latitude,
             lng: longitude,
             timestamp: new Date().toISOString(),
-            rumbo: typeof heading === 'number' && Number.isFinite(heading) ? heading : null,
-            precision: typeof accuracy === 'number' && Number.isFinite(accuracy) ? accuracy : null,
-            velocidad: typeof speed === 'number' && Number.isFinite(speed) ? speed : null,
+            rumbo: sanitizarRumbo(heading),
+            precision: sanitizarNoNegativo(accuracy),
+            velocidad: sanitizarNoNegativo(speed),
           };
 
           ultimaPosicionRef.current = payload;
@@ -121,6 +164,10 @@ export function useTelemetry({
           }
         },
         (geoError: GeolocationPositionError) => {
+          if (!activoRef.current || seqActual !== solicitudSeqRef.current) {
+            return;
+          }
+
           if (geoError.code === geoError.PERMISSION_DENIED) {
             setEstado('SIN_PERMISO');
             setError('Permiso de geolocalización denegado en el dispositivo.');
@@ -132,19 +179,22 @@ export function useTelemetry({
         opcionesGeo
       );
     } catch (err) {
+      if (!activoRef.current || seqActual !== solicitudSeqRef.current) {
+        return;
+      }
       setEstado('ERROR_GPS');
       setError(err instanceof Error ? err.message : 'Error inesperado al consultar GPS.');
     }
-  }, [activa, unidadId, tipoUnidad, resolveSocket]);
+  }, [habilitada, unidadIdLimpia, tipoUnidad, resolveSocket]);
 
   // Manejo de reconexión silenciosa del socket para retransmitir última posición
   useEffect(() => {
-    if (!activa) return;
+    if (!habilitada) return;
     const sock = resolveSocket();
     if (!sock) return;
 
     const handleConnect = () => {
-      if (ultimaPosicionRef.current) {
+      if (activoRef.current && ultimaPosicionRef.current) {
         sock.emit('telemetria:posicion', ultimaPosicionRef.current);
       }
     };
@@ -153,16 +203,18 @@ export function useTelemetry({
     return () => {
       sock.off('connect', handleConnect);
     };
-  }, [activa, resolveSocket]);
+  }, [habilitada, resolveSocket]);
 
   // Monitoreo proactivo de cambios en permisos de geolocalización del navegador
   useEffect(() => {
-    if (!activa) return;
+    if (!habilitada) return;
     if (typeof navigator === 'undefined' || !navigator.permissions?.query) return;
 
+    let cancelado = false;
     let permissionStatus: PermissionStatus | null = null;
 
     const handleStatusChange = () => {
+      if (cancelado || !activoRef.current) return;
       if (permissionStatus?.state === 'denied') {
         setEstado('SIN_PERMISO');
         setError('Permiso de ubicación denegado en el navegador.');
@@ -174,6 +226,7 @@ export function useTelemetry({
     navigator.permissions
       .query({ name: 'geolocation' as PermissionName })
       .then((status) => {
+        if (cancelado) return;
         permissionStatus = status;
         if (status.state === 'denied') {
           setEstado('SIN_PERMISO');
@@ -186,31 +239,41 @@ export function useTelemetry({
       });
 
     return () => {
+      cancelado = true;
       if (permissionStatus) {
         permissionStatus.removeEventListener('change', handleStatusChange);
       }
     };
-  }, [activa, capturarYEmitir]);
+  }, [habilitada, capturarYEmitir]);
 
   // Temporizador de emisión periódica en segundo plano
   useEffect(() => {
-    if (!activa || !unidadId || !tipoUnidad) {
+    if (!habilitada) {
+      activoRef.current = false;
+      solicitudSeqRef.current += 1;
+      ultimaPosicionRef.current = null;
       setEstado('INACTIVO');
+      setError(null);
       return;
     }
+
+    activoRef.current = true;
 
     // Primera captura inmediata al activarse la misión
     capturarYEmitir();
 
     const timerId = setInterval(() => {
       capturarYEmitir();
-    }, intervaloMs);
+    }, intervaloSeguroMs);
 
     return () => {
+      activoRef.current = false;
+      solicitudSeqRef.current += 1;
       clearInterval(timerId);
+      ultimaPosicionRef.current = null;
       setEstado('INACTIVO');
     };
-  }, [activa, unidadId, tipoUnidad, intervaloMs, capturarYEmitir]);
+  }, [habilitada, intervaloSeguroMs, capturarYEmitir]);
 
   const reintentar = useCallback(() => {
     capturarYEmitir();

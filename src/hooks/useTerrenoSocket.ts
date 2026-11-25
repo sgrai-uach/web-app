@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 import { useAuth } from '@/context/AuthContext';
 import {
-  establecerSocketTerreno,
-  getSocketUrl,
+  conectarSocketTerreno,
+  desconectarSocketTerreno,
 } from '@/lib/socket/terrenoSocket';
 
 /**
@@ -20,33 +20,28 @@ export function useTerrenoSocket(): void {
   useEffect(() => {
     if (!token || !usuario?.unidadId) {
       if (socketRef.current) {
-        socketRef.current.disconnect();
+        desconectarSocketTerreno(socketRef.current);
         socketRef.current = null;
-        establecerSocketTerreno(null);
       }
       return;
     }
-
-    const socketUrl = getSocketUrl();
 
     const roomName = esCuadrilla
       ? `cuadrilla:${usuario.unidadId}`
       : `patrulla:${usuario.unidadId}`;
 
-    const socket: Socket = io(socketUrl, {
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-      auth: { token },
-      autoConnect: true,
-    });
-
+    const socket: Socket = conectarSocketTerreno(token);
     socketRef.current = socket;
-    establecerSocketTerreno(socket);
 
-    socket.on('connect', () => {
+    const suscribirSalas = () => {
       socket.emit('join', roomName);
       socket.emit('unirse', roomName);
-    });
+    };
+
+    socket.on('connect', suscribirSalas);
+    if (socket.connected) {
+      suscribirSalas();
+    }
 
     interface DesactivacionPayload {
       id?: string;
@@ -65,13 +60,13 @@ export function useTerrenoSocket(): void {
     socket.on('cuadrilla:desactivada', manejarDesactivacion);
 
     return () => {
+      socket.off('connect', suscribirSalas);
       socket.off('patrulla:desactivada', manejarDesactivacion);
       socket.off('cuadrilla:desactivada', manejarDesactivacion);
       socket.emit('leave', roomName);
       socket.emit('salir', roomName);
-      socket.disconnect();
+      desconectarSocketTerreno(socket);
       socketRef.current = null;
-      establecerSocketTerreno(null);
     };
   }, [token, usuario?.unidadId, esCuadrilla, recargarSesion]);
 }
