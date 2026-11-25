@@ -60,7 +60,7 @@ En la cabecera de la misión activa se despliega un distintivo visual de estado:
 2. **GPS sin permiso (Advertencia no bloqueante):**
    - Distintivo ámbar (`--color-warning`) que advierte que el navegador denegó la geolocalización.
    - En la tarjeta principal se despliega un aviso informativo que no interrumpe el llenado de reportes ni la operativa de terreno:
-     > *"Ubicación GPS no autorizada: Para que el Centro de Mando visualice la unidad en el mapa en tiempo real, habilite el permiso de ubicación en los ajustes del navegador."*
+     > *"Ubicación GPS no autorizada: Para que el Centro de Mando visualice la unidad en el mapa en tiempo real, habilite el permiso de ubicación en los ajustes del navegador de su dispositivo móvil."*
    - Cuenta con el botón **"Reintentar"** para solicitar el permiso nuevamente sin recargar la pantalla.
 3. **Sin señal GPS (Falla satelital):**
    - Distintivo ámbar que indica búsqueda de cobertura satelital en zonas de cañones urbanos o bosques densos.
