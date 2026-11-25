@@ -105,14 +105,18 @@ describe('useTelemetry Hook (HU-70)', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
-    if (originalGeolocation !== undefined) {
+    if (originalGeolocation === undefined) {
+      delete (navigator as unknown as { geolocation?: Geolocation }).geolocation;
+    } else {
       Object.defineProperty(navigator, 'geolocation', {
         value: originalGeolocation,
         writable: true,
         configurable: true,
       });
     }
-    if (originalPermissions !== undefined) {
+    if (originalPermissions === undefined) {
+      delete (navigator as unknown as { permissions?: Permissions }).permissions;
+    } else {
       Object.defineProperty(navigator, 'permissions', {
         value: originalPermissions,
         writable: true,

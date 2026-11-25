@@ -104,7 +104,9 @@ describe('CuadrillaDetailPage — Telemetría GPS en faena activa (HU-70)', () =
 
   afterEach(() => {
     vi.restoreAllMocks();
-    if (originalGeolocation) {
+    if (originalGeolocation === undefined) {
+      delete (navigator as unknown as { geolocation?: Geolocation }).geolocation;
+    } else {
       Object.defineProperty(navigator, 'geolocation', {
         value: originalGeolocation,
         writable: true,

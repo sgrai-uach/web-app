@@ -4,6 +4,7 @@ import {
   formatearPrioridad,
   formatearTipologia,
   formatearFechaHora24h,
+  ordenarMisionesPorActualizacion,
 } from '../formatters';
 
 describe('formatters — Conversión de Enums a Lenguaje Natural', () => {
@@ -49,6 +50,34 @@ describe('formatters — Conversión de Enums a Lenguaje Natural', () => {
       expect(formatearTipologia('CAIDA_ARBOL')).toBe('Caída de árbol');
       expect(formatearTipologia('ANEGAMIENTO')).toBe('Anegamiento');
       expect(formatearTipologia('DESCONOCIDO_TIPO')).toBe('Desconocido tipo');
+    });
+
+    it('sanitiza prefijos técnicos como Verificación o Triage y sufijos de código', () => {
+      expect(formatearTipologia('Verificación: Anegamiento - INC-592395-562')).toBe('Anegamiento');
+      expect(formatearTipologia('Triage: Caída de árbol')).toBe('Caída de árbol');
+    });
+  });
+
+  describe('ordenarMisionesPorActualizacion', () => {
+    it('ordena las misiones colocando primero las actualizadas más recientemente', () => {
+      const lista = [
+        { id: '1', actualizadoEn: '2026-10-14T10:00:00Z' },
+        { id: '2', actualizadoEn: '2026-11-10T12:00:00Z' },
+        { id: '3', actualizadoEn: '2026-11-01T08:00:00Z' },
+      ];
+
+      const ordenadas = ordenarMisionesPorActualizacion(lista);
+      expect(ordenadas.map((m) => m.id)).toEqual(['2', '3', '1']);
+    });
+
+    it('recurre a fechaDespacho o creadoEn si actualizadoEn está ausente', () => {
+      const lista = [
+        { id: '1', fechaDespacho: '2026-10-01T00:00:00Z' },
+        { id: '2', creadoEn: '2026-11-05T00:00:00Z' },
+      ];
+
+      const ordenadas = ordenarMisionesPorActualizacion(lista);
+      expect(ordenadas.map((m) => m.id)).toEqual(['2', '1']);
     });
   });
 

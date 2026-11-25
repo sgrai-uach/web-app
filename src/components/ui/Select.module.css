@@ -19,8 +19,9 @@
 
 .select {
   width: 100%;
-  min-height: 44px;
-  padding: 10px 14px;
+  min-height: 48px;
+  padding: 12px 14px;
+  line-height: 1.4;
   background-color: var(--color-white, #FFFFFF);
   color: var(--color-text-dark, #2B2B2B);
   border: 1px solid var(--border-color-dark, #3B3F45);

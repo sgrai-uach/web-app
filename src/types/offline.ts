@@ -1,4 +1,4 @@
-import type { paths } from '@/types/api-generated';
+import type { components, paths } from '@/types/api-generated';
 
 /**
  * Tipos para persistencia local e IndexedDB (Offline-First)
@@ -13,7 +13,8 @@ export type AccionOutboxTipo =
   | 'ENVIAR_REPORTE'
   | 'SUBIR_EVIDENCIA'
   | 'SOLICITAR_APOYO'
-  | 'CERRAR_FAENA';
+  | 'CERRAR_FAENA'
+  | 'ACK_NOTIFICACION';
 
 /**
  * Payload validado contra el contrato OpenAPI generado antes de encolarse en IndexedDB (GEMINI.md §5.3).
@@ -57,3 +58,72 @@ export interface CatalogoLocal {
   datos: unknown[];
   actualizadoEn: string;
 }
+
+export type TipoIncidenteCatalogoItem = components['schemas']['TipoIncidenteCatalogoItem'];
+
+export type ReclasificarTipologiaPayload = NonNullable<
+  paths['/api/incidentes/{id}/tipologia']['patch']['requestBody']
+>['content']['application/json'];
+
+export type PrioridadIncidente = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA';
+
+export type NivelCompromisoVivienda =
+  | 'SIN_DANO'
+  | 'LEVE'
+  | 'MODERADO'
+  | 'GRAVE_INHABITABLE';
+
+export interface FamiliaAfectadaItem {
+  id: string;
+  referencia?: string; // Ej: "Familia Pérez", "Casa 2", "Depto 201"
+  nucleoFamiliarTotal: number;
+  cantidadNinos: number;
+  cantidadAdultosMayores: number;
+  personasDiscapacitadas: number;
+  personasElectrodependientes: number;
+  mascotasAfectadas: number;
+  nivelCompromisoVivienda: NivelCompromisoVivienda;
+  requiereAsistenciaSocial: boolean;
+}
+
+export interface EvaluacionTerrenoPrioridadForm {
+  familias: FamiliaAfectadaItem[];
+  nucleoFamiliarTotal: number;
+  cantidadNinos: number;
+  cantidadAdultosMayores: number;
+  personasDiscapacitadas: number;
+  personasElectrodependientes: number;
+  mascotasAfectadas: number;
+  viviendasAfectadas: number;
+  nivelCompromisoVivienda: NivelCompromisoVivienda;
+  riesgoElectrico: boolean;
+  riesgoEstructural: boolean;
+  riesgoQuimicoSanitario: boolean;
+  aislamientoVial: boolean;
+  requiereEvacuacion: boolean;
+  requiereAsistenciaSocial: boolean;
+  requiereApoyoAdicional: boolean;
+  detallesAdicionales: string;
+}
+
+export interface ReportePrioridadTerrenoLocal {
+  id?: string;
+  versionReporte: number;
+  evaluacion: EvaluacionTerrenoPrioridadForm;
+  prioridadSugerida: PrioridadIncidente;
+  prioridadAsignada: PrioridadIncidente;
+  factoresGatillantes: string[];
+  justificacionPrioridad: string;
+  creadoEn: string;
+  sincronizado: boolean;
+}
+
+export type CalcularPrioridadPayload = NonNullable<
+  paths['/api/incidentes/{id}/prioridad/calcular']['post']['requestBody']
+>['content']['application/json'];
+
+export type AsignarPrioridadPayload = NonNullable<
+  paths['/api/incidentes/{id}/prioridad']['patch']['requestBody']
+>['content']['application/json'];
+
+

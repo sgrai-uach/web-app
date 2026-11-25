@@ -8,24 +8,36 @@ import {
   Calendar,
   Archive,
   Map,
+  Tag,
   CheckCircle,
+  CheckCircle2,
+  XCircle,
   Navigation,
   ClipboardCheck,
   WifiOff,
+  AlertCircle,
+  ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
+import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
+import { SeccionDesplegable } from '@/components/ui/SeccionDesplegable';
+import { EvaluacionTipologiaCard } from '@/components/misiones/EvaluacionTipologiaCard';
+import { EvaluacionPrioridadCard } from '@/components/misiones/EvaluacionPrioridadCard';
+import { RechazoMisionModal, type CoordenadasGPS } from '@/components/misiones/RechazoMisionModal';
 import {
   obtenerDetalleMision,
   aceptarMisionPatrulla,
+  rechazarMision,
 } from '@/services/misionesService';
-import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
+import { formatearPrioridad, formatearFechaHora24h, formatearTipologia } from '@/lib/utils/formatters';
 import { useTelemetry } from '@/hooks/useTelemetry';
 import {
   TelemetryStatusBadge,
@@ -39,7 +51,8 @@ interface PageProps {
 }
 
 export default function PatrullaMisionDetailPage({ params }: PageProps) {
-  const { id: misionId } = use(params);
+  const resolvedParams = use(params);
+  const misionId = resolvedParams?.id;
   const {
     usuario,
     esPatrulla,
@@ -55,6 +68,13 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
   const [errorAceptacion, setErrorAceptacion] = useState<string | null>(null);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
+  const [seccionCategorizacionAbierta, setSeccionCategorizacionAbierta] = useState<boolean>(true);
+  const [seccionPrioridadAbierta, setSeccionPrioridadAbierta] = useState<boolean>(false);
+  const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
+  const [feedbackMensaje, setFeedbackMensaje] = useState<{
+    tipo: 'success' | 'offline';
+    texto: string;
+  } | null>(null);
 
   const cargarDetalle = useCallback(async () => {
     setCargando(true);
@@ -62,6 +82,17 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       const encontrada = await obtenerDetalleMision(misionId);
       if (encontrada) {
         setMision(encontrada);
+        const reportesCount = Array.isArray(encontrada.datosAdicionales?.reportesPrioridad)
+          ? encontrada.datosAdicionales.reportesPrioridad.length
+          : Array.isArray(encontrada.datosAdicionales?.reportesTerreno)
+            ? encontrada.datosAdicionales.reportesTerreno.length
+            : 0;
+        const tipologiaYaEvaluada = Boolean(encontrada.datosAdicionales?.tipologiaEvaluada);
+        const prioridadYaEvaluada =
+          Boolean(encontrada.datosAdicionales?.prioridadEvaluada) || reportesCount > 0;
+
+        setSeccionCategorizacionAbierta(!tipologiaYaEvaluada);
+        setSeccionPrioridadAbierta(tipologiaYaEvaluada && !prioridadYaEvaluada);
       } else {
         setMision(null);
       }
@@ -123,7 +154,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     activa: misionActiva,
   });
 
-  if (cargando || !mision) {
+  if (cargando) {
     return (
       <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
         Cargando misión...
@@ -131,12 +162,57 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     );
   }
 
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
+  if (!mision) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.topBar}>
+          <Link href="/patrulla/misiones" className={styles.backLink}>
+            <ArrowLeft size={16} aria-hidden="true" />
+            <span>Misiones</span>
+          </Link>
+          <ConnectionStatusBadge
+            status={status}
+            pendingCount={pendientes}
+            onRetry={sincronizar}
+          />
+        </div>
+        <div
+          style={{
+            backgroundColor: 'var(--color-white)',
+            border: '1px solid var(--color-border)',
+            padding: 'var(--space-6)',
+            textAlign: 'center',
+          }}
+          role="alert"
+        >
+          <p style={{ fontWeight: 700, margin: '0 0 var(--space-2) 0' }}>
+            Misión no encontrada
+          </p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: 0 }}>
+            La misión solicitada no existe o no se encuentra asignada a su unidad operativa, o no
+            está disponible en caché local.
+          </p>
+          <Link
+            href="/patrulla/misiones"
+            style={{
+              display: 'inline-block',
+              marginTop: 'var(--space-4)',
+              padding: 'var(--space-2) var(--space-4)',
+              background: 'var(--color-primary-teal)',
+              color: 'var(--color-white)',
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              borderRadius: 0,
+              minHeight: '48px',
+              lineHeight: '48px',
+            }}
+          >
+            Volver a la bandeja
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   const tienePermisoVerificar =
@@ -153,7 +229,63 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     !unidadActiva ||
     estadoNormalizado === 'FINALIZADA' ||
     estadoNormalizado === 'COMPLETADA' ||
-    estadoNormalizado === 'CERRADA';
+    estadoNormalizado === 'CERRADA' ||
+    estadoNormalizado === 'RECHAZADA';
+
+  const esRechazable =
+    unidadActiva &&
+    esPatrulla &&
+    tienePermisoVerificar &&
+    (estadoNormalizado === 'DESPACHADA' ||
+      estadoNormalizado === 'ASIGNADA' ||
+      estadoNormalizado === 'PENDIENTE');
+
+  const handleConfirmarRechazo = async (
+    motivo: string,
+    coordenadas?: CoordenadasGPS
+  ) => {
+    try {
+      const res = await rechazarMision(mision.id, {
+        justificacion_rechazo: motivo,
+        latitud: coordenadas?.lat,
+        longitud: coordenadas?.lng,
+      });
+
+      setMision((prev) =>
+        prev
+          ? {
+              ...prev,
+              estado: 'RECHAZADA',
+              sincronizacionPendiente: Boolean(res.modoOffline),
+              actualizadoEn: res.mision?.actualizadoEn || new Date().toISOString(),
+              datosAdicionales: {
+                ...prev.datosAdicionales,
+                justificacionRechazo: motivo,
+              },
+            }
+          : prev
+      );
+
+      setModalRechazoAbierto(false);
+      await actualizarPendientes();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
+      }
+      setFeedbackMensaje({
+        tipo: res.modoOffline ? 'offline' : 'success',
+        texto: res.mensaje,
+      });
+    } catch (err) {
+      setModalRechazoAbierto(false);
+      setFeedbackMensaje({
+        tipo: 'offline',
+        texto:
+          err instanceof Error
+            ? err.message
+            : 'No se pudo registrar el rechazo de la misión.',
+      });
+    }
+  };
 
   return (
     <div className={styles.container}>
@@ -181,15 +313,53 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         />
       ) : null}
 
+      {feedbackMensaje && (
+        <div
+          className={`${styles.feedbackBanner} ${
+            feedbackMensaje.tipo === 'offline'
+              ? styles.feedbackOffline
+              : styles.feedbackSuccess
+          }`}
+          role="status"
+        >
+          {feedbackMensaje.tipo === 'offline' ? (
+            <AlertCircle size={18} aria-hidden="true" />
+          ) : (
+            <CheckCircle size={18} aria-hidden="true" />
+          )}
+          <span>{feedbackMensaje.texto}</span>
+        </div>
+      )}
+
+      {estadoNormalizado === 'RECHAZADA' && (
+        <div className={styles.rejectedBanner} role="status">
+          <div className={styles.rejectedHeader}>
+            <XCircle size={18} aria-hidden="true" />
+            <span>Misión Rechazada por Patrulla Verificadora</span>
+          </div>
+          {Boolean(mision.datosAdicionales?.justificacionRechazo) && (
+            <p className={styles.rejectedReason}>
+              <strong>Motivo documentado:</strong>{' '}
+              {String(mision.datosAdicionales?.justificacionRechazo)}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
           <div className={styles.codeArea}>
+            <AlertCircle
+              size={20}
+              color="var(--color-primary-teal, #1B6F7D)"
+              aria-hidden="true"
+            />
             <span className={styles.code}>{mision.codigoIncidente}</span>
-            <span className={`${styles.priorityChip} ${prioridadClase}`}>
+            <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
               {formatearPrioridad(mision.prioridad)}
-            </span>
+            </Chip>
           </div>
-          <EstadoBadge estado={mision.estado} />
+          <EstadoBadge estado={mision.estado} size="md" />
         </div>
 
         <div className={styles.detailGrid}>
@@ -197,7 +367,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
           <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Tipo</span>
             <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
-              {mision.tipologia}
+              {formatearTipologia(mision.tipologia)}
             </span>
           </div>
 
@@ -249,17 +419,15 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Acción principal: Confirmar y Aceptar Misión (HU-36) */}
-      {mostrarBotonAceptar && (
+      {/* Acciones Operativas de Despacho (H36 / H69) */}
+      {(mostrarBotonAceptar || esRechazable) && (
         <section
-          className={styles.acceptCard}
-          aria-label="Confirmación de salida de patrulla"
+          className={styles.dispatchActionsCard}
+          aria-label="Acciones operativas de despacho"
         >
-          <h2 className={styles.acceptTitle}>Confirmación de salida a terreno</h2>
-          <p className={styles.acceptDescription}>
-            Presione el botón para informar al Centro de Mando que la patrulla ha
-            tomado conocimiento de la emergencia y se dirige al lugar para iniciar
-            la evaluación.
+          <h2 className={styles.dispatchActionsTitle}>Acciones de Despacho</h2>
+          <p className={styles.dispatchActionsDesc}>
+            Confirme la salida a terreno para evaluar o fundamente el rechazo si no es posible concurrir.
           </p>
 
           {errorAceptacion && (
@@ -268,21 +436,38 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             </div>
           )}
 
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={aceptando}
-            icon={<CheckCircle size={20} />}
-            onClick={handleAceptarMision}
-            className={styles.acceptButton}
-          >
-            Aceptar Misión
-          </Button>
+          <div className={styles.dispatchButtonsGroup}>
+            {mostrarBotonAceptar && (
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={aceptando}
+                icon={<CheckCircle size={20} />}
+                onClick={handleAceptarMision}
+                className={styles.acceptButton}
+              >
+                Aceptar Misión
+              </Button>
+            )}
+
+            {esRechazable && (
+              <Button
+                variant="destructive"
+                size="md"
+                fullWidth
+                icon={<XCircle size={18} />}
+                onClick={() => setModalRechazoAbierto(true)}
+                disabled={aceptando}
+              >
+                Rechazar Misión
+              </Button>
+            )}
+          </div>
         </section>
       )}
 
-      {/* Vista activa: En Trayecto / Evaluación (HU-36) */}
+{/* Vista activa: En Trayecto / Evaluación (HU-36) */}
       {unidadActiva && esEnCurso && (
         <>
           <section
@@ -293,7 +478,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               <div className={styles.enTrayectoTitleRow}>
                 <Navigation
                   size={20}
-                  color="var(--color-primary-teal)"
+                  color="var(--color-primary-teal, #1B6F7D)"
                   aria-hidden="true"
                 />
                 <h2 className={styles.enTrayectoTitle}>
@@ -305,44 +490,48 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                   estado={estadoTelemetria}
                   onRetry={reintentarTelemetria}
                 />
-                <span className={styles.activeStatusChip}>Misión activa</span>
+                <Chip variant="success" size="sm">
+                  Misión activa
+                </Chip>
               </div>
             </div>
 
-            <TelemetryWarningBanner
-              estado={estadoTelemetria}
-              onRetry={reintentarTelemetria}
-            />
+            <div className={styles.enTrayectoContent}>
+              <TelemetryWarningBanner
+                estado={estadoTelemetria}
+                onRetry={reintentarTelemetria}
+              />
 
-            {mision.sincronizacionPendiente ? (
-              <div className={styles.offlineQueueBanner} role="status">
-                <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
-                <span>
-                  Pendiente de sincronizar: La aceptación fue guardada en la cola
-                  local del dispositivo y se enviará automáticamente al recuperar
-                  conexión.
-                </span>
-              </div>
-            ) : (
-              mensajeConfirmacion && (
-                <div className={styles.SyncedBanner} role="status">
-                  {mensajeConfirmacion}
+              {mision.sincronizacionPendiente ? (
+                <div className={styles.offlineQueueBanner} role="status">
+                  <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+                  <span>
+                    Pendiente de sincronizar: Los cambios de esta misión fueron guardados
+                    en la cola local del dispositivo y se enviarán automáticamente al
+                    recuperar conexión.
+                  </span>
                 </div>
-              )
-            )}
+              ) : (
+                mensajeConfirmacion && (
+                  <div className={styles.SyncedBanner} role="status">
+                    {mensajeConfirmacion}
+                  </div>
+                )
+              )}
 
-            <div className={styles.canonicalStatesGrid}>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Misión</span>
-                <span className={styles.canonicalStateValue}>En curso</span>
-              </div>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Patrulla</span>
-                <span className={styles.canonicalStateValue}>En verificación</span>
-              </div>
-              <div className={styles.canonicalStateItem}>
-                <span className={styles.canonicalStateLabel}>Incidente</span>
-                <span className={styles.canonicalStateValue}>Verificando</span>
+              <div className={styles.canonicalStatesGrid}>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Misión</span>
+                  <span className={styles.canonicalStateValue}>En curso</span>
+                </div>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Patrulla</span>
+                  <span className={styles.canonicalStateValue}>En verificación</span>
+                </div>
+                <div className={styles.canonicalStateItem}>
+                  <span className={styles.canonicalStateLabel}>Incidente</span>
+                  <span className={styles.canonicalStateValue}>Verificando</span>
+                </div>
               </div>
             </div>
           </section>
@@ -355,19 +544,126 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             <div className={styles.evaluationHeader}>
               <h3 className={styles.evaluationTitle}>
                 <ClipboardCheck
-                  size={18}
-                  color="var(--color-primary-teal)"
+                  size={20}
+                  color="var(--color-primary-teal, #1B6F7D)"
                   aria-hidden="true"
                 />
                 <span>Formularios de Reporte Técnico</span>
               </h3>
-              <span className={styles.activeStatusChip}>Habilitado</span>
             </div>
-            <p className={styles.evaluationBody}>
-              La unidad se encuentra en trayecto / evaluación. Los formularios
-              operativos para categorizar el incidente, ajustar la prioridad y
-              enviar el reporte de situación están habilitados.
-            </p>
+
+            <div className={styles.evaluationContent}>
+              {(() => {
+                const reportesPrioridadCount = Array.isArray(
+                  mision.datosAdicionales?.reportesPrioridad
+                )
+                  ? mision.datosAdicionales.reportesPrioridad.length
+                  : Array.isArray(mision.datosAdicionales?.reportesTerreno)
+                    ? mision.datosAdicionales.reportesTerreno.length
+                    : 0;
+                const tipologiaCompletada = Boolean(
+                  mision.datosAdicionales?.tipologiaEvaluada
+                );
+                const prioridadCompletada =
+                  Boolean(mision.datosAdicionales?.prioridadEvaluada) ||
+                  reportesPrioridadCount > 0;
+                const versionPrioridad =
+                  typeof mision.datosAdicionales?.versionReportePrioridad === 'number'
+                    ? mision.datosAdicionales.versionReportePrioridad
+                    : reportesPrioridadCount > 0
+                      ? reportesPrioridadCount
+                      : undefined;
+
+                return (
+                  <>
+                    <SeccionDesplegable
+                      titulo="Categorización del incidente"
+                      icono={<Tag size={18} />}
+                      abierto={seccionCategorizacionAbierta}
+                      onToggle={(abierto) => setSeccionCategorizacionAbierta(abierto)}
+                      indicador={
+                        tipologiaCompletada ? (
+                          <Chip
+                            variant="success"
+                            size="sm"
+                            icon={<CheckCircle2 size={12} />}
+                          >
+                            Completado
+                          </Chip>
+                        ) : mision.sincronizacionPendiente ? (
+                          <Chip variant="warning" size="sm">
+                            Pendiente
+                          </Chip>
+                        ) : null
+                      }
+                    >
+                      {!tienePermisoVerificar && (
+                        <div
+                          className={styles.permissionWarning}
+                          role="note"
+                          style={{ marginBottom: '12px' }}
+                        >
+                          Su perfil no cuenta con el permiso misiones:terreno:verificar para
+                          categorizar incidentes.
+                        </div>
+                      )}
+                      <EvaluacionTipologiaCard
+                        incidenteId={mision.incidenteId}
+                        misionActual={mision}
+                        deshabilitado={!tienePermisoVerificar}
+                        onTipologiaActualizada={(resultado) => {
+                          if (resultado.mision) {
+                            setMision(resultado.mision);
+                          }
+                          setSeccionCategorizacionAbierta(false);
+                          if (!prioridadCompletada) {
+                            setSeccionPrioridadAbierta(true);
+                          }
+                        }}
+                      />
+                    </SeccionDesplegable>
+
+                    <SeccionDesplegable
+                      titulo="Evaluación en terreno y prioridad"
+                      icono={<ShieldAlert size={18} />}
+                      abierto={seccionPrioridadAbierta}
+                      onToggle={(abierto) => setSeccionPrioridadAbierta(abierto)}
+                      indicador={
+                        prioridadCompletada ? (
+                          <Chip
+                            variant="success"
+                            size="sm"
+                            icon={<CheckCircle2 size={12} />}
+                          >
+                            Completado
+                            {typeof versionPrioridad === 'number'
+                              ? ` (#${versionPrioridad})`
+                              : ''}
+                          </Chip>
+                        ) : mision.sincronizacionPendiente ? (
+                          <Chip variant="warning" size="sm">
+                            Pendiente
+                          </Chip>
+                        ) : null
+                      }
+                    >
+                      <EvaluacionPrioridadCard
+                        incidenteId={mision.incidenteId}
+                        misionActual={mision}
+                        deshabilitado={!tienePermisoVerificar}
+                        onPrioridadActualizada={(resultado) => {
+                          if (resultado.mision) {
+                            setMision(resultado.mision);
+                          }
+                          setSeccionPrioridadAbierta(false);
+                          void actualizarPendientes();
+                        }}
+                      />
+                    </SeccionDesplegable>
+                  </>
+                );
+              })()}
+            </div>
           </section>
         </>
       )}
@@ -395,6 +691,13 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
         longitud={mision.coordenadas?.lng}
         titulo={mision.tipologia || mision.codigoIncidente}
         direccion={mision.direccion}
+      />
+
+      <RechazoMisionModal
+        abierto={modalRechazoAbierto}
+        codigoMision={mision.codigoIncidente}
+        alConfirmar={handleConfirmarRechazo}
+        alCancelar={() => setModalRechazoAbierto(false)}
       />
     </div>
   );
