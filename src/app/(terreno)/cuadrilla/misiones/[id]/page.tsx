@@ -27,6 +27,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   const { id: misionId } = use(params);
   const {
     usuario,
+    esCuadrilla,
     unidadActiva,
     tieneUnidadAsignada,
     estadoAsignacion,
@@ -59,11 +60,11 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     estadoNormalizado === 'EN_CURSO' ||
     estadoNormalizado === 'EN_RUTA' ||
     estadoNormalizado === 'EN_TERRENO';
-  const misionActiva = Boolean(unidadActiva && esEnCurso);
+  const misionActiva = Boolean(unidadActiva && esEnCurso && esCuadrilla);
 
   const { estado: estadoTelemetria, reintentar: reintentarTelemetria } = useTelemetry({
     unidadId: usuario?.unidadId ?? null,
-    tipoUnidad: 'CUADRILLA',
+    tipoUnidad: esCuadrilla ? 'CUADRILLA' : null,
     activa: misionActiva,
   });
 

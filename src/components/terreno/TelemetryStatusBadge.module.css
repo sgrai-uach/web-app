@@ -60,7 +60,7 @@
 .inactivo {
   background-color: var(--color-bg-light, #ECEFF3);
   color: var(--color-text-muted, #5F676E);
-  border-color: #D2D6DC;
+  border-color: var(--border-color-neutral, #DFE3E8);
 }
 
 .inactivo .dot {
@@ -69,6 +69,9 @@
 
 .clickable {
   cursor: pointer;
+  min-height: var(--touch-target-min, 48px);
+  padding: 0 var(--space-3, 12px);
+  appearance: none;
 }
 
 .clickable:hover {
@@ -109,6 +112,7 @@
   line-height: 1.4;
   margin-top: var(--space-3, 12px);
   margin-bottom: var(--space-3, 12px);
+  flex-wrap: wrap;
 }
 
 .warningIcon {
@@ -118,6 +122,7 @@
 
 .warningContent {
   flex: 1;
+  min-width: 180px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -138,12 +143,12 @@
   border: 1px solid var(--color-warning, #E65100);
   color: var(--color-warning, #E65100);
   border-radius: var(--radius-none, 0px);
-  padding: 6px 12px;
+  padding: 0 var(--space-4, 16px);
   font-size: var(--font-size-xs, 12px);
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  min-height: 36px;
+  min-height: var(--touch-target-min, 48px);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -154,3 +159,7 @@
   background-color: var(--color-warning-bg, #FFF3E0);
 }
 
+.retryButton:focus-visible {
+  outline: 2px solid var(--color-primary-teal, #1B6F7D);
+  outline-offset: 2px;
+}

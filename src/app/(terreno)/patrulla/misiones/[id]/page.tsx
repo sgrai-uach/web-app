@@ -42,6 +42,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const { id: misionId } = use(params);
   const {
     usuario,
+    esPatrulla,
     unidadActiva,
     tieneUnidadAsignada,
     estadoAsignacion,
@@ -115,10 +116,10 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     estadoNormalizado === 'EN_RUTA' ||
     estadoNormalizado === 'EN_TERRENO';
 
-  const misionActiva = Boolean(unidadActiva && esEnCurso);
+  const misionActiva = Boolean(unidadActiva && esEnCurso && esPatrulla);
   const { estado: estadoTelemetria, reintentar: reintentarTelemetria } = useTelemetry({
     unidadId: usuario?.unidadId ?? null,
-    tipoUnidad: 'PATRULLA',
+    tipoUnidad: esPatrulla ? 'PATRULLA' : null,
     activa: misionActiva,
   });
 

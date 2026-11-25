@@ -15,7 +15,7 @@ export interface TelemetryStatusBadgeProps {
 
 /**
  * Indicador visual sutil no intrusivo del estado de transmisión de telemetría GPS (HU-70).
- * Diseñado bajo Flat UI y esquinas rectas institucionales.
+ * Diseñado bajo Flat UI, esquinas rectas institucionales y ergonomía táctil mínima de 48px.
  */
 export function TelemetryStatusBadge({
   estado,
@@ -52,27 +52,32 @@ export function TelemetryStatusBadge({
 
   const esClickeable = Boolean(onRetry && (estado === 'SIN_PERMISO' || estado === 'ERROR_GPS'));
 
+  if (esClickeable) {
+    return (
+      <button
+        type="button"
+        className={`${styles.badge} ${statusClass} ${styles.clickable} ${className}`.trim()}
+        title={tooltip}
+        aria-label={`${label}. ${tooltip}`}
+        onClick={onRetry}
+        style={style}
+      >
+        <span className={styles.dot} aria-hidden="true" />
+        <Icon size={13} aria-hidden="true" style={{ flexShrink: 0 }} />
+        <span className={styles.label}>{label}</span>
+      </button>
+    );
+  }
+
   return (
     <div
-      className={`${styles.badge} ${statusClass} ${esClickeable ? styles.clickable : ''} ${className}`.trim()}
+      className={`${styles.badge} ${statusClass} ${className}`.trim()}
       title={tooltip}
       role="status"
       aria-live="polite"
-      onClick={esClickeable ? onRetry : undefined}
-      onKeyDown={
-        esClickeable
-          ? (e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onRetry?.();
-              }
-            }
-          : undefined
-      }
-      tabIndex={esClickeable ? 0 : undefined}
       style={style}
     >
-      <span className={`${styles.dot}`} aria-hidden="true" />
+      <span className={styles.dot} aria-hidden="true" />
       <Icon size={13} aria-hidden="true" style={{ flexShrink: 0 }} />
       <span className={styles.label}>{label}</span>
     </div>
@@ -122,4 +127,3 @@ export function TelemetryWarningBanner({
 }
 
 export default TelemetryStatusBadge;
-
