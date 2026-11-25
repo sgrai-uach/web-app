@@ -37,6 +37,7 @@ describe('useTelemetry Hook (HU-70)', () => {
   let mockSocket: MockSocket;
   let mockGetCurrentPosition: ReturnType<typeof vi.fn>;
   let originalGeolocation: Geolocation | undefined;
+  let originalPermissions: Permissions | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -89,6 +90,7 @@ describe('useTelemetry Hook (HU-70)', () => {
     });
 
     originalGeolocation = navigator.geolocation;
+    originalPermissions = navigator.permissions;
     Object.defineProperty(navigator, 'geolocation', {
       value: {
         getCurrentPosition: mockGetCurrentPosition,
@@ -102,9 +104,17 @@ describe('useTelemetry Hook (HU-70)', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    if (originalGeolocation) {
+    vi.useRealTimers();
+    if (originalGeolocation !== undefined) {
       Object.defineProperty(navigator, 'geolocation', {
         value: originalGeolocation,
+        writable: true,
+        configurable: true,
+      });
+    }
+    if (originalPermissions !== undefined) {
+      Object.defineProperty(navigator, 'permissions', {
+        value: originalPermissions,
         writable: true,
         configurable: true,
       });
@@ -128,8 +138,8 @@ describe('useTelemetry Hook (HU-70)', () => {
     expect(mockSocket.emit).not.toHaveBeenCalled();
   });
 
-  it('no inicia captura si falta unidadId o tipoUnidad aunque activa sea true', () => {
-    const { result } = renderHook(() =>
+  it('no inicia captura si falta unidadId, es solo espacios o falta tipoUnidad aunque activa sea true', () => {
+    const { result: resNull } = renderHook(() =>
       useTelemetry({
         unidadId: null,
         tipoUnidad: 'PATRULLA',
@@ -138,7 +148,19 @@ describe('useTelemetry Hook (HU-70)', () => {
       })
     );
 
-    expect(result.current.estado).toBe('INACTIVO');
+    expect(resNull.current.estado).toBe('INACTIVO');
+    expect(mockGetCurrentPosition).not.toHaveBeenCalled();
+
+    const { result: resBlank } = renderHook(() =>
+      useTelemetry({
+        unidadId: '   ',
+        tipoUnidad: 'PATRULLA',
+        activa: true,
+        socket: mockSocket as unknown as import('socket.io-client').Socket,
+      })
+    );
+
+    expect(resBlank.current.estado).toBe('INACTIVO');
     expect(mockGetCurrentPosition).not.toHaveBeenCalled();
   });
 
@@ -188,7 +210,7 @@ describe('useTelemetry Hook (HU-70)', () => {
     );
   });
 
-  it('emite periódicamente según el intervalo configurado', () => {
+  it('emite periódicamente según el intervalo configurado y aplica fallback seguro ante intervaloMs inválido', () => {
     vi.useFakeTimers();
 
     renderHook(() =>
@@ -196,7 +218,7 @@ describe('useTelemetry Hook (HU-70)', () => {
         unidadId: 'cuad-200',
         tipoUnidad: 'CUADRILLA',
         activa: true,
-        intervaloMs: 30000,
+        intervaloMs: 0, // Inválido: debe aplicar 30000 ms por defecto
         socket: mockSocket as unknown as import('socket.io-client').Socket,
       })
     );
@@ -204,7 +226,6 @@ describe('useTelemetry Hook (HU-70)', () => {
     expect(mockGetCurrentPosition).toHaveBeenCalledTimes(1);
     expect(mockSocket.emit).toHaveBeenCalledTimes(1);
 
-    // Avanzar 30 segundos
     act(() => {
       vi.advanceTimersByTime(30000);
     });
@@ -212,19 +233,21 @@ describe('useTelemetry Hook (HU-70)', () => {
     expect(mockGetCurrentPosition).toHaveBeenCalledTimes(2);
     expect(mockSocket.emit).toHaveBeenCalledTimes(2);
 
-    // Avanzar otros 30 segundos
     act(() => {
       vi.advanceTimersByTime(30000);
     });
 
     expect(mockGetCurrentPosition).toHaveBeenCalledTimes(3);
     expect(mockSocket.emit).toHaveBeenCalledTimes(3);
-
-    vi.useRealTimers();
   });
 
-  it('detiene la transmisión y limpia el temporizador al desactivarse la misión', () => {
+  it('detiene la transmisión, limpia el temporizador y descarta lecturas GPS asíncronas tardías al desactivarse', () => {
     vi.useFakeTimers();
+
+    let deferredSuccess: ((pos: GeolocationPosition) => void) | null = null;
+    mockGetCurrentPosition.mockImplementation((success) => {
+      deferredSuccess = success;
+    });
 
     let activa = true;
     const { rerender, result } = renderHook(() =>
@@ -237,24 +260,100 @@ describe('useTelemetry Hook (HU-70)', () => {
       })
     );
 
-    expect(result.current.estado).toBe('TRANSMITIENDO');
+    expect(mockGetCurrentPosition).toHaveBeenCalledTimes(1);
 
-    // Desactivar misión (ej. finalizada, rechazada o cancelada)
+    // Finalizar/desactivar misión antes de que el GPS resuelva
     activa = false;
     rerender();
 
     expect(result.current.estado).toBe('INACTIVO');
     expect(result.current.transmitiendo).toBe(false);
 
-    // Avanzar tiempo y verificar que no emite más
-    const countBefore = mockGetCurrentPosition.mock.calls.length;
+    // El sensor GPS resuelve tardíamente tras haber finalizado la misión
+    act(() => {
+      deferredSuccess?.({
+        coords: {
+          latitude: -39.8142,
+          longitude: -73.2459,
+          heading: 90,
+          accuracy: 5,
+          speed: 4,
+          altitude: null,
+          altitudeAccuracy: null,
+          toJSON: () => ({}),
+        },
+        timestamp: Date.now(),
+        toJSON: () => ({}),
+      });
+    });
+
+    // No debe emitir ni volver a TRANSMITIENDO
+    expect(mockSocket.emit).not.toHaveBeenCalled();
+    expect(result.current.estado).toBe('INACTIVO');
+
+    // Avanzar tiempo y confirmar ausencia de sondeos adicionales
     act(() => {
       vi.advanceTimersByTime(60000);
     });
+    expect(mockGetCurrentPosition).toHaveBeenCalledTimes(1);
+  });
 
-    expect(mockGetCurrentPosition.mock.calls.length).toBe(countBefore);
+  it('rechaza coordenadas fuera de rango WGS84 y sanea valores negativos o fuera de rango en rumbo, precisión y velocidad', () => {
+    mockGetCurrentPosition.mockImplementationOnce((success) => {
+      success({
+        coords: {
+          latitude: 95.5,
+          longitude: -73.2459,
+          heading: 180,
+          accuracy: 5,
+          speed: 10,
+        },
+        timestamp: Date.now(),
+      });
+    });
 
-    vi.useRealTimers();
+    const { result } = renderHook(() =>
+      useTelemetry({
+        unidadId: 'pat-100',
+        tipoUnidad: 'PATRULLA',
+        activa: true,
+        socket: mockSocket as unknown as import('socket.io-client').Socket,
+      })
+    );
+
+    expect(result.current.estado).toBe('ERROR_GPS');
+    expect(result.current.error).toContain('WGS84');
+    expect(mockSocket.emit).not.toHaveBeenCalled();
+
+    // Segunda lectura válida en WGS84 pero con heading/accuracy/speed inválidos del sensor móvil
+    mockGetCurrentPosition.mockImplementationOnce((success) => {
+      success({
+        coords: {
+          latitude: -39.8142,
+          longitude: -73.2459,
+          heading: 420,
+          accuracy: -3,
+          speed: -1,
+        },
+        timestamp: Date.now(),
+      });
+    });
+
+    act(() => {
+      result.current.reintentar();
+    });
+
+    expect(result.current.estado).toBe('TRANSMITIENDO');
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'telemetria:posicion',
+      expect.objectContaining({
+        lat: -39.8142,
+        lng: -73.2459,
+        rumbo: null,
+        precision: null,
+        velocidad: null,
+      })
+    );
   });
 
   it('cambia a estado SIN_PERMISO ante rechazo de geolocalización (PERMISSION_DENIED) de forma no bloqueante', () => {
@@ -283,8 +382,8 @@ describe('useTelemetry Hook (HU-70)', () => {
     expect(mockSocket.emit).not.toHaveBeenCalled();
   });
 
-  it('cambia a estado ERROR_GPS ante falla satelital (POSITION_UNAVAILABLE / TIMEOUT)', () => {
-    mockGetCurrentPosition.mockImplementation((_, error) => {
+  it('cambia a estado ERROR_GPS ante falla satelital (POSITION_UNAVAILABLE / TIMEOUT) o navegador sin geolocation', () => {
+    mockGetCurrentPosition.mockImplementationOnce((_, error) => {
       error({
         code: 2, // POSITION_UNAVAILABLE
         message: 'Position unavailable',
@@ -307,10 +406,22 @@ describe('useTelemetry Hook (HU-70)', () => {
     expect(result.current.transmitiendo).toBe(false);
     expect(result.current.error).toBe('Position unavailable');
     expect(mockSocket.emit).not.toHaveBeenCalled();
+
+    Object.defineProperty(navigator, 'geolocation', {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+
+    act(() => {
+      result.current.reintentar();
+    });
+
+    expect(result.current.estado).toBe('ERROR_GPS');
+    expect(result.current.error).toContain('no soportada');
   });
 
   it('tolera socket desconectado sin arrojar errores y retransmite al reconectarse', () => {
-    // Socket inicialmente desconectado
     const disconnectedSocket = createMockSocket(false);
 
     const { result } = renderHook(() =>
@@ -322,18 +433,15 @@ describe('useTelemetry Hook (HU-70)', () => {
       })
     );
 
-    // Coordenadas se capturan correctamente aunque no se emitan por estar offline
     expect(result.current.estado).toBe('TRANSMITIENDO');
     expect(result.current.ultimaPosicion).not.toBeNull();
     expect(disconnectedSocket.emit).not.toHaveBeenCalled();
 
-    // Reconectar socket (ej: recupera señal 4G)
     act(() => {
       disconnectedSocket.connected = true;
       disconnectedSocket.triggerConnect();
     });
 
-    // Debe retransmitir la última posición capturada inmediatamente
     expect(disconnectedSocket.emit).toHaveBeenCalledWith(
       'telemetria:posicion',
       expect.objectContaining({
@@ -341,6 +449,50 @@ describe('useTelemetry Hook (HU-70)', () => {
         tipoUnidad: 'PATRULLA',
       })
     );
+  });
+
+  it('monitorea cambios de navigator.permissions y evita fugas de listeners al desmontar antes de resolver', async () => {
+    let resolveQuery: ((status: PermissionStatus) => void) | null = null;
+    const addEventListenerMock = vi.fn();
+    const removeEventListenerMock = vi.fn();
+
+    Object.defineProperty(navigator, 'permissions', {
+      value: {
+        query: vi.fn(
+          () =>
+            new Promise<PermissionStatus>((resolve) => {
+              resolveQuery = resolve;
+            })
+        ),
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    const { unmount } = renderHook(() =>
+      useTelemetry({
+        unidadId: 'pat-100',
+        tipoUnidad: 'PATRULLA',
+        activa: true,
+        socket: mockSocket as unknown as import('socket.io-client').Socket,
+      })
+    );
+
+    // Desmontar antes de que resuelva permissions.query
+    unmount();
+
+    await act(async () => {
+      resolveQuery?.({
+        state: 'denied',
+        name: 'geolocation',
+        onchange: null,
+        addEventListener: addEventListenerMock,
+        removeEventListener: removeEventListenerMock,
+        dispatchEvent: vi.fn(),
+      } as unknown as PermissionStatus);
+    });
+
+    expect(addEventListenerMock).not.toHaveBeenCalled();
   });
 
   it('soporta reintento manual mediante la función reintentar()', () => {

@@ -29,9 +29,11 @@ function configurarAuthCuadrillaMock(opciones?: {
   unidadActiva?: boolean;
   tieneUnidadAsignada?: boolean;
   estadoAsignacion?: 'ACTIVA' | 'DESACTIVADA' | 'SIN_ASIGNACION';
+  esCuadrilla?: boolean;
 }) {
   const tieneUnidadAsignada = opciones?.tieneUnidadAsignada ?? true;
   const unidadActiva = tieneUnidadAsignada ? (opciones?.unidadActiva ?? true) : false;
+  const esCuadrilla = opciones?.esCuadrilla ?? true;
   const estadoAsignacion =
     opciones?.estadoAsignacion ??
     (!tieneUnidadAsignada ? 'SIN_ASIGNACION' : unidadActiva ? 'ACTIVA' : 'DESACTIVADA');
@@ -43,8 +45,8 @@ function configurarAuthCuadrillaMock(opciones?: {
       nombre: 'Delegado Cuadrilla Líder',
       email: 'cuadrilla@valdivia.cl',
       rolId: 'rol-cuadrilla',
-      rolNombre: 'Delegado de Cuadrilla',
-      rolCodigo: 'DELEGADO_CUADRILLA',
+      rolNombre: esCuadrilla ? 'Delegado de Cuadrilla' : 'Patrulla Verificadora',
+      rolCodigo: esCuadrilla ? 'DELEGADO_CUADRILLA' : 'PATRULLA_VERIFICADORA',
       delegacionId: 'del-2',
       delegacionNombre: 'Valdivia Sur',
       permisos: ['misiones:terreno:operar'],
@@ -55,8 +57,8 @@ function configurarAuthCuadrillaMock(opciones?: {
     token: 'jwt-cuadrilla-token',
     cargando: false,
     autenticado: true,
-    esPatrulla: false,
-    esCuadrilla: true,
+    esPatrulla: !esCuadrilla,
+    esCuadrilla,
     unidadActiva,
     tieneUnidadAsignada,
     estadoAsignacion,
@@ -155,5 +157,27 @@ describe('CuadrillaDetailPage — Telemetría GPS en faena activa (HU-70)', () =
     });
 
     expect(screen.queryByText('GPS activo')).not.toBeInTheDocument();
+  });
+
+  it('no activa telemetría de cuadrilla si el operador no posee rol DELEGADO_CUADRILLA (prevención de rol cruzado)', async () => {
+    configurarAuthCuadrillaMock({ unidadActiva: true, esCuadrilla: false });
+    vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue(misionCuadrillaEnCursoMock);
+
+    await act(async () => {
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <CuadrillaMisionDetailPage
+            params={Promise.resolve({ id: misionCuadrillaEnCursoMock.id })}
+          />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('INC-2026-0002')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('GPS activo')).not.toBeInTheDocument();
+    expect(mockGetCurrentPosition).not.toHaveBeenCalled();
   });
 });
