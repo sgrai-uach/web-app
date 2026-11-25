@@ -207,4 +207,69 @@ describe('RechazoMisionModal (H41, H69)', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(alCancelarMock).toHaveBeenCalledTimes(2);
   });
+
+  it('bloquea el cierre con Escape mientras cargando es true y limpia estado GPS al cerrar antes de resolver (BUG-H41-PWA-04 / PWA-05)', async () => {
+    let resolverEnvio!: () => void;
+    alConfirmarMock.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolverEnvio = resolve;
+        })
+    );
+
+    let callbackGps!: (pos: { coords: { latitude: number; longitude: number } }) => void;
+    Object.defineProperty(navigator, 'geolocation', {
+      value: {
+        getCurrentPosition: vi.fn((success) => {
+          callbackGps = success;
+        }),
+      },
+      configurable: true,
+    });
+
+    const { rerender } = render(
+      <RechazoMisionModal
+        abierto={true}
+        codigoMision="INC-2026-0042"
+        alConfirmar={alConfirmarMock}
+        alCancelar={alCancelarMock}
+      />
+    );
+
+    expect(screen.getByText(/Obteniendo coordenadas GPS/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Motivo del Rechazo/i), {
+      target: { value: 'Falla hidráulica en ruta' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar Rechazo/i }));
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(alCancelarMock).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(typeof resolverEnvio).toBe('function'));
+    resolverEnvio();
+
+    rerender(
+      <RechazoMisionModal
+        abierto={false}
+        codigoMision="INC-2026-0042"
+        alConfirmar={alConfirmarMock}
+        alCancelar={alCancelarMock}
+      />
+    );
+
+    // Callback tardío de GPS no debe contaminar reapertura posterior
+    callbackGps({ coords: { latitude: -39.81, longitude: -73.24 } });
+
+    rerender(
+      <RechazoMisionModal
+        abierto={true}
+        codigoMision="INC-2026-0042"
+        alConfirmar={alConfirmarMock}
+        alCancelar={alCancelarMock}
+      />
+    );
+
+    expect(screen.queryByText(/GPS registrado/i)).not.toBeInTheDocument();
+  });
 });

@@ -44,5 +44,5 @@ El rechazo documentado garantiza:
 ## 4. Comportamiento sin conexión
 
 - Si el dispositivo pierde cobertura celular al momento de confirmar el rechazo, el cliente valida localmente la justificación contra el esquema de negocio, marca la misión como **`RECHAZADA`** en el almacenamiento local (`IndexedDB`) y encola la mutación `RECHAZAR_MISION` en la cola de salida (`outbox`).
-- El indicador superior (`ConnectionStatusBadge`) mostrará el estado **"Sin conexión"** o **"Sincronizando (N pendientes)"**.
+- El indicador superior (`ConnectionStatusBadge`) mostrará el estado **"Trabajando offline"** (o **"Trabajando offline (N pendientes)"**) y posteriormente **"Sincronizando (N pendientes)..."** al restablecer señal.
 - Al restablecer la conexión de red, la PWA reintentará automáticamente el envío hacia `POST /api/misiones/{id}/rechazar` y actualizará la bandeja local sin intervención del usuario.

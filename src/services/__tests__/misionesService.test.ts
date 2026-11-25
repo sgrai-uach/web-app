@@ -1021,5 +1021,74 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
         })
       );
     });
+
+    it('crea respaldo local en IndexedDB cuando no existía registro previo en persistirRechazoLocal (BUG-H41-PWA-03)', async () => {
+      const misionId = '70000000-0000-4000-8000-000000000099';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue(undefined);
+      vi.mocked(apiClient.POST).mockRejectedValue(new TypeError('Failed to fetch'));
+
+      const res = await rechazarMision(misionId, {
+        justificacion_rechazo: 'Sin caché previa en IndexedDB',
+      });
+
+      expect(res.exito).toBe(true);
+      expect(res.modoOffline).toBe(true);
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: misionId,
+          estado: 'RECHAZADA',
+          sincronizacionPendiente: true,
+          datosAdicionales: expect.objectContaining({
+            justificacionRechazo: 'Sin caché previa en IndexedDB',
+          }),
+        })
+      );
+    });
+
+    it('obtenerDetalleMision mapea justificacionRechazo y omite estadoPatrulla si patrulla es null (BUG-H41-PWA-03)', async () => {
+      const misionId = '70000000-0000-4000-8000-000000000088';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue(undefined);
+      vi.mocked(apiClient.GET).mockResolvedValue({
+        data: {
+          message: 'OK',
+          data: {
+            id: misionId,
+            codigo: 'MIS-2026-0088',
+            titulo: 'Atención cuadrilla',
+            descripcion: 'Despeje',
+            tipoMision: 'ATENCION_CUADRILLA',
+            estado: 'RECHAZADA',
+            prioridad: 'ALTA',
+            justificacionRechazo: 'Motivo persistido en servidor',
+            patrulla: null,
+            cuadrilla: { id: 'c1', nombre: 'Cuadrilla 1', estado: 'DISPONIBLE' },
+            incidente: {
+              id: 'inc-1',
+              codigo: 'INC-2026-0088',
+              tipoAfectacion: 'Árbol caído',
+              direccion: 'Valdivia',
+              estado: 'VERIFICANDO',
+              latitud: -39.81,
+              longitud: -73.24,
+            },
+            bitacoraTiempos: [],
+            reportesTerreno: [],
+            fechaInicio: null,
+            creadoEn: '2026-11-16T22:00:00Z',
+            actualizadoEn: '2026-11-16T23:00:00Z',
+          },
+        },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
+
+      const detalle = await obtenerDetalleMision(misionId);
+
+      expect(detalle?.datosAdicionales?.justificacionRechazo).toBe(
+        'Motivo persistido en servidor'
+      );
+      expect(detalle?.datosAdicionales?.estadoPatrulla).toBeUndefined();
+      expect(detalle?.datosAdicionales?.estadoCuadrilla).toBe('DISPONIBLE');
+    });
   });
 });
