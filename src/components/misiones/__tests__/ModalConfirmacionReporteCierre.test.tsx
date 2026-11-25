@@ -12,6 +12,7 @@ describe('ModalConfirmacionReporteCierre (H39)', () => {
       <ModalConfirmacionReporteCierre
         abierto={true}
         dictamen="REQUIERE_CUADRILLA"
+        estadoTerreno="CRITICO"
         resumenTecnico="Obstrucción total de sumidero principal."
         personasAfectadas={4}
         requiereAsistenciaSocial={true}
@@ -24,6 +25,8 @@ describe('ModalConfirmacionReporteCierre (H39)', () => {
       screen.getByText('Confirmar Informe Técnico y Cierre')
     ).toBeInTheDocument();
     expect(screen.getByText('Requiere cuadrilla')).toBeInTheDocument();
+    expect(screen.getByText('Estado del Terreno')).toBeInTheDocument();
+    expect(screen.getByText('Crítico')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('Solicitada')).toBeInTheDocument();
 

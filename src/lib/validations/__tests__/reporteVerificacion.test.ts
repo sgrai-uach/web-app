@@ -106,4 +106,15 @@ describe('Validaciones de informe técnico de verificación y cierre (H39)', () 
       expect(parsed.data.adjuntos).toHaveLength(1);
     }
   });
+
+  it('exige estado_terreno como campo obligatorio (BUG-H39-PWA-02)', () => {
+    const sinEstado = crearReporteVerificacionSchema.safeParse({
+      dictamen: 'REQUIERE_CUADRILLA',
+      resumen_tecnico: 'Diagnóstico técnico válido de terreno.',
+      personas_afectadas: 2,
+      requiere_asistencia_social: false,
+    });
+
+    expect(sinEstado.success).toBe(false);
+  });
 });

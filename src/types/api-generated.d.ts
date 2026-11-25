@@ -1723,6 +1723,11 @@ export interface paths {
                                 fechaCierre?: string | null;
                                 /** @description Motivo fundado cuando el incidente fue declarado NO_ABORDABLE */
                                 motivoNoAbordable?: string | null;
+                                /**
+                                 * @description Último dictamen operativo emitido por la patrulla verificadora en terreno (HU-39)
+                                 * @enum {string|null}
+                                 */
+                                dictamenTerreno?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
                                 /** @description Fuente de origen del reporte (CHATBOT, LLAMADA, TERRENO, SENAPRED) */
                                 fuenteOrigen: string;
                                 /** @description Nombre de pila del ciudadano informante o null si anónimo */
@@ -4094,14 +4099,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description No autenticado / cabecera X-User-Id ausente o inválida */
+                /** @description No autenticado / cabecera Authorization ausente o inválida */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description No cuenta con el permiso requerido: misiones:leer */
+                /** @description No cuenta con ninguno de los permisos requeridos: misiones:leer, misiones:terreno:verificar o reportes:crear */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -9980,7 +9985,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Conflicto: la misión no se encuentra en estado EN_CURSO (ej. está DESPACHADA o ya fue COMPLETADA) */
+                /** @description Conflicto: la misión no es de tipo VERIFICACION con patrulla asignada, no está en estado EN_CURSO, la patrulla no está activa en EN_VERIFICACION, el incidente asociado no está en REPORTADO/VERIFICANDO o un adjunto ya pertenece a otro reporte */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -12323,6 +12328,11 @@ export interface components {
                 fechaCierre?: string | null;
                 /** @description Motivo fundado cuando el incidente fue declarado NO_ABORDABLE */
                 motivoNoAbordable?: string | null;
+                /**
+                 * @description Último dictamen operativo emitido por la patrulla verificadora en terreno (HU-39)
+                 * @enum {string|null}
+                 */
+                dictamenTerreno?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
                 /** @description Fuente de origen del reporte (CHATBOT, LLAMADA, TERRENO, SENAPRED) */
                 fuenteOrigen: string;
                 /** @description Nombre de pila del ciudadano informante o null si anónimo */
@@ -13170,15 +13180,17 @@ export interface components {
             /**
              * @description Estado operativo constatado del terreno (ej. CRITICO, ESTABLE, INACCESIBLE, CONTROLADO, FINALIZADO)
              * @example CRITICO
+             * @enum {string|null}
              */
-            estadoTerreno?: string;
-            estado_terreno?: string;
+            estadoTerreno?: "CRITICO" | "ESTABLE" | "INACCESIBLE" | "CONTROLADO" | "EN_VERIFICACION" | "FINALIZADO" | null;
+            /** @enum {string|null} */
+            estado_terreno?: "CRITICO" | "ESTABLE" | "INACCESIBLE" | "CONTROLADO" | "EN_VERIFICACION" | "FINALIZADO" | null;
             /**
-             * @description Estimación de personas damnificadas. Si se omite, se rescata automáticamente del reporte de prioridad previo (HU-38); si se envía, permite confirmar o rectificar dicho conteo.
+             * @description Estimación de personas damnificadas. Si se omite o es null, se rescata automáticamente del reporte de prioridad previo (HU-38); si se envía, permite confirmar o rectificar dicho conteo.
              * @example 4
              */
-            personasAfectadas?: number;
-            personas_afectadas?: number;
+            personasAfectadas?: number | null;
+            personas_afectadas?: number | null;
             /**
              * @description Descripción o estimación cuantitativa/cualitativa de daños materiales observados
              * @example Anegamiento de primer nivel en 2 viviendas y daño en cerco perimetral.
@@ -13211,12 +13223,12 @@ export interface components {
              * @description Coordenada GPS opcional de latitud (WGS84) al cerrar la verificación
              * @example -39.819588
              */
-            latitud?: number;
+            latitud?: number | null;
             /**
              * @description Coordenada GPS opcional de longitud (WGS84) al cerrar la verificación
              * @example -73.245209
              */
-            longitud?: number;
+            longitud?: number | null;
         };
         EnviarReporteVerificacionResponse: {
             /** @example Informe técnico de verificación registrado y misión cerrada exitosamente. */

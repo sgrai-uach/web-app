@@ -251,7 +251,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
 
   const tienePermisoCrearReporte =
     typeof tienePermiso === 'function'
-      ? tienePermiso('reportes:crear') || tienePermiso('misiones:terreno:verificar')
+      ? tienePermiso('reportes:crear')
       : false;
 
   const mostrarBotonAceptar =
@@ -724,29 +724,51 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                     }
                   >
                     {seccionReporteCierreAbierta && (
-                      <EvaluacionReporteCierreCard
-                        misionActual={mision}
-                        usuarioActualId={usuario?.id}
-                        deshabilitado={esSoloLectura || !tienePermisoCrearReporte}
-                        onReporteEnviado={(resultado) => {
-                          if (resultado.mision) {
-                            setMision(resultado.mision);
-                          }
-                          setMensajeConfirmacion(resultado.mensaje);
-                          if (toast) {
-                            if (resultado.offline) {
-                              toast.showWarning(
-                                resultado.mensaje,
-                                'Guardado sin conexión'
-                              );
-                            } else {
-                              toast.showSuccess(resultado.mensaje, 'Misión cerrada');
+                      <>
+                        {!esSoloLectura && !tienePermisoCrearReporte && (
+                          <div
+                            role="alert"
+                            style={{
+                              padding: '0.75rem 1rem',
+                              marginBottom: '0.75rem',
+                              backgroundColor: 'var(--color-warning-bg, #FFF3E0)',
+                              border: '1px solid var(--color-warning, #E65100)',
+                              color: 'var(--color-text-dark, #2B2B2B)',
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            Su perfil no cuenta con el permiso{' '}
+                            <code>reportes:crear</code> necesario para enviar el informe
+                            técnico y cerrar la misión.
+                          </div>
+                        )}
+                        <EvaluacionReporteCierreCard
+                          misionActual={mision}
+                          usuarioActualId={usuario?.id}
+                          deshabilitado={esSoloLectura || !tienePermisoCrearReporte}
+                          onReporteEnviado={(resultado) => {
+                            if (resultado.mision) {
+                              setMision(resultado.mision);
                             }
-                          }
-                          void actualizarPendientes();
-                          router.push('/patrulla/misiones');
-                        }}
-                      />
+                            setMensajeConfirmacion(resultado.mensaje);
+                            if (toast) {
+                              if (resultado.offline) {
+                                toast.showWarning(
+                                  resultado.mensaje,
+                                  'Guardado sin conexión'
+                                );
+                              } else {
+                                toast.showSuccess(resultado.mensaje, 'Misión cerrada');
+                              }
+                            }
+                            if (typeof window !== 'undefined') {
+                              window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
+                            }
+                            void actualizarPendientes();
+                            router.push('/patrulla/misiones');
+                          }}
+                        />
+                      </>
                     )}
                   </SeccionDesplegable>
                 </>

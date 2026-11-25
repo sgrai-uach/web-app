@@ -211,7 +211,10 @@ async function obtenerReferenciasOutboxPendientes(): Promise<{
     for (const accion of acciones) {
       if (
         accion.tipo !== 'ACEPTAR_MISION' &&
-        accion.tipo !== 'ACTUALIZAR_TIPOLOGIA'
+        accion.tipo !== 'ACTUALIZAR_TIPOLOGIA' &&
+        accion.tipo !== 'AJUSTAR_PRIORIDAD' &&
+        accion.tipo !== 'ENVIAR_REPORTE' &&
+        accion.tipo !== 'RECHAZAR_MISION'
       ) {
         continue;
       }
@@ -506,7 +509,12 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
         titulo: d.titulo,
         estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION',
         estadoIncidente: d.incidente?.estado || 'VERIFICANDO',
-        reportesTerreno: reportesRemotos,
+        reportesTerreno:
+          mantenerOptimista &&
+          reportesCierreRemotos.length === 0 &&
+          Array.isArray(datosPrevios.reportesTerreno)
+            ? datosPrevios.reportesTerreno
+            : reportesRemotos,
         ...(reportesPrioridadRemotos.length > 0
           ? { reportesPrioridad: reportesPrioridadLocalesPendientes }
           : reportesPrioridadLocales.length > 0

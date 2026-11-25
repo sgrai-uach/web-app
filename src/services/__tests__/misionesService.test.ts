@@ -381,6 +381,84 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
         })
       );
     });
+
+    it('preserva estado optimista COMPLETADA mientras exista ENVIAR_REPORTE pendiente en outbox (BUG-H39-PWA-03)', async () => {
+      const misionId = '60000000-0000-4000-8000-000000000099';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: misionId,
+        incidenteId: 'a0000000-0000-4000-8000-000000000099',
+        codigoIncidente: 'INC-2026-0099',
+        tipologia: 'Inundación',
+        direccion: 'Costanera 420',
+        prioridad: 'ALTA',
+        estado: 'COMPLETADA',
+        fechaDespacho: '2026-10-30T04:00:00Z',
+        sincronizacionPendiente: true,
+        datosAdicionales: {
+          reporteVerificacionEnviado: true,
+          dictamenVerificacion: 'REQUIERE_CUADRILLA',
+        },
+        actualizadoEn: '2026-10-30T04:10:00Z',
+      });
+      vi.mocked(offlineQueue.obtenerAccionesOutbox).mockResolvedValue([
+        {
+          id: 'outbox-rep-99',
+          tipo: 'ENVIAR_REPORTE',
+          url: `/api/misiones/${misionId}/reporte`,
+          metodo: 'POST',
+          payload: {},
+          timestamp: '2026-10-30T04:10:00Z',
+          intentos: 0,
+        },
+      ]);
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: {
+            id: misionId,
+            codigo: 'MIS-2026-0099',
+            titulo: 'Inundación',
+            descripcion: 'Verificar',
+            tipoMision: 'VERIFICACION',
+            estado: 'EN_CURSO',
+            prioridad: 'ALTA',
+            justificacionRechazo: null,
+            fechaInicio: '2026-10-30T04:05:00Z',
+            fechaCierre: null,
+            creadoEn: '2026-10-30T04:00:00Z',
+            actualizadoEn: '2026-10-30T04:05:00Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: {
+              id: 'a0000000-0000-4000-8000-000000000099',
+              codigo: 'INC-2026-0099',
+              codigoSeguimiento: 'SEG-099',
+              tipoAfectacion: 'INUNDACION',
+              descripcion: 'Agua en calzada',
+              direccion: 'Costanera 420',
+              latitud: -39.8123,
+              longitud: -73.2467,
+              estado: 'VERIFICANDO',
+              prioridad: 'ALTA',
+              requiereAsistenciaSocial: false,
+              delegacionNombre: 'Norte',
+            },
+            prevencion: null,
+            cuadrilla: null,
+            patrulla: null,
+            bitacoraTiempos: [],
+            reportesTerreno: [],
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle = await obtenerDetalleMision(misionId);
+
+      expect(detalle?.estado).toBe('COMPLETADA');
+      expect(detalle?.sincronizacionPendiente).toBe(true);
+    });
   });
 
   describe('rechazarMision (H41, H69 — Regla Crítica §3.3)', () => {

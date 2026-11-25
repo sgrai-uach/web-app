@@ -18,6 +18,7 @@ export const VALORES_INICIALES_REPORTE_VERIFICACION: ReporteVerificacionTerrenoF
   dictamen: 'REQUIERE_CUADRILLA',
   motivo_no_abordable: '',
   resumen_tecnico: '',
+  estado_terreno: 'ESTABLE',
   personas_afectadas: 0,
   danos_estimados: '',
   observaciones: '',
@@ -55,11 +56,9 @@ export const crearReporteVerificacionSchema = z
         `El resumen técnico del siniestro es obligatorio y debe contener al menos ${RESUMEN_TECNICO_MIN} caracteres.`
       )
       .max(2000, 'El resumen técnico no puede exceder los 2000 caracteres.'),
-    estado_terreno: z
-      .enum(ESTADOS_TERRENO_VERIFICACION, {
-        message: 'Seleccione un estado del terreno válido.',
-      })
-      .optional(),
+    estado_terreno: z.enum(ESTADOS_TERRENO_VERIFICACION, {
+      message: 'Seleccione un estado del terreno válido.',
+    }),
     personas_afectadas: z
       .number({ message: 'La cantidad de personas afectadas debe ser un número entero.' })
       .int('La cantidad de personas afectadas debe ser un número entero.')

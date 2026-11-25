@@ -3,6 +3,7 @@ import {
   enviarReporteVerificacionTerreno,
   obtenerReporteVerificacionMision,
 } from '../reporteVerificacionService';
+import apiClient from '@/lib/api/client';
 import { VALORES_INICIALES_REPORTE_VERIFICACION } from '@/lib/validations/reporteVerificacion';
 import * as offlineQueue from '../offlineQueue';
 import * as misionesService from '../misionesService';
@@ -41,45 +42,42 @@ describe('reporteVerificacionService (H39)', () => {
   });
 
   describe('enviarReporteVerificacionTerreno', () => {
-    it('envía POST online (201 Created), actualiza la misión a COMPLETADA, patrulla a DISPONIBLE y captura evaluador', async () => {
+    it('envía POST online (201 Created) vía apiClient, actualiza la misión a COMPLETADA, patrulla a DISPONIBLE y captura evaluador', async () => {
       vi.stubGlobal('navigator', { onLine: true });
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          status: 201,
-          json: async () => ({
-            message:
-              'Informe técnico de verificación registrado y misión cerrada exitosamente.',
-            data: {
-              reporteTerreno: {
-                id: 'rep-cierre-1',
-                creadoEn: '2026-11-16T01:00:00Z',
-                evaluador: {
-                  id: 'usr-p1',
-                  nombre: 'Personal 1',
-                  email: 'p1@valdivia.cl',
-                  rut: '11.111.111-1',
-                },
-              },
-              mision: {
-                id: misionMock.id,
-                estado: 'COMPLETADA',
-                fechaCierre: '2026-11-16T01:00:00Z',
-                actualizadoEn: '2026-11-16T01:00:00Z',
-              },
-              patrulla: {
-                id: 'pat-1',
-                estado: 'DISPONIBLE',
-              },
-              incidente: {
-                id: misionMock.incidenteId,
-                estado: 'VERIFICANDO',
+      const postSpy = vi.spyOn(apiClient, 'POST').mockResolvedValueOnce({
+        data: {
+          message:
+            'Informe técnico de verificación registrado y misión cerrada exitosamente.',
+          data: {
+            reporteTerreno: {
+              id: 'rep-cierre-1',
+              creadoEn: '2026-11-16T01:00:00Z',
+              evaluador: {
+                id: 'usr-p1',
+                nombre: 'Personal 1',
+                email: 'p1@valdivia.cl',
+                rut: '11.111.111-1',
               },
             },
-          }),
-        })
-      );
+            mision: {
+              id: misionMock.id,
+              estado: 'COMPLETADA',
+              fechaCierre: '2026-11-16T01:00:00Z',
+              actualizadoEn: '2026-11-16T01:00:00Z',
+            },
+            patrulla: {
+              id: 'pat-1',
+              estado: 'DISPONIBLE',
+            },
+            incidente: {
+              id: misionMock.incidenteId,
+              estado: 'VERIFICANDO',
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(null, { status: 201 }),
+      } as never);
 
       const resultado = await enviarReporteVerificacionTerreno(
         misionMock.id,
@@ -95,6 +93,16 @@ describe('reporteVerificacionService (H39)', () => {
         misionMock
       );
 
+      expect(postSpy).toHaveBeenCalledWith(
+        '/api/misiones/{id}/reporte',
+        expect.objectContaining({
+          params: { path: { id: misionMock.id } },
+          body: expect.objectContaining({
+            dictamen: 'REQUIERE_CUADRILLA',
+            estado_terreno: 'CRITICO',
+          }),
+        })
+      );
       expect(resultado.ok).toBe(true);
       expect(resultado.offline).toBe(false);
       expect(resultado.reporte.evaluador?.nombre).toBe('Personal 1');
@@ -139,18 +147,31 @@ describe('reporteVerificacionService (H39)', () => {
       );
     });
 
-    it('lanza error descriptivo ante 403 Forbidden (sin permiso reportes:crear)', async () => {
+    it('propaga estrictamente 401, 403 y 404 sin devolver nunca éxito (BUG-H39-PWA-01)', async () => {
       vi.stubGlobal('navigator', { onLine: true });
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: false,
-          status: 403,
-          json: async () => ({
-            message: 'No posee el permiso requerido: reportes:crear.',
-          }),
-        })
-      );
+
+      vi.spyOn(apiClient, 'POST').mockResolvedValueOnce({
+        data: undefined,
+        error: { message: 'Token inválido' },
+        response: new Response(null, { status: 401 }),
+      } as never);
+
+      await expect(
+        enviarReporteVerificacionTerreno(
+          misionMock.id,
+          {
+            ...VALORES_INICIALES_REPORTE_VERIFICACION,
+            resumen_tecnico: 'Diagnóstico técnico válido de verificación.',
+          },
+          misionMock
+        )
+      ).rejects.toThrow(/Sesión expirada/i);
+
+      vi.spyOn(apiClient, 'POST').mockResolvedValueOnce({
+        data: undefined,
+        error: { message: 'No posee el permiso requerido: reportes:crear.' },
+        response: new Response(null, { status: 403 }),
+      } as never);
 
       await expect(
         enviarReporteVerificacionTerreno(
@@ -162,20 +183,32 @@ describe('reporteVerificacionService (H39)', () => {
           misionMock
         )
       ).rejects.toThrow(/reportes:crear/i);
+
+      vi.spyOn(apiClient, 'POST').mockResolvedValueOnce({
+        data: undefined,
+        error: { message: 'Misión no encontrada.' },
+        response: new Response(null, { status: 404 }),
+      } as never);
+
+      await expect(
+        enviarReporteVerificacionTerreno(
+          misionMock.id,
+          {
+            ...VALORES_INICIALES_REPORTE_VERIFICACION,
+            resumen_tecnico: 'Diagnóstico técnico válido de verificación.',
+          },
+          misionMock
+        )
+      ).rejects.toThrow(/no encontrada/i);
     });
 
     it('lanza error descriptivo ante 409 Conflict (misión no EN_CURSO o ya cerrada)', async () => {
       vi.stubGlobal('navigator', { onLine: true });
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: false,
-          status: 409,
-          json: async () => ({
-            message: 'La misión ya fue cerrada previamente.',
-          }),
-        })
-      );
+      vi.spyOn(apiClient, 'POST').mockResolvedValueOnce({
+        data: undefined,
+        error: { message: 'La misión ya fue cerrada previamente.' },
+        response: new Response(null, { status: 409 }),
+      } as never);
 
       await expect(
         enviarReporteVerificacionTerreno(

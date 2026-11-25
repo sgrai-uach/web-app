@@ -175,8 +175,43 @@ describe('AuthContext (Control de Sesión y RBAC de Terreno)', () => {
 
     expect(result.current.autenticado).toBe(true);
     expect(result.current.tienePermiso('misiones:terreno:verificar')).toBe(false);
+    expect(result.current.tienePermiso('reportes:crear')).toBe(false);
     expect(result.current.usuario?.unidadId).toBe('pat-09');
     expect(result.current.usuario?.unidadNombre).toBe('Patrulla Costa-9');
+  });
+
+  it('rechaza estrictamente reportes:crear aunque el usuario posea misiones:terreno:verificar (BUG-H39-PWA-01)', async () => {
+    vi.mocked(cookieUtils.getAuthCookie).mockReturnValue('token-patrulla-verificar');
+    vi.mocked(seguridadService.obtenerUsuarioActivo).mockResolvedValue({
+      id: 'user-pat-verificar',
+      rut: '12.345.678-9',
+      nombre: 'Patrullero Solo Verificar',
+      email: 'verificar@valdivia.cl',
+      activo: true,
+      rol: {
+        id: 'rol-pat',
+        nombre: 'Patrulla Verificadora',
+        codigo: 'PATRULLA_VERIFICADORA',
+        esAdmin: false,
+      },
+      permisos: ['misiones:terreno:verificar'],
+      delegacionId: 'del-1',
+      delegacionNombre: 'Norte',
+      unidadId: 'pat-01',
+      unidadNombre: 'Patrulla 1',
+      unidadActiva: true,
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await act(async () => {
+      await result.current.recargarSesion();
+    });
+
+    expect(result.current.tienePermiso('misiones:terreno:verificar')).toBe(true);
+    expect(result.current.tienePermiso('reportes:crear')).toBe(false);
   });
 
   it('mapea correctamente unidadActiva=false cuando la patrulla verificadora fue desactivada (H85)', async () => {
