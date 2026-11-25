@@ -17,8 +17,10 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
 import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
+import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
@@ -32,14 +34,11 @@ import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaDetailPage.module.css';
 
 interface PageProps {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default function CuadrillaMisionDetailPage({ params }: PageProps) {
-  const resolvedParams =
-    params && typeof (params as { then?: unknown }).then === 'function'
-      ? use(params as Promise<{ id: string }>)
-      : (params as { id: string });
+  const resolvedParams = use(params);
   const misionId = resolvedParams?.id;
   const router = useRouter();
 
@@ -138,14 +137,6 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     );
   }
 
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
-  }
-
   const estadoNormalizado = mision.estado?.toUpperCase() || '';
   const tienePermisoEjecutar =
     typeof tienePermiso === 'function'
@@ -165,7 +156,6 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     typeof mision.datosAdicionales?.justificacionRechazo === 'string'
       ? mision.datosAdicionales.justificacionRechazo
       : null;
-
   const esSoloLectura =
     !unidadActiva ||
     estadoNormalizado === 'FINALIZADA' ||
@@ -249,11 +239,11 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         <div className={styles.headerRow}>
           <div className={styles.codeArea}>
             <span className={styles.code}>{mision.codigoIncidente}</span>
-            <span className={`${styles.priorityChip} ${prioridadClase}`}>
+            <Chip variant={obtenerVarianteChipPrioridad(mision.prioridad)} size="md">
               {formatearPrioridad(mision.prioridad)}
-            </span>
+            </Chip>
           </div>
-          <EstadoBadge estado={mision.estado} />
+          <EstadoBadge estado={mision.estado} size="md" />
         </div>
 
         <div className={styles.detailGrid}>

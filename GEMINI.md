@@ -87,6 +87,29 @@ Usa la misma paleta e identidad institucional que `sgrai-web` (derivada de la Mu
 - **Diseño plano (Flat UI):** Sin sombras de elevación (`--shadow-none: none`).
 - **Tipografía:** Noto Sans en toda la aplicación mediante la variable `--font-noto-sans`.
 
+### Estándar de Chips y Badges Semánticos (`<Chip />`)
+
+Todos los chips y etiquetas semánticas (`src/components/ui/Chip.tsx`, `src/components/ui/Chip.module.css` y `src/lib/utils/chipVariants.ts`) están sincronizados 1:1 con `sgrai-web`:
+
+- **Geometría rectangular plana:** `border-radius: var(--radius-none, 0px)` (esquinas estrictamente rectas a `0px`), `border: 1px solid`, `display: inline-flex`, `align-items: center`, `justify-content: center`, `gap: 0.3rem`, `font-weight: 700`, `line-height: 1`, `letter-spacing: 0.02em`, `white-space: nowrap`, `box-sizing: border-box`, `user-select: none`.
+- **Criterios de usabilidad en terreno:**
+  - **Sentence Case de alto contraste:** Los estados y prioridades usan formato oración (`Crítica`, `Alta`, `Media`, `Baja`, `En curso`, `Completado`) con `font-weight: 700` y borde sólido de `1px` para lectura rápida bajo luz solar directa.
+  - **Jerarquía de tamaños (`ChipSize`):**
+    - `md` (`height: 24px`, `padding: 0 10px`, `font-size: 0.75rem` / `12px`): usado en cabeceras de tarjetas de misión (`MisionCard`, `EstadoBadge`) y encabezados de detalle de misión en móvil para garantizar legibilidad a brazo extendido.
+    - `sm` (`height: 20px`, `padding: 0 8px`, `font-size: 0.6875rem` / `11px`): usado en indicadores secundarios de acordeones (`Completado`, `Pendiente`, `Reporte #N`).
+  - **Affordance estático vs. interactivo:** Si `<Chip />` recibe `onClick`, renderiza un `<button type="button">` con estados `:hover` y `:focus-visible`; de lo contrario, renderiza un `<span>` informativo.
+- **Variantes semánticas de color (`ChipVariant`) y mapeo (`src/lib/utils/chipVariants.ts`):**
+
+| Variante | Fondo (`background-color`) | Texto (`color`) | Borde (`border-color`) | Uso canónico en SGRAI |
+|---|---|---|---|---|
+| `neutral` | `var(--color-bg-light, #ECEFF3)` | `var(--color-charcoal, #3B3F45)` | `#CBD5E1` | Misiones finalizadas/cerradas, códigos neutros |
+| `info` | `var(--color-info-bg, #E0F2F1)` | `var(--color-primary-teal-dark, #14505A)` | `var(--color-primary-teal, #1B6F7D)` | Incidente `VERIFICANDO`, misión `DESPACHADA` / `ASIGNADA` / `PLANIFICACION`, prioridad `MEDIA` |
+| `success` | `var(--color-success-bg, #E8F5E9)` | `var(--color-success, #2E7D32)` | `#A5D6A7` | Incidente `RESUELTO`, misión `COMPLETADA`, sección `Completado`, `Misión activa`, prioridad `BAJA` |
+| `warning` | `var(--color-warning-bg, #FFF3E0)` | `var(--color-warning, #E65100)` | `#FFCC80` | Incidente `REPORTADO` / `EN_ATENCION`, misión `EN_CURSO` / `EN_RUTA` / `EN_TERRENO`, prioridad `ALTA`, `Pendiente` |
+| `danger` | `var(--color-danger-bg, #FFEBEE)` | `var(--color-danger, #D32F2F)` | `#EF9A9A` | Incidente `NO_ABORDABLE`, misión `RECHAZADA` / `CANCELADA` / `ABORTADA`, prioridad `CRITICA` |
+| `teal` | `var(--color-info-bg, #E0F2F1)` | `var(--color-primary-teal, #1B6F7D)` | `var(--color-primary-teal, #1B6F7D)` | Etiquetas de versión de reporte técnico (`Reporte #N`) |
+| `solidTeal` | `var(--color-primary-teal, #1B6F7D)` | `var(--color-white, #FFFFFF)` | `var(--color-primary-teal-dark, #14505A)` | Badges destacados de vigencia (`Vigente`) |
+
 ---
 
 ## 5. Comunicación con el backend (`sgrai-api`)

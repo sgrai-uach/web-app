@@ -22,8 +22,8 @@ export interface RechazoMisionModalProps {
 export function RechazoMisionModal({
   abierto,
   codigoMision,
-  titulo = 'Rechazar Misión',
-  unidadEtiqueta = 'unidad',
+  titulo = 'Rechazar Misión de Verificación',
+  unidadEtiqueta = 'patrulla',
   alConfirmar,
   alCancelar,
 }: RechazoMisionModalProps) {

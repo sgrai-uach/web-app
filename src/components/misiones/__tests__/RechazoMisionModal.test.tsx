@@ -23,7 +23,28 @@ describe('RechazoMisionModal (H41, H69)', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('mantiene deshabilitado el botón Confirmar Rechazo con menos de 5 caracteres útiles', () => {
+  it('renderiza título por defecto, código de misión, área de texto y contador cuando está abierto (H69)', () => {
+    render(
+      <RechazoMisionModal
+        abierto={true}
+        codigoMision="INC-2026-0042"
+        alConfirmar={alConfirmarMock}
+        alCancelar={alCancelarMock}
+      />
+    );
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /rechazar misión de verificación/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText('INC-2026-0042')).toBeInTheDocument();
+    expect(screen.getByText(/0 \/ 5 caracteres mín/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /confirmar rechazo/i })
+    ).toBeDisabled();
+  });
+
+  it('mantiene deshabilitado el botón Confirmar Rechazo con menos de 5 caracteres útiles y personaliza etiqueta de cuadrilla (H41)', () => {
     render(
       <RechazoMisionModal
         abierto={true}
@@ -50,6 +71,24 @@ describe('RechazoMisionModal (H41, H69)', () => {
     expect(
       screen.getByText('La justificación debe contener al menos 5 caracteres.')
     ).toBeInTheDocument();
+  });
+
+  it('habilita el botón de confirmación cuando se alcanzan 5 caracteres o más', () => {
+    render(
+      <RechazoMisionModal
+        abierto={true}
+        codigoMision="INC-2026-0042"
+        alConfirmar={alConfirmarMock}
+        alCancelar={alCancelarMock}
+      />
+    );
+
+    const textarea = screen.getByLabelText(/motivo del rechazo/i);
+    const botonConfirmar = screen.getByRole('button', { name: /confirmar rechazo/i });
+
+    fireEvent.change(textarea, { target: { value: 'Falla' } });
+    expect(screen.getByText(/5 \/ 5 caracteres mín/i)).toBeInTheDocument();
+    expect(botonConfirmar).not.toBeDisabled();
   });
 
   it('habilita el botón al ingresar 5 o más caracteres y llama a alConfirmar con texto recortado', async () => {
@@ -82,6 +121,47 @@ describe('RechazoMisionModal (H41, H69)', () => {
     });
   });
 
+  it('ejecuta alConfirmar con el texto ingresado y coordenadas GPS cuando están disponibles', async () => {
+    alConfirmarMock.mockResolvedValueOnce(undefined);
+
+    const mockGeolocation = {
+      getCurrentPosition: vi.fn().mockImplementation((success) =>
+        success({
+          coords: {
+            latitude: -39.8142,
+            longitude: -73.2458,
+          },
+        })
+      ),
+    };
+    Object.defineProperty(navigator, 'geolocation', {
+      value: mockGeolocation,
+      configurable: true,
+    });
+
+    render(
+      <RechazoMisionModal
+        abierto={true}
+        codigoMision="INC-2026-0042"
+        alConfirmar={alConfirmarMock}
+        alCancelar={alCancelarMock}
+      />
+    );
+
+    const textarea = screen.getByLabelText(/motivo del rechazo/i);
+    fireEvent.change(textarea, { target: { value: 'Desperfecto mecánico en vehículo' } });
+
+    const botonConfirmar = screen.getByRole('button', { name: /confirmar rechazo/i });
+    fireEvent.click(botonConfirmar);
+
+    await waitFor(() => {
+      expect(alConfirmarMock).toHaveBeenCalledWith('Desperfecto mecánico en vehículo', {
+        lat: -39.8142,
+        lng: -73.2458,
+      });
+    });
+  });
+
   it('muestra el mensaje de error si alConfirmar rechaza la promesa', async () => {
     alConfirmarMock.mockRejectedValueOnce(
       new Error('La misión ya fue rechazada previamente.')
@@ -104,9 +184,27 @@ describe('RechazoMisionModal (H41, H69)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Confirmar Rechazo/i }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText('La misión ya fue rechazada previamente.')
-      ).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'La misión ya fue rechazada previamente.'
+      );
     });
+  });
+
+  it('ejecuta alCancelar al presionar el botón Cancelar y la tecla Escape', () => {
+    render(
+      <RechazoMisionModal
+        abierto={true}
+        codigoMision="INC-2026-0042"
+        alConfirmar={alConfirmarMock}
+        alCancelar={alCancelarMock}
+      />
+    );
+
+    const botonCancelar = screen.getByRole('button', { name: /cancelar/i });
+    fireEvent.click(botonCancelar);
+    expect(alCancelarMock).toHaveBeenCalledTimes(1);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(alCancelarMock).toHaveBeenCalledTimes(2);
   });
 });

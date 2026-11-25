@@ -1,5 +1,5 @@
-import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import React, { Suspense } from 'react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CuadrillaMisionDetailPage from '../page';
 import { useAuth } from '@/context/AuthContext';
@@ -77,7 +77,13 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
   });
 
   it('muestra el botón Rechazar Misión cuando la misión está DESPACHADA y el delegado tiene permiso', async () => {
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id }} />);
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();
@@ -98,7 +104,13 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
       tienePermiso: () => false,
     } as never);
 
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id }} />);
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();
@@ -115,7 +127,13 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
       mensaje: 'Misión rechazada exitosamente.',
     });
 
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id }} />);
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
 
     await waitFor(() => {
       expect(

@@ -31,7 +31,8 @@ Este archivo contiene las directrices obligatorias que cualquier asistente o age
 - **Diseño plano estricto (Flat UI) y esquinas rectas:**
   - Todos los botones, tarjetas, inputs, selects y modales deben tener esquinas rectas (`borderRadius: 0` / `--radius-none: 0px`).
   - Sin degradados ni sombras pronunciadas; el contraste se genera mediante bloques de color sólido.
-- **Tipografía Institucional:** Uso obligatorio de **Noto Sans** cargada mediante `next/font/google` (`--font-noto-sans`).
+- **Tipografía Institucional:** Uso obligatorio de **Noto Sans**, auto-alojada con `next/font/local` desde `src/fonts/noto-sans/` (`--font-noto-sans`).
+- **Prohibido `next/font/google`:** ver sección 7 (Build y Fuentes).
 - **Ergonomía de Terreno:**
   - Objetivos táctiles mínimos de **48px** de altura para facilitar el uso a una mano o con guantes.
   - Alto contraste para asegurar legibilidad bajo luz solar directa.
@@ -69,3 +70,60 @@ Este archivo contiene las directrices obligatorias que cualquier asistente o age
 
 - Flujo de trabajo: **Gitflow** (`main`, `develop`, ramas `feature/H<numero>-<slug>`).
 - Commits atómicos siguiendo **Conventional Commits** (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
+
+---
+
+## 7. Build y Fuentes (incidente documentado)
+
+### Prohibido `next/font/google`
+
+**Nunca** importar `next/font/google` en este repositorio. El build de Docker/CI (`Dockerfile` → `RUN npm run build`) no tiene salida garantizada a Internet, y el loader de Google Fonts falla al descargar la tipografía:
+
+```text
+src/app/layout.tsx
+An error occurred in `next/font`.
+
+TypeError: Cannot read properties of null (reading '1')
+    at node_modules/next/dist/compiled/@next/font/dist/google/loader.js:...
+```
+
+El job de CI termina con `Build failed because of webpack errors` y `exit code: 1`, aunque el código y el Dockerfile estén correctos. **No es un fallo transitorio del runner**: puede repetirse en cualquier build sin red.
+
+### Solución obligatoria: Noto Sans auto-alojada
+
+- Usar `next/font/local` en `src/app/layout.tsx`.
+- Los archivos viven en `src/fonts/noto-sans/`:
+  - `NotoSans-Latin-400.woff2`
+  - `NotoSans-Latin-500.woff2`
+  - `NotoSans-Latin-600.woff2`
+  - `NotoSans-Latin-700.woff2`
+  - `NotoSans-Latin-800.woff2`
+- Mantener la variable CSS `--font-noto-sans` (la usan `src/styles/tokens.css` y los CSS Modules).
+- Mantener `display: 'swap'` y un `fallback` del sistema.
+
+```ts
+import localFont from 'next/font/local';
+
+const notoSans = localFont({
+  src: [
+    { path: '../fonts/noto-sans/NotoSans-Latin-400.woff2', weight: '400', style: 'normal' },
+    { path: '../fonts/noto-sans/NotoSans-Latin-500.woff2', weight: '500', style: 'normal' },
+    { path: '../fonts/noto-sans/NotoSans-Latin-600.woff2', weight: '600', style: 'normal' },
+    { path: '../fonts/noto-sans/NotoSans-Latin-700.woff2', weight: '700', style: 'normal' },
+    { path: '../fonts/noto-sans/NotoSans-Latin-800.woff2', weight: '800', style: 'normal' },
+  ],
+  variable: '--font-noto-sans',
+  display: 'swap',
+  fallback: ['system-ui', 'arial', 'sans-serif'],
+});
+```
+
+### Regla de verificación
+
+Antes de cerrar cualquier cambio que toque tipografía o `layout.tsx`:
+
+```bash
+grep -rn "next/font/google" src || echo "OK: sin Google Fonts"
+```
+
+La regla ESLint `no-restricted-imports` de `eslint.config.mjs` bloquea automáticamente ese import.
