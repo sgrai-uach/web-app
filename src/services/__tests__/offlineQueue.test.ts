@@ -247,4 +247,84 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
     expect(pendientes).toBe(0);
   });
 
+  it('preserva prioridad optimista y reportes locales en guardarMisionesLocales si existe AJUSTAR_PRIORIDAD en outbox (BUG-INT-PWA-09)', async () => {
+    const misionPrioridadPendiente: MisionLocal = {
+      ...misionEjemplo,
+      id: 'mision-prio-pendiente-01',
+      incidenteId: 'inc-prio-pendiente-01',
+      estado: 'EN_CURSO',
+      prioridad: 'CRITICA',
+      sincronizacionPendiente: true,
+      datosAdicionales: {
+        prioridadEvaluada: true,
+        versionReportePrioridad: 1,
+        reportesPrioridad: [{ versionReporte: 1, prioridadAsignada: 'CRITICA', sincronizado: false }],
+      },
+    };
+
+    await guardarMisionesLocales([misionPrioridadPendiente]);
+    const accion = await encolarAccionOutbox({
+      tipo: 'AJUSTAR_PRIORIDAD',
+      url: '/api/incidentes/inc-prio-pendiente-01/prioridad',
+      metodo: 'PATCH',
+      payload: {
+        misionId: 'mision-prio-pendiente-01',
+        prioridad: 'CRITICA',
+      },
+    });
+
+    await guardarMisionesLocales([
+      {
+        ...misionPrioridadPendiente,
+        prioridad: 'MEDIA',
+        sincronizacionPendiente: false,
+        datosAdicionales: { trabajo: 'Remoto desactualizado' },
+      },
+    ]);
+
+    const recuperada = await obtenerMisionLocalPorId('mision-prio-pendiente-01');
+    expect(recuperada?.prioridad).toBe('CRITICA');
+    expect(recuperada?.sincronizacionPendiente).toBe(true);
+    expect(recuperada?.datosAdicionales?.prioridadEvaluada).toBe(true);
+
+    await eliminarAccionOutbox(accion.id);
+  });
+
+  it('garantiza orden causal FIFO determinista en outbox aunque se encolen múltiples mutaciones en el mismo milisegundo (BUG-INT-PWA-12)', async () => {
+    const misionId = 'mision-fifo-01';
+    const a1 = await encolarAccionOutbox({
+      tipo: 'ACEPTAR_MISION',
+      url: `/api/misiones/${misionId}/aceptar`,
+      metodo: 'POST',
+      payload: { misionId },
+    });
+    const a2 = await encolarAccionOutbox({
+      tipo: 'ACTUALIZAR_TIPOLOGIA',
+      url: '/api/incidentes/inc-fifo-01/tipologia',
+      metodo: 'PATCH',
+      payload: { misionId },
+    });
+    const a3 = await encolarAccionOutbox({
+      tipo: 'AJUSTAR_PRIORIDAD',
+      url: '/api/incidentes/inc-fifo-01/prioridad',
+      metodo: 'PATCH',
+      payload: { misionId, prioridad: 'CRITICA' },
+    });
+
+    const ordenadas = (await obtenerAccionesOutbox()).filter((a) =>
+      [a1.id, a2.id, a3.id].includes(a.id)
+    );
+    expect(ordenadas.map((a) => a.tipo)).toEqual([
+      'ACEPTAR_MISION',
+      'ACTUALIZAR_TIPOLOGIA',
+      'AJUSTAR_PRIORIDAD',
+    ]);
+    expect(Date.parse(a1.timestamp)).toBeLessThan(Date.parse(a2.timestamp));
+    expect(Date.parse(a2.timestamp)).toBeLessThan(Date.parse(a3.timestamp));
+
+    await eliminarAccionOutbox(a1.id);
+    await eliminarAccionOutbox(a2.id);
+    await eliminarAccionOutbox(a3.id);
+  });
+
 });

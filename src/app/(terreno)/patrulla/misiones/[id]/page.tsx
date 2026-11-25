@@ -596,6 +596,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                           if (!prioridadCompletada) {
                             setSeccionPrioridadAbierta(true);
                           }
+                          void actualizarPendientes();
                         }}
                       />
                     </SeccionDesplegable>
