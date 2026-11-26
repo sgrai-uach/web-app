@@ -292,37 +292,40 @@ export async function guardarMisionesLocales(misiones: MisionLocal[]): Promise<v
   }
 
   for (const mision of misiones) {
-    const local = existentesPorId.get(mision.id) ?? (await tx.store.get(mision.id));
+    const local = existentesPorId.get(mision.id);
     const tienePendiente =
       Boolean(local?.sincronizacionPendiente) ||
       misionesConOutbox.has(mision.id) ||
       (Boolean(mision.incidenteId) && incidentesConOutbox.has(mision.incidenteId));
 
-    if (local && tienePendiente) {
-      await tx.store.put({
-        ...mision,
-        tipologia: local.tipologia || mision.tipologia,
-        estado: local.estado || mision.estado,
-        fechaInicio: local.fechaInicio ?? mision.fechaInicio,
-        sincronizacionPendiente: true,
-        datosAdicionales: {
-          ...mision.datosAdicionales,
-          ...local.datosAdicionales,
-        },
-        actualizadoEn: local.actualizadoEn || mision.actualizadoEn,
+    const baseFusionada = fusionarDatosAdicionalesMision(
+      mision,
+      local?.datosAdicionales
+    );
+
+    const misionGuardar: MisionLocal =
+      local && tienePendiente
+        ? {
+            ...baseFusionada,
+            tipologia: local.tipologia || baseFusionada.tipologia,
+            prioridad: local.prioridad || baseFusionada.prioridad,
+            estado: local.estado || baseFusionada.estado,
+            fechaInicio: local.fechaInicio ?? baseFusionada.fechaInicio,
+            sincronizacionPendiente: true,
+            actualizadoEn: local.actualizadoEn || baseFusionada.actualizadoEn,
+          }
+        : baseFusionada;
+
+    if (tieneDatosEvaluacion(misionGuardar.datosAdicionales)) {
+      guardarEvaluacionMisionCache(misionGuardar.id, {
+        ...misionGuardar.datosAdicionales,
+        ...(misionGuardar.datosAdicionales?.tipologiaEvaluada && misionGuardar.tipologia
+          ? { tipologiaConstatada: misionGuardar.tipologia }
+          : {}),
       });
-    } else {
-      const fusionada = fusionarDatosAdicionalesMision(mision, local?.datosAdicionales);
-      if (tieneDatosEvaluacion(fusionada.datosAdicionales)) {
-        guardarEvaluacionMisionCache(fusionada.id, {
-          ...fusionada.datosAdicionales,
-          ...(fusionada.datosAdicionales?.tipologiaEvaluada && fusionada.tipologia
-            ? { tipologiaConstatada: fusionada.tipologia }
-            : {}),
-        });
-      }
-      await tx.store.put(fusionada);
     }
+
+    await tx.store.put(misionGuardar);
   }
   await tx.done;
 }
@@ -399,14 +402,28 @@ export async function obtenerCatalogoLocal<T = unknown>(clave: string): Promise<
 // COLA OUTBOX (MUTACIONES OFFLINE)
 // ==========================================
 
+let ultimoTimestampOutboxMs = 0;
+
+function generarTimestampMonotonico(existentes: AccionOutbox[]): string {
+  let siguienteMs = Math.max(Date.now(), ultimoTimestampOutboxMs + 1);
+  for (const item of existentes) {
+    const itemMs = Date.parse(item.timestamp);
+    if (Number.isFinite(itemMs) && itemMs >= siguienteMs) {
+      siguienteMs = itemMs + 1;
+    }
+  }
+  ultimoTimestampOutboxMs = siguienteMs;
+  return new Date(siguienteMs).toISOString();
+}
+
 export async function encolarAccionOutbox(
   accion: Omit<AccionOutbox, 'id' | 'timestamp' | 'intentos'>
 ): Promise<AccionOutbox> {
   const db = await getDB();
+  const existentes = await obtenerAccionesOutbox();
 
   // Cada evidencia multimedia representa un archivo independiente aunque comparta ruta/misión
   if (accion.tipo !== 'SUBIR_EVIDENCIA') {
-    const existentes = await obtenerAccionesOutbox();
     const duplicada = existentes.find(
       (item) => item.tipo === accion.tipo && item.url === accion.url
     );
@@ -415,7 +432,7 @@ export async function encolarAccionOutbox(
       const actualizada: AccionOutbox = {
         ...duplicada,
         payload: accion.payload,
-        timestamp: new Date().toISOString(),
+        timestamp: generarTimestampMonotonico(existentes),
       };
       await db.put('outbox', actualizada);
       return actualizada;
@@ -425,7 +442,7 @@ export async function encolarAccionOutbox(
   const nuevaAccion: AccionOutbox = {
     ...accion,
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `outbox-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    timestamp: new Date().toISOString(),
+    timestamp: generarTimestampMonotonico(existentes),
     intentos: 0,
   };
 

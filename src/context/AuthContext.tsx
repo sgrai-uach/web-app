@@ -253,13 +253,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (listaPermisos.includes('*') || listaPermisos.includes(permiso)) {
         return true;
       }
-      if (
-        esPatrulla &&
-        (permiso.startsWith('patrulla:') ||
-          (permiso === 'reportes:crear' &&
-            (listaPermisos.includes('misiones:terreno:reportar') ||
-              listaPermisos.includes('misiones:terreno:verificar'))))
-      ) {
+      // Fallback por rol canónico de terreno solo para prefijos de ruta propios
+      if (esPatrulla && permiso.startsWith('patrulla:')) {
         return true;
       }
       if (esCuadrilla && permiso.startsWith('cuadrilla:')) {

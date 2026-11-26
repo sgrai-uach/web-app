@@ -1719,6 +1719,15 @@ export interface paths {
                                 totalReportesTerreno?: number;
                                 /** @description Indica si se requiere derivación para ficha FIBE */
                                 requiereAsistenciaSocial: boolean;
+                                /** @description Fecha y hora de cierre del incidente (si aplica) */
+                                fechaCierre?: string | null;
+                                /** @description Motivo fundado cuando el incidente fue declarado NO_ABORDABLE */
+                                motivoNoAbordable?: string | null;
+                                /**
+                                 * @description Último dictamen operativo emitido por la patrulla verificadora en terreno (HU-39)
+                                 * @enum {string|null}
+                                 */
+                                dictamenTerreno?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
                                 /** @description Fuente de origen del reporte (CHATBOT, LLAMADA, TERRENO, SENAPRED) */
                                 fuenteOrigen: string;
                                 /** @description Nombre de pila del ciudadano informante o null si anónimo */
@@ -1874,6 +1883,10 @@ export interface paths {
                                 /** @description Justificación técnica de cambio de prioridad en terreno (HU-38) */
                                 justificacionPrioridad?: string | null;
                                 requiereAsistenciaSocial: boolean;
+                                /** @description Fecha y hora de cierre del incidente (ej. al declararse NO_ABORDABLE o RESUELTO) */
+                                fechaCierre?: string | null;
+                                /** @description Motivo técnico fundado registrado por la patrulla verificadora si fue declarado NO_ABORDABLE (HU-39 / HU-86) */
+                                motivoNoAbordable?: string | null;
                                 fuenteOrigen: string;
                                 asteriskCallId: string | null;
                                 asteriskCallerPhone: string | null;
@@ -1977,6 +1990,12 @@ export interface paths {
                                     id: string;
                                     /** Format: uuid */
                                     misionId: string;
+                                    tipoReporte?: string;
+                                    /** @enum {string|null} */
+                                    dictamen?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
+                                    motivoNoAbordable?: string | null;
+                                    requiereAsistenciaSocial?: boolean;
+                                    estadoTerreno?: string;
                                     versionReporte: number;
                                     esRectificacion: boolean;
                                     etiquetaReporte: string;
@@ -1994,6 +2013,15 @@ export interface paths {
                                     evaluacion: {
                                         [key: string]: unknown;
                                     };
+                                    adjuntos?: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        nombreArchivo: string;
+                                        url: string;
+                                        tipoMime: string;
+                                        tamanoBytes: number;
+                                        creadoEn: string;
+                                    }[];
                                     evaluador: {
                                         /** Format: uuid */
                                         id: string;
@@ -2041,6 +2069,10 @@ export interface paths {
                                     resumen: string;
                                     /** @enum {string|null} */
                                     prioridadAsignada: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | null;
+                                    /** @enum {string|null} */
+                                    dictamen?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
+                                    motivoNoAbordable?: string | null;
+                                    tipoReporte?: string | null;
                                     versionReporte: number | null;
                                     esRectificacion: boolean;
                                 } | null;
@@ -3793,10 +3825,6 @@ export interface paths {
                                     estado: string;
                                     /** @description Prioridad del incidente (BAJA, MEDIA, ALTA, CRITICA) */
                                     prioridad: string;
-                                    /** @description Prioridad sugerida preliminarmente por el sistema (HU-38) */
-                                    prioridadSugerida?: string | null;
-                                    /** @description Justificación técnica del ajuste de prioridad en terreno (HU-38) */
-                                    justificacionPrioridad?: string | null;
                                     /** @description Requiere derivación social / ficha FIBE */
                                     requiereAsistenciaSocial: boolean;
                                     /** @description Fecha y hora de cierre del incidente si fue cerrado o declarado NO_ABORDABLE */
@@ -3910,6 +3938,7 @@ export interface paths {
                                     timestamp: string;
                                     /** @description Glosa descriptiva del hito operativo */
                                     descripcion: string;
+                                    /** @description Funcionario que registró el hito en terreno o Centro de Mando */
                                     registradoPor?: {
                                         /** Format: uuid */
                                         id: string;
@@ -3917,6 +3946,7 @@ export interface paths {
                                         /** Format: email */
                                         email?: string;
                                     } | null;
+                                    /** @description Metadatos estructurados del hito (ej. tipoAnterior y tipoNuevo en TIPOLOGIA_RECLASIFICADA) */
                                     metadatos?: {
                                         [key: string]: unknown;
                                     } | null;
@@ -4045,7 +4075,7 @@ export interface paths {
                                     /** @description Fecha y hora de última modificación en formato ISO 8601 */
                                     actualizadoEn: string;
                                 }[];
-                                /** @description Estado consolidado de evaluaciones en terreno realizadas en la misión (HU-37 / HU-38) */
+                                /** @description Estado consolidado de evaluaciones en terreno realizadas en la misión (HU-37 / HU-38 / HU-39) */
                                 evaluaciones?: {
                                     tipologiaEvaluada: boolean;
                                     tipologiaEvaluadaEn: string | null;
@@ -4069,14 +4099,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description No autenticado / cabecera X-User-Id ausente o inválida */
+                /** @description No autenticado / cabecera Authorization ausente o inválida */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description No cuenta con el permiso requerido: misiones:leer */
+                /** @description No cuenta con ninguno de los permisos requeridos: misiones:leer, misiones:terreno:verificar o reportes:crear */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -4101,95 +4131,6 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/misiones/{id}/reporte": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Enviar informe técnico de verificación en terreno y cerrar misión inicial de patrullaje (HU-39 / HU-86)
-         * @description Permite a la patrulla verificadora enviar el informe técnico consolidado de terreno con dictamen operativo ('REQUIERE_CUADRILLA' o 'NO_ABORDABLE'), resumen técnico (>= 10 caracteres), estado del terreno, estimación de personas damnificadas (rescatable desde el reporte previo de prioridad HU-38 y modificable), daños estimados, observaciones, indicador de Ficha FIBE (requiere_asistencia_social) y sección preparada para evidencia fotográfica (HU-43). Requiere permiso RBAC 'reportes:crear'.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Identificador único UUID de la misión */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Informe técnico de verificación en terreno y dictamen de cierre */
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["CrearReporteVerificacionInput"];
-                };
-            };
-            responses: {
-                /** @description Informe técnico registrado y misión de verificación cerrada exitosamente */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["EnviarReporteVerificacionResponse"];
-                    };
-                };
-                /** @description Datos de entrada inválidos (ej. resumen_tecnico < 10 caracteres o dictamen NO_ABORDABLE sin motivo_no_abordable >= 15 caracteres) */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description No autenticado o token inválido */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Sin permiso 'reportes:crear' o el usuario no pertenece a la patrulla asignada a la misión */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Misión no encontrada */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Conflicto: la misión no se encuentra en estado EN_CURSO (ej. está DESPACHADA o ya fue COMPLETADA) */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Error interno del servidor */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
         delete?: never;
         options?: never;
         head?: never;
@@ -9462,8 +9403,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Rechazar misión asignada en terreno por Patrulla Verificadora (HU-69) o Delegado de Cuadrilla (HU-41)
-         * @description Permite a una patrulla verificadora o delegado de cuadrilla rechazar una misión asignada ingresando una justificación obligatoria (mínimo 5 caracteres según Regla Crítica §3.3). Ejecuta una transacción atómica que actualiza la misión a estado RECHAZADA, libera la unidad asignada a DISPONIBLE, retorna el incidente para reasignación, registra el hito en mision_hito y emite la notificación WebSocket mision:rechazada hacia la sala encargado.
+         * Rechazar asignación de misión en terreno (HU-41 / HU-69)
+         * @description Permite al Delegado de cuadrilla (permiso 'misiones:terreno:ejecutar') o a una patrulla verificadora (permiso 'misiones:terreno:verificar') rechazar una misión asignada ingresando una justificación técnica obligatoria (mínimo 5 caracteres según Regla §3.3). Ejecuta una transacción atómica que: (1) actualiza mision.estado = 'RECHAZADA' y persiste justificacion_rechazo, (2) devuelve la cuadrilla/dotación o patrulla a DISPONIBLE, (3) retorna el incidente a VERIFICANDO o REPORTADO para reasignación, y (4) registra el hito 'RECHAZADA' en mision_hito. Emite la alerta WebSocket mision:rechazada hacia la sala encargado.
          */
         post: {
             parameters: {
@@ -9504,7 +9445,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Acceso denegado. Se requiere permiso 'misiones:terreno:verificar' o 'misiones:terreno:ejecutar' y pertenecer a la unidad asignada (o rol Administrador) */
+                /** @description Acceso denegado. Se requiere permiso 'misiones:terreno:ejecutar' (cuadrilla) o 'misiones:terreno:verificar' (patrulla) y pertenecer a la unidad asignada (o rol Administrador) */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -9518,7 +9459,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Conflicto: la misión ya fue rechazada, no está en estado DESPACHADA, o no tiene una unidad asignada */
+                /** @description Conflicto: la misión ya fue rechazada, no está en estado DESPACHADA, o no tiene una unidad asignada compatible */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -9926,6 +9867,95 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/misiones/{id}/reporte": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enviar informe técnico de verificación en terreno y cerrar misión inicial de patrullaje (HU-39 / HU-86)
+         * @description Permite a la patrulla verificadora enviar el informe técnico consolidado de terreno con dictamen operativo ('REQUIERE_CUADRILLA' o 'NO_ABORDABLE'), resumen técnico (>= 10 caracteres), estado del terreno, estimación de personas damnificadas (rescatable desde el reporte previo de prioridad HU-38 y modificable), daños estimados, observaciones, indicador de Ficha FIBE (requiere_asistencia_social) y sección preparada para evidencia fotográfica (HU-43). Ejecuta una transacción atómica que: (1) persiste el reporte en reporte_terreno con evaluador_id = usuario.id, (2) cierra la misión (COMPLETADA con fecha_cierre), (3) libera la patrulla a DISPONIBLE, (4) si es NO_ABORDABLE (exige motivo_no_abordable >= 15 caracteres), transiciona el incidente a NO_ABORDABLE con fecha_cierre y motivo, o si solicita Ficha FIBE marca incidente.requiere_asistencia_social = true, y (5) registra el hito VERIFICACION_COMPLETADA en mision_hito. Emite eventos WebSocket 'mision:actualizada', 'incidente:actualizado' y 'patrulla:actualizada' / 'patrulla:liberada'. Requiere permiso RBAC 'reportes:crear'.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Identificador único UUID de la misión */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Informe técnico de verificación en terreno y dictamen de cierre */
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CrearReporteVerificacionInput"];
+                };
+            };
+            responses: {
+                /** @description Informe técnico registrado y misión de verificación cerrada exitosamente */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EnviarReporteVerificacionResponse"];
+                    };
+                };
+                /** @description Datos de entrada inválidos (ej. resumen_tecnico < 10 caracteres o dictamen NO_ABORDABLE sin motivo_no_abordable >= 15 caracteres) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token inválido */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Sin permiso 'reportes:crear' o el usuario no pertenece a la patrulla asignada a la misión */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Misión no encontrada */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto: la misión no es de tipo VERIFICACION con patrulla asignada, no está en estado EN_CURSO, la patrulla no está activa en EN_VERIFICACION, el incidente asociado no está en REPORTADO/VERIFICANDO o un adjunto ya pertenece a otro reporte */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -12245,6 +12275,15 @@ export interface components {
                 totalReportesTerreno?: number;
                 /** @description Indica si se requiere derivación para ficha FIBE */
                 requiereAsistenciaSocial: boolean;
+                /** @description Fecha y hora de cierre del incidente (si aplica) */
+                fechaCierre?: string | null;
+                /** @description Motivo fundado cuando el incidente fue declarado NO_ABORDABLE */
+                motivoNoAbordable?: string | null;
+                /**
+                 * @description Último dictamen operativo emitido por la patrulla verificadora en terreno (HU-39)
+                 * @enum {string|null}
+                 */
+                dictamenTerreno?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
                 /** @description Fuente de origen del reporte (CHATBOT, LLAMADA, TERRENO, SENAPRED) */
                 fuenteOrigen: string;
                 /** @description Nombre de pila del ciudadano informante o null si anónimo */
@@ -12331,6 +12370,10 @@ export interface components {
                 /** @description Justificación técnica de cambio de prioridad en terreno (HU-38) */
                 justificacionPrioridad?: string | null;
                 requiereAsistenciaSocial: boolean;
+                /** @description Fecha y hora de cierre del incidente (ej. al declararse NO_ABORDABLE o RESUELTO) */
+                fechaCierre?: string | null;
+                /** @description Motivo técnico fundado registrado por la patrulla verificadora si fue declarado NO_ABORDABLE (HU-39 / HU-86) */
+                motivoNoAbordable?: string | null;
                 fuenteOrigen: string;
                 asteriskCallId: string | null;
                 asteriskCallerPhone: string | null;
@@ -12434,6 +12477,12 @@ export interface components {
                     id: string;
                     /** Format: uuid */
                     misionId: string;
+                    tipoReporte?: string;
+                    /** @enum {string|null} */
+                    dictamen?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
+                    motivoNoAbordable?: string | null;
+                    requiereAsistenciaSocial?: boolean;
+                    estadoTerreno?: string;
                     versionReporte: number;
                     esRectificacion: boolean;
                     etiquetaReporte: string;
@@ -12451,6 +12500,15 @@ export interface components {
                     evaluacion: {
                         [key: string]: unknown;
                     };
+                    adjuntos?: {
+                        /** Format: uuid */
+                        id: string;
+                        nombreArchivo: string;
+                        url: string;
+                        tipoMime: string;
+                        tamanoBytes: number;
+                        creadoEn: string;
+                    }[];
                     evaluador: {
                         /** Format: uuid */
                         id: string;
@@ -12498,6 +12556,10 @@ export interface components {
                     resumen: string;
                     /** @enum {string|null} */
                     prioridadAsignada: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | null;
+                    /** @enum {string|null} */
+                    dictamen?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
+                    motivoNoAbordable?: string | null;
+                    tipoReporte?: string | null;
                     versionReporte: number | null;
                     esRectificacion: boolean;
                 } | null;
@@ -12767,12 +12829,6 @@ export interface components {
             requiereEvacuacion?: boolean;
             requiere_evacuacion?: boolean;
             /**
-             * @description Indica si el grupo familiar requiere derivación para levantamiento de ficha FIBE
-             * @example true
-             */
-            requiereAsistenciaSocial?: boolean;
-            requiere_asistencia_social?: boolean;
-            /**
              * @deprecated
              * @description (Deprecado) Indica si la patrulla solicita despacho de cuadrilla pesada o recursos adicionales
              * @example false
@@ -12828,8 +12884,6 @@ export interface components {
             nivelCompromisoVivienda?: "SIN_DANO" | "LEVE" | "MODERADO" | "GRAVE_INHABITABLE";
             /** @enum {string} */
             nivel_compromiso_vivienda?: "SIN_DANO" | "LEVE" | "MODERADO" | "GRAVE_INHABITABLE";
-            requiereAsistenciaSocial?: boolean;
-            requiere_asistencia_social?: boolean;
         };
         RiesgosActivosEvaluacion: {
             riesgoElectrico?: boolean;
@@ -12856,7 +12910,6 @@ export interface components {
                 prioridadSugerida: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
                 puntajeTotal: number;
                 factoresGatillantes: string[];
-                requiereAsistenciaSocialSugerido: boolean;
                 evaluacionNormalizada: {
                     familias?: {
                         id?: string;
@@ -12869,7 +12922,7 @@ export interface components {
                         mascotasAfectadas: number;
                         /** @enum {string} */
                         nivelCompromisoVivienda: "SIN_DANO" | "LEVE" | "MODERADO" | "GRAVE_INHABITABLE";
-                        requiereAsistenciaSocial: boolean;
+                        requiereAsistenciaSocial?: boolean;
                     }[];
                     nucleoFamiliarTotal: number;
                     familiasAfectadas: number;
@@ -12882,7 +12935,6 @@ export interface components {
                     /** @enum {string} */
                     nivelCompromisoVivienda: "SIN_DANO" | "LEVE" | "MODERADO" | "GRAVE_INHABITABLE";
                     requiereEvacuacion: boolean;
-                    requiereAsistenciaSocial: boolean;
                     requiereApoyoAdicional: boolean;
                     riesgosActivos: {
                         riesgoElectrico: boolean;
@@ -13040,6 +13092,300 @@ export interface components {
             descripcion: string;
             /** Format: uuid */
             registradoPorId: string | null;
+            creadoEn: string;
+        };
+        AdjuntoReporteInput: {
+            /** Format: uuid */
+            id?: string;
+            nombreArchivo?: string;
+            nombre_archivo?: string;
+            url?: string;
+            tipoMime?: string;
+            tipo_mime?: string;
+            tamanoBytes?: number;
+            tamano_bytes?: number;
+        };
+        CrearReporteVerificacionInput: {
+            /**
+             * @description Dictamen operativo de verificación en terreno: 'REQUIERE_CUADRILLA' o 'NO_ABORDABLE'
+             * @example REQUIERE_CUADRILLA
+             * @enum {string}
+             */
+            dictamen?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE";
+            /** @enum {string} */
+            dictamenAtencion?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE";
+            /** @enum {string} */
+            dictamen_atencion?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE";
+            /**
+             * @description Motivo técnico obligatorio (mínimo 15 caracteres) cuando el dictamen es NO_ABORDABLE (predio privado inaccesible, faja fiscal externa o falsa alarma)
+             * @example Emergencia emplazada dentro de predio privado cercado sin autorización de ingreso ni riesgo para vía pública.
+             */
+            motivoNoAbordable?: string | null;
+            motivo_no_abordable?: string | null;
+            /**
+             * @description Resumen técnico consolidado del siniestro constatado en terreno (obligatorio, mínimo 10 caracteres)
+             * @example Se constata obstrucción completa de sumidero y socavón en berma norte; requiere cuadrilla vial con motobomba.
+             */
+            resumenTecnico?: string;
+            resumen_tecnico?: string;
+            /**
+             * @description Estado operativo constatado del terreno (ej. CRITICO, ESTABLE, INACCESIBLE, CONTROLADO, FINALIZADO)
+             * @example CRITICO
+             * @enum {string|null}
+             */
+            estadoTerreno?: "CRITICO" | "ESTABLE" | "INACCESIBLE" | "CONTROLADO" | "EN_VERIFICACION" | "FINALIZADO" | null;
+            /** @enum {string|null} */
+            estado_terreno?: "CRITICO" | "ESTABLE" | "INACCESIBLE" | "CONTROLADO" | "EN_VERIFICACION" | "FINALIZADO" | null;
+            /**
+             * @description Estimación de personas damnificadas. Si se omite o es null, se rescata automáticamente del reporte de prioridad previo (HU-38); si se envía, permite confirmar o rectificar dicho conteo.
+             * @example 4
+             */
+            personasAfectadas?: number | null;
+            personas_afectadas?: number | null;
+            /**
+             * @description Descripción o estimación cuantitativa/cualitativa de daños materiales observados
+             * @example Anegamiento de primer nivel en 2 viviendas y daño en cerco perimetral.
+             */
+            danosEstimados?: string | null;
+            danos_estimados?: string | null;
+            /**
+             * @description Observaciones generales, condiciones de acceso o seguridad en terreno
+             * @example Acceso despejado para camión aljibe por calle paralela.
+             */
+            observaciones?: string | null;
+            /**
+             * @description Maniobras preliminares de contención o señalización realizadas por la patrulla
+             * @example Instalación de conos preventivos y entrevista con vecinos afectados.
+             */
+            accionesRealizadas?: string | null;
+            acciones_realizadas?: string | null;
+            /**
+             * @description Casilla de verificación que indica si requiere derivación a Asistente Social para Ficha FIBE (trasladada desde HU-38)
+             * @example true
+             */
+            requiereAsistenciaSocial?: boolean;
+            requiere_asistencia_social?: boolean;
+            /** @description Listado opcional de UUIDs de evidencias fotográficas previamente cargadas (integración preparada para HU-43) */
+            adjuntoIds?: string[];
+            adjunto_ids?: string[];
+            /** @description Metadatos opcionales de fotografías de evidencia técnica (sección reservada para integración con HU-43) */
+            adjuntos?: components["schemas"]["AdjuntoReporteInput"][];
+            /**
+             * @description Coordenada GPS opcional de latitud (WGS84) al cerrar la verificación
+             * @example -39.819588
+             */
+            latitud?: number | null;
+            /**
+             * @description Coordenada GPS opcional de longitud (WGS84) al cerrar la verificación
+             * @example -73.245209
+             */
+            longitud?: number | null;
+        };
+        EnviarReporteVerificacionResponse: {
+            /** @example Informe técnico de verificación registrado y misión cerrada exitosamente. */
+            message: string;
+            data: {
+                reporteTerreno: {
+                    /**
+                     * Format: uuid
+                     * @description Identificador único UUID del reporte de terreno
+                     */
+                    id: string;
+                    /**
+                     * Format: uuid
+                     * @description Identificador de la misión asociada
+                     */
+                    misionId: string;
+                    /**
+                     * @description Naturaleza del reporte (EVALUACION_PRIORIDAD, VERIFICACION_CIERRE, REPORTE_CUADRILLA)
+                     * @example VERIFICACION_CIERRE
+                     */
+                    tipoReporte?: string;
+                    /**
+                     * @description Dictamen operativo de la patrulla verificadora al cerrar la verificación (HU-39)
+                     * @example REQUIERE_CUADRILLA
+                     * @enum {string|null}
+                     */
+                    dictamen?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
+                    /** @description Justificación obligatoria cuando el dictamen es NO_ABORDABLE (HU-39 / HU-86) */
+                    motivoNoAbordable?: string | null;
+                    /** @description Indica si se solicitó derivación social / Ficha FIBE en este reporte (HU-39) */
+                    requiereAsistenciaSocial?: boolean;
+                    /**
+                     * @description Número correlativo de versión del reporte en esta misión (1 = inicial, 2+ = rectificaciones)
+                     * @example 1
+                     */
+                    versionReporte?: number;
+                    /**
+                     * @description Indica si es una modificación/reenvío de evaluación en terreno
+                     * @example false
+                     */
+                    esRectificacion?: boolean;
+                    /**
+                     * @description Etiqueta legible del número de reporte para el Centro de Mando
+                     * @example Reporte de Evaluación #1 (Inicial)
+                     */
+                    etiquetaReporte?: string;
+                    /**
+                     * @description Prioridad sugerida por el sistema en este reporte (HU-38)
+                     * @enum {string|null}
+                     */
+                    prioridadSugerida?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | null;
+                    /**
+                     * @description Prioridad confirmada por la patrulla en este reporte (HU-38)
+                     * @enum {string|null}
+                     */
+                    prioridadAsignada?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | null;
+                    /** @description Justificación técnica si se modificó la prioridad sugerida (HU-38) */
+                    justificacionPrioridad?: string | null;
+                    /** @description Desglose del formulario de evaluación en terreno (núcleo familiar, niños, discapacitados, mascotas, vivienda, riesgos) */
+                    detallesEvaluacion?: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Datos del funcionario o patrullero que emitió el reporte */
+                    evaluador: {
+                        /**
+                         * Format: uuid
+                         * @description Identificador único UUID del usuario
+                         */
+                        id: string;
+                        /** @description Nombre completo del evaluador */
+                        nombre: string;
+                        /**
+                         * Format: email
+                         * @description Correo institucional
+                         */
+                        email: string;
+                        /** @description RUT del funcionario */
+                        rut?: string | null;
+                    };
+                    /** @description Diagnóstico técnico consolidado de la intervención */
+                    resumenTecnico: string;
+                    /** @description Labores y maniobras ejecutadas en terreno */
+                    accionesRealizadas: string | null;
+                    /** @description Indica si se requiere escalamiento logístico o relevo */
+                    requiereApoyoAdicional: boolean;
+                    /** @description Descripción o estimación preliminar de daños observados */
+                    danosEstimados: string | null;
+                    /** @description Observaciones de seguridad o condiciones de terreno */
+                    observaciones: string | null;
+                    /** @description Cantidad estimada de personas o familias afectadas */
+                    personasAfectadas: number;
+                    /** @description Estado operativo al momento del reporte (ej. FINALIZADO, EN_CURSO) */
+                    estadoTerreno: string;
+                    /** @description Fotografías, videos o documentos levantados como evidencia en terreno */
+                    adjuntos: {
+                        /**
+                         * Format: uuid
+                         * @description Identificador único UUID del archivo adjunto
+                         */
+                        id: string;
+                        /**
+                         * @description Nombre original del archivo
+                         * @example foto_evaluacion_1.jpg
+                         */
+                        nombreArchivo: string;
+                        /**
+                         * @description Ruta de acceso pública o relativa del recurso estático bajo Caddy
+                         * @example /uploads/evidencia/foto_evaluacion_1.jpg
+                         */
+                        url: string;
+                        /**
+                         * @description MIME type del archivo
+                         * @example image/jpeg
+                         */
+                        tipoMime: string;
+                        /**
+                         * @description Tamaño en bytes del archivo
+                         * @example 1048576
+                         */
+                        tamanoBytes: number;
+                        /** @description Fecha y hora de carga del archivo en formato ISO 8601 */
+                        creadoEn: string;
+                    }[];
+                    /** @description Fecha y hora del levantamiento del reporte en formato ISO 8601 */
+                    creadoEn: string;
+                    /** @description Fecha y hora de última modificación en formato ISO 8601 */
+                    actualizadoEn: string;
+                };
+                mision: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    titulo: string;
+                    /** @enum {string} */
+                    tipoMision: "VERIFICACION" | "ATENCION_CUADRILLA" | "PREVENCION" | "RECUPERACION" | "ASISTENCIA_SOCIAL";
+                    /**
+                     * @example COMPLETADA
+                     * @enum {string}
+                     */
+                    estado: "PLANIFICADA" | "DESPACHADA" | "EN_CURSO" | "COMPLETADA" | "CANCELADA" | "RECHAZADA";
+                    /** @enum {string} */
+                    prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
+                    /** Format: uuid */
+                    incidenteId: string | null;
+                    /** Format: uuid */
+                    patrullaId: string | null;
+                    fechaInicio: string | null;
+                    fechaCierre: string;
+                    actualizadoEn: string;
+                };
+                patrulla: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /** @example DISPONIBLE */
+                    estado: string;
+                } | null;
+                incidente: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    /** @example VERIFICANDO */
+                    estado: string;
+                    prioridad: string;
+                    requiereAsistenciaSocial: boolean;
+                    fechaCierre: string | null;
+                    motivoNoAbordable: string | null;
+                } | null;
+                hito: components["schemas"]["MisionHitoRegistrado"] & {
+                    metadatos?: {
+                        [key: string]: unknown;
+                    } | null;
+                };
+            };
+        };
+        MisionHitoRegistrado: {
+            /**
+             * Format: uuid
+             * @description Identificador único UUID del hito registrado en mision_hito
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Identificador único UUID de la misión
+             */
+            misionId: string;
+            /**
+             * @description Código canónico del hito
+             * @example MISION_ACEPTADA
+             */
+            hito: string;
+            /**
+             * @description Glosa descriptiva del hito operativo
+             * @example Misión Aceptada por Patrulla
+             */
+            descripcion: string;
+            /**
+             * Format: uuid
+             * @description UUID del funcionario de patrulla en sesión que confirmó la salida
+             */
+            registradoPorId: string | null;
+            /** @description Latitud reportada al momento del hito */
+            latitud: number | null;
+            /** @description Longitud reportada al momento del hito */
+            longitud: number | null;
+            /** @description Fecha y hora del hito en formato ISO 8601 */
             creadoEn: string;
         };
         ListarPuntosCriticosResponse: {
@@ -14216,7 +14562,15 @@ export interface components {
                 tipoNuevo: string;
                 /** Format: uuid */
                 tipoNuevoId: string;
+                esReclasificacion?: boolean;
                 justificacion: string;
+                evaluador?: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    email: string;
+                    rut?: string | null;
+                };
             } | null;
             /** @description Fecha y hora de registro del hito (ISO 8601) */
             creadoEn: string;
@@ -14231,59 +14585,81 @@ export interface components {
         };
         RechazarMisionBody: {
             /**
-             * @description Motivo obligatorio del rechazo de la misión (mínimo 5 caracteres según Regla Crítica §3.3)
-             * @example Desperfecto mecánico en el neumático delantero del vehículo institucional.
+             * @description Justificación técnica obligatoria del rechazo de la misión (mínimo 5 caracteres según Regla §3.3)
+             * @example Camión tolva presenta falla hidráulica en ruta de salida desde base.
              */
             justificacion_rechazo: string;
             /**
-             * @description Latitud WGS84 de la patrulla (-90 a 90)
+             * @description Latitud WGS84 opcional de la unidad al momento del rechazo (-90 a 90)
              * @example -39.81422
              */
             latitud?: number;
             /**
-             * @description Longitud WGS84 de la patrulla (-180 a 180)
+             * @description Longitud WGS84 opcional de la unidad al momento del rechazo (-180 a 180)
              * @example -73.24589
              */
             longitud?: number;
         };
         RechazarMisionResponse: {
-            /** @example Misión rechazada exitosamente. El incidente ha vuelto a estado REPORTADO para su reasignación. */
+            /** @example Misión rechazada exitosamente. La unidad ha vuelto a estado DISPONIBLE y el incidente ha retornado para su reasignación. */
             message: string;
             data: {
                 mision: {
                     /** Format: uuid */
                     id: string;
                     codigo: string;
-                    tipoMision?: string;
-                    estado: string;
+                    /** @enum {string} */
+                    tipoMision?: "VERIFICACION" | "ATENCION_CUADRILLA" | "PREVENCION" | "RECUPERACION" | "ASISTENCIA_SOCIAL";
+                    /**
+                     * @example RECHAZADA
+                     * @enum {string}
+                     */
+                    estado: "PLANIFICADA" | "DESPACHADA" | "EN_CURSO" | "COMPLETADA" | "CANCELADA" | "RECHAZADA";
                     justificacionRechazo: string;
-                    fechaCierre?: string | null;
+                    fechaCierre?: string;
                     actualizadoEn: string;
                 };
-                patrulla?: {
-                    /** Format: uuid */
-                    id: string;
-                    nombre: string;
-                    estado: string;
-                } | null;
                 cuadrilla?: {
                     /** Format: uuid */
                     id: string;
                     nombre: string;
+                    /** @example DISPONIBLE */
                     estado: string;
+                    /** Format: uuid */
+                    delegacionId?: string | null;
+                    /** Format: uuid */
+                    usuarioDelegadoId?: string | null;
+                } | null;
+                patrulla?: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /** @example DISPONIBLE */
+                    estado: string;
+                    /** Format: uuid */
+                    delegacionId?: string | null;
+                    /** Format: uuid */
+                    usuarioLiderId?: string | null;
                 } | null;
                 incidente: {
                     /** Format: uuid */
                     id: string;
                     codigo: string;
+                    /** @example VERIFICANDO */
                     estado: string;
                     prioridad?: string;
                 } | null;
                 hito: {
                     /** Format: uuid */
                     id: string;
+                    /** Format: uuid */
+                    misionId?: string;
                     hito: string;
                     descripcion: string;
+                    /** Format: uuid */
+                    registradoPorId?: string | null;
+                    latitud?: number | null;
+                    longitud?: number | null;
                     creadoEn: string;
                 };
             };
@@ -14299,39 +14675,6 @@ export interface components {
              * @example -73.245209
              */
             longitud?: number;
-        };
-        MisionHitoRegistrado: {
-            /**
-             * Format: uuid
-             * @description Identificador único UUID del hito registrado en mision_hito
-             */
-            id: string;
-            /**
-             * Format: uuid
-             * @description Identificador único UUID de la misión
-             */
-            misionId: string;
-            /**
-             * @description Código canónico del hito
-             * @example MISION_ACEPTADA
-             */
-            hito: string;
-            /**
-             * @description Glosa descriptiva del hito operativo
-             * @example Misión Aceptada por Patrulla
-             */
-            descripcion: string;
-            /**
-             * Format: uuid
-             * @description UUID del funcionario de patrulla en sesión que confirmó la salida
-             */
-            registradoPorId: string | null;
-            /** @description Latitud reportada al momento del hito */
-            latitud: number | null;
-            /** @description Longitud reportada al momento del hito */
-            longitud: number | null;
-            /** @description Fecha y hora del hito en formato ISO 8601 */
-            creadoEn: string;
         };
         AceptarMisionResponse: {
             /** @example Misión aceptada exitosamente. La patrulla se encuentra en trayecto para iniciar la evaluación. */
@@ -15014,6 +15357,15 @@ export interface components {
         CrearEventoPrevencionInput: {
             /**
              * @description Título o nombre descriptivo de la operación preventiva
+             * @example Inspección preventiva y limpieza de colectores en Angachilla
+             */
+            nombre: string;
+            /**
+             * @description Instrucciones de mitigación, detalle de vulnerabilidad y objetivos
+             * @example Monitoreo preventivo del caudal y despeje de rejillas por alerta temprana de temporal
+             */
+            descripcion: string;
+            /**
              * @description Sector, población o referencia barrial dentro de Valdivia
              * @example Humedal Angachilla
              */
@@ -16175,201 +16527,6 @@ export interface components {
              * @example Valdivia2026!
              */
             confirmacionPassword: string;
-        };
-        AdjuntoReporteInput: {
-            /** Format: uuid */
-            id?: string;
-            nombreArchivo?: string;
-            nombre_archivo?: string;
-            url?: string;
-            tipoMime?: string;
-            tipo_mime?: string;
-            tamanoBytes?: number;
-            tamano_bytes?: number;
-        };
-        CrearReporteVerificacionInput: {
-            /**
-             * @description Dictamen operativo de verificación en terreno: 'REQUIERE_CUADRILLA' o 'NO_ABORDABLE'
-             * @example REQUIERE_CUADRILLA
-             * @enum {string}
-             */
-            dictamen?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE";
-            /** @enum {string} */
-            dictamenAtencion?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE";
-            /** @enum {string} */
-            dictamen_atencion?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE";
-            /**
-             * @description Motivo técnico obligatorio (mínimo 15 caracteres) cuando el dictamen es NO_ABORDABLE
-             * @example Emergencia emplazada dentro de predio privado cercado sin autorización de ingreso ni riesgo para vía pública.
-             */
-            motivoNoAbordable?: string | null;
-            motivo_no_abordable?: string | null;
-            /**
-             * @description Resumen técnico consolidado del siniestro constatado en terreno (obligatorio, mínimo 10 caracteres)
-             * @example Se constata obstrucción completa de sumidero y socavón en berma norte; requiere cuadrilla vial con motobomba.
-             */
-            resumenTecnico?: string;
-            resumen_tecnico?: string;
-            /**
-             * @description Estado operativo constatado del terreno (ej. CRITICO, ESTABLE, INACCESIBLE, CONTROLADO, FINALIZADO)
-             * @example CRITICO
-             */
-            estadoTerreno?: string;
-            estado_terreno?: string;
-            /**
-             * @description Estimación de personas damnificadas. Si se omite, se rescata automáticamente del reporte de prioridad previo (HU-38).
-             * @example 4
-             */
-            personasAfectadas?: number;
-            personas_afectadas?: number;
-            /**
-             * @description Descripción o estimación cuantitativa/cualitativa de daños materiales observados
-             * @example Anegamiento de primer nivel en 2 viviendas y daño en cerco perimetral.
-             */
-            danosEstimados?: string | null;
-            danos_estimados?: string | null;
-            /**
-             * @description Observaciones generales, condiciones de acceso o seguridad en terreno
-             * @example Acceso despejado para camión aljibe por calle paralela.
-             */
-            observaciones?: string | null;
-            /**
-             * @description Maniobras preliminares de contención o señalización realizadas por la patrulla
-             * @example Instalación de conos preventivos y entrevista con vecinos afectados.
-             */
-            accionesRealizadas?: string | null;
-            acciones_realizadas?: string | null;
-            /**
-             * @description Casilla de verificación que indica si requiere derivación a Asistente Social para Ficha FIBE (trasladada desde HU-38)
-             * @example true
-             */
-            requiereAsistenciaSocial?: boolean;
-            requiere_asistencia_social?: boolean;
-            /** @description Listado opcional de UUIDs de evidencias fotográficas previamente cargadas (integración preparada para HU-43) */
-            adjuntoIds?: string[];
-            adjunto_ids?: string[];
-            /** @description Metadatos opcionales de fotografías de evidencia técnica (sección reservada para integración con HU-43) */
-            adjuntos?: components["schemas"]["AdjuntoReporteInput"][];
-            /**
-             * @description Coordenada GPS opcional de latitud (WGS84) al cerrar la verificación
-             * @example -39.819588
-             */
-            latitud?: number;
-            /**
-             * @description Coordenada GPS opcional de longitud (WGS84) al cerrar la verificación
-             * @example -73.245209
-             */
-            longitud?: number;
-        };
-        EnviarReporteVerificacionResponse: {
-            /** @example Informe técnico de verificación registrado y misión cerrada exitosamente. */
-            message: string;
-            data: {
-                reporteTerreno: {
-                    /** Format: uuid */
-                    id: string;
-                    /** Format: uuid */
-                    misionId: string;
-                    tipoReporte?: string;
-                    /** @enum {string|null} */
-                    dictamen?: "REQUIERE_CUADRILLA" | "NO_ABORDABLE" | null;
-                    motivoNoAbordable?: string | null;
-                    requiereAsistenciaSocial?: boolean;
-                    versionReporte?: number;
-                    esRectificacion?: boolean;
-                    etiquetaReporte?: string;
-                    /** @enum {string|null} */
-                    prioridadSugerida?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | null;
-                    /** @enum {string|null} */
-                    prioridadAsignada?: "BAJA" | "MEDIA" | "ALTA" | "CRITICA" | null;
-                    justificacionPrioridad?: string | null;
-                    detallesEvaluacion?: {
-                        [key: string]: unknown;
-                    };
-                    evaluador: {
-                        /** Format: uuid */
-                        id: string;
-                        nombre: string;
-                        /** Format: email */
-                        email: string;
-                        rut?: string | null;
-                    };
-                    resumenTecnico: string;
-                    accionesRealizadas: string | null;
-                    requiereApoyoAdicional: boolean;
-                    danosEstimados: string | null;
-                    observaciones: string | null;
-                    personasAfectadas: number;
-                    estadoTerreno: string;
-                    adjuntos: {
-                        /** Format: uuid */
-                        id: string;
-                        nombreArchivo: string;
-                        url: string;
-                        tipoMime: string;
-                        tamanoBytes: number;
-                        creadoEn: string;
-                    }[];
-                    creadoEn: string;
-                    actualizadoEn: string;
-                };
-                mision: {
-                    /** Format: uuid */
-                    id: string;
-                    codigo: string;
-                    titulo: string;
-                    /** @enum {string} */
-                    tipoMision: "VERIFICACION" | "ATENCION_CUADRILLA" | "PREVENCION" | "RECUPERACION" | "ASISTENCIA_SOCIAL";
-                    /**
-                     * @example COMPLETADA
-                     * @enum {string}
-                     */
-                    estado: "PLANIFICADA" | "DESPACHADA" | "EN_CURSO" | "COMPLETADA" | "CANCELADA" | "RECHAZADA";
-                    /** @enum {string} */
-                    prioridad: "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
-                    /** Format: uuid */
-                    incidenteId: string | null;
-                    /** Format: uuid */
-                    patrullaId: string | null;
-                    fechaInicio: string | null;
-                    fechaCierre: string;
-                    actualizadoEn: string;
-                };
-                patrulla: {
-                    /** Format: uuid */
-                    id: string;
-                    nombre: string;
-                    /** @example DISPONIBLE */
-                    estado: string;
-                } | null;
-                incidente: {
-                    /** Format: uuid */
-                    id: string;
-                    codigo: string;
-                    /** @example VERIFICANDO */
-                    estado: string;
-                    prioridad: string;
-                    requiereAsistenciaSocial: boolean;
-                    fechaCierre: string | null;
-                    motivoNoAbordable: string | null;
-                } | null;
-                hito: {
-                    /** Format: uuid */
-                    id: string;
-                    /** Format: uuid */
-                    misionId: string;
-                    hito: string;
-                    descripcion: string;
-                    /** Format: uuid */
-                    registradoPorId: string | null;
-                    latitud: number | null;
-                    longitud: number | null;
-                    creadoEn: string;
-                    metadatos?: {
-                        [key: string]: unknown;
-                    } | null;
-                };
-            };
         };
     };
     responses: never;

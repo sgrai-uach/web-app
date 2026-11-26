@@ -121,6 +121,7 @@ export function obtenerReportesPrioridadMision(
           ? r.riesgosActivos
           : undefined
     ) as Record<string, unknown> | undefined;
+
     const version =
       typeof r.versionReporte === 'number' && r.versionReporte > 0
         ? r.versionReporte
@@ -519,11 +520,11 @@ export async function asignarPrioridadEnTerreno(
   const construirReporteLocal = (
     sincronizado: boolean,
     idRemoto?: string,
-    evaluadorRemoto?: EvaluadorReporteTerreno,
-    versionConfirmada?: number
+    versionConfirmada?: number,
+    evaluadorRemoto?: EvaluadorReporteTerreno
   ): ReportePrioridadTerrenoLocal => {
-    const evaluadorFinal = evaluadorRemoto ?? evaluadorSesion;
     const versionFinal = versionConfirmada ?? versionReporte;
+    const evaluadorFinal = evaluadorRemoto ?? evaluadorSesion;
     return {
       id: idRemoto || `rep-prio-v${versionFinal}-${Date.now()}`,
       versionReporte: versionFinal,
@@ -615,16 +616,19 @@ export async function asignarPrioridadEnTerreno(
     );
 
     if (!error && data) {
-      const reporteRemotoObj = data.data?.reporteTerreno as
+      const reporteTerrenoObj = data.data?.reporteTerreno as
         | { id?: string; versionReporte?: number; evaluador?: unknown }
         | undefined;
-      const evaluadorRemoto = extraerEvaluadorDeObjeto(reporteRemotoObj?.evaluador);
-      const versionConfirmada = reporteRemotoObj?.versionReporte ?? versionReporte;
+      const versionConfirmada =
+        reporteTerrenoObj?.versionReporte ?? versionReporte;
+      const evaluadorRemoto = extraerEvaluadorDeObjeto(
+        reporteTerrenoObj?.evaluador
+      );
       const reporteOnline = construirReporteLocal(
         true,
-        reporteRemotoObj?.id,
-        evaluadorRemoto,
-        versionConfirmada
+        reporteTerrenoObj?.id,
+        versionConfirmada,
+        evaluadorRemoto
       );
       const misionActualizada = await actualizarMisionConReporte(
         reporteOnline,

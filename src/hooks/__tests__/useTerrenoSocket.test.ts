@@ -259,5 +259,60 @@ describe('useTerrenoSocket hook (H85)', () => {
     expect(mockSocket.off).toHaveBeenCalledWith('mision:actualizada', expect.any(Function));
     expect(mockSocket.off).toHaveBeenCalledWith('incidente:actualizado', expect.any(Function));
   });
+
+  it('filtra mision:rechazada por cuadrillaId y despacha sgrai:mision-rechazada solo para la unidad activa (BUG-H41-PWA-04)', () => {
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: {
+        id: 'u-cuad-1',
+        rut: '15.111.222-3',
+        nombre: 'Delegado Cuadrilla',
+        email: 'delegado@valdivia.cl',
+        rolId: 'r-2',
+        rolNombre: 'Delegado de Cuadrilla',
+        rolCodigo: 'DELEGADO_CUADRILLA',
+        delegacionId: 'del-2',
+        delegacionNombre: 'Las Ánimas',
+        permisos: ['misiones:terreno:ejecutar'],
+        unidadId: 'cuad-99',
+        unidadNombre: 'Cuadrilla Sur',
+        unidadActiva: true,
+      },
+      token: 'jwt-cuadrilla',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: false,
+      esCuadrilla: true,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: recargarSesionMock,
+    });
+
+    const listenerSpy = vi.fn();
+    window.addEventListener('sgrai:mision-rechazada', listenerSpy);
+
+    renderHook(() => useTerrenoSocket());
+
+    act(() => {
+      mockSocket.trigger('mision:rechazada', { misionId: 'm-otra', cuadrillaId: 'cuad-otra' });
+    });
+    expect(listenerSpy).not.toHaveBeenCalled();
+
+    act(() => {
+      mockSocket.trigger('mision:rechazada', { misionId: 'm-mia', cuadrillaId: 'cuad-99' });
+    });
+    expect(listenerSpy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      mockSocket.trigger('mision:rechazada', { misionId: 'm-sin-unidad' });
+    });
+    expect(listenerSpy).toHaveBeenCalledTimes(2);
+
+    window.removeEventListener('sgrai:mision-rechazada', listenerSpy);
+  });
 });
 

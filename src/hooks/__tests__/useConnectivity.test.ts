@@ -3,6 +3,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { useConnectivity } from '../useConnectivity';
 import * as offlineQueue from '@/services/offlineQueue';
 import { obtenerDetalleMision } from '@/services/misionesService';
+import { setAuthCookie, removeAuthCookie } from '@/lib/utils/cookieUtils';
 
 vi.mock('@/services/offlineQueue');
 vi.mock('@/services/misionesService', () => ({
@@ -51,18 +52,38 @@ describe('useConnectivity hook', () => {
     expect(result.current.online).toBe(true);
   });
 
-  it('no descarta ACTUALIZAR_TIPOLOGIA del outbox ante 409 Conflict', async () => {
+  it('no descarta ACTUALIZAR_TIPOLOGIA del outbox ante 409 Conflict (BUG-INT-PWA-08)', async () => {
+    const misionId = '60000000-0000-4000-8000-000000000001';
+    vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+      id: misionId,
+      incidenteId: '50000000-0000-4000-8000-000000000001',
+      codigoIncidente: 'INC-2026-0001',
+      tipologia: 'Inundación',
+      direccion: 'Valdivia',
+      prioridad: 'ALTA',
+      estado: 'EN_CURSO',
+      fechaDespacho: '2026-11-10T00:00:00Z',
+      actualizadoEn: '2026-11-10T00:00:00Z',
+      sincronizacionPendiente: true,
+      datosAdicionales: { tipologiaEvaluada: true },
+    });
+
+    let ejecutorResultado = true;
     vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (ejecutor) => {
-      const ok = await ejecutor({
+      ejecutorResultado = await ejecutor({
         id: 'act-tip-1',
         tipo: 'ACTUALIZAR_TIPOLOGIA',
         url: '/api/incidentes/50000000-0000-4000-8000-000000000001/tipologia',
         metodo: 'PATCH',
-        payload: { tipoIncidenteId: '40000000-0000-4000-8000-000000000001', justificacion: 'Motivo' },
+        payload: {
+          misionId,
+          tipoIncidenteId: '40000000-0000-4000-8000-000000000001',
+          justificacion: 'Motivo',
+        },
         timestamp: new Date().toISOString(),
         intentos: 0,
       });
-      return { total: 1, exitosas: ok ? 1 : 0, fallidas: ok ? 0 : 1 };
+      return { total: 1, exitosas: ejecutorResultado ? 1 : 0, fallidas: ejecutorResultado ? 0 : 1 };
     });
 
     const fetchSpy = vi
@@ -75,7 +96,9 @@ describe('useConnectivity hook', () => {
     });
 
     expect(fetchSpy).toHaveBeenCalled();
+    expect(ejecutorResultado).toBe(false);
     expect(offlineQueue.guardarMisionLocal).not.toHaveBeenCalled();
+    expect(offlineQueue.eliminarAccionOutbox).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
 
@@ -142,6 +165,61 @@ describe('useConnectivity hook', () => {
       })
     );
     expect(offlineQueue.eliminarAccionOutbox).toHaveBeenCalledWith('act-tip-err-1');
+    expect(obtenerDetalleMision).toHaveBeenCalledWith(misionId);
+    fetchSpy.mockRestore();
+  });
+
+  it('reconcilia ENVIAR_REPORTE exitoso (201) y revierte cierre optimista ante rechazo 403/409 (BUG-H39-PWA-03)', async () => {
+    const misionId = '60000000-0000-4000-8000-000000000039';
+    vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+      id: misionId,
+      incidenteId: 'inc-39',
+      codigoIncidente: 'INC-2026-0039',
+      tipologia: 'Inundación',
+      direccion: 'Valdivia',
+      prioridad: 'ALTA',
+      estado: 'COMPLETADA',
+      fechaDespacho: '2026-11-10T01:00:00Z',
+      sincronizacionPendiente: true,
+      datosAdicionales: {
+        trabajo: 'Verificar',
+        reporteVerificacionEnviado: true,
+        dictamenVerificacion: 'REQUIERE_CUADRILLA',
+        reporteVerificacion: { id: 'rep-local', sincronizado: false },
+      },
+      actualizadoEn: '2026-11-10T01:10:00Z',
+    });
+
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (ejecutor) => {
+      await ejecutor({
+        id: 'act-rep-403',
+        tipo: 'ENVIAR_REPORTE',
+        url: `/api/misiones/${misionId}/reporte`,
+        metodo: 'POST',
+        payload: { dictamen: 'REQUIERE_CUADRILLA', resumen_tecnico: 'Test rollback.' },
+        timestamp: new Date().toISOString(),
+        intentos: 0,
+      });
+      return { total: 1, exitosas: 1, fallidas: 0 };
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ message: 'Forbidden' }), { status: 403 }));
+
+    const { result } = renderHook(() => useConnectivity());
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: misionId,
+        estado: 'EN_CURSO',
+        sincronizacionPendiente: false,
+      })
+    );
+    expect(offlineQueue.eliminarAccionOutbox).toHaveBeenCalledWith('act-rep-403');
     expect(obtenerDetalleMision).toHaveBeenCalledWith(misionId);
     fetchSpy.mockRestore();
   });
@@ -336,6 +414,93 @@ describe('useConnectivity hook', () => {
     fetchSpy.mockRestore();
   });
 
+  it('no inyecta bypass x-user-id ante token no-JWT en outbox (BUG-INT-PWA-07)', async () => {
+    setAuthCookie('dev-patrulla-token');
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (ejecutor) => {
+      const ok = await ejecutor({
+        id: 'act-auth-1',
+        tipo: 'ACEPTAR_MISION',
+        url: '/api/misiones/mis-auth-1/aceptar',
+        metodo: 'POST',
+        payload: {},
+        timestamp: new Date().toISOString(),
+        intentos: 0,
+      });
+      return { total: 1, exitosas: ok ? 1 : 0, fallidas: ok ? 0 : 1 };
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+    const { result } = renderHook(() => useConnectivity());
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+
+    const [, initArg] = fetchSpy.mock.calls[0];
+    const headers = (initArg?.headers || {}) as Record<string, string>;
+    expect(headers['Authorization']).toBe('Bearer dev-patrulla-token');
+    expect(headers['x-user-id']).toBeUndefined();
+
+    removeAuthCookie();
+    fetchSpy.mockRestore();
+  });
+
+  it('revierte rechazo optimista y refresca desde servidor si RECHAZAR_MISION recibe 409 Conflict (BUG-INT-PWA-08)', async () => {
+    vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+      id: 'mis-rech-409',
+      incidenteId: 'inc-rech-409',
+      codigoIncidente: 'INC-2026-0409',
+      tipologia: 'Caída de árbol',
+      direccion: 'Valdivia',
+      prioridad: 'ALTA',
+      estado: 'EN_CURSO',
+      fechaDespacho: '2026-11-01T20:30:00Z',
+      sincronizacionPendiente: true,
+      datosAdicionales: {
+        trabajo: 'Verificar caída',
+        justificacionRechazo: 'Falla mecánica',
+      },
+      actualizadoEn: '2026-11-01T20:30:00Z',
+    });
+
+    let ejecutorResultado = false;
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (ejecutor) => {
+      ejecutorResultado = await ejecutor({
+        id: 'outbox-rech-409',
+        tipo: 'RECHAZAR_MISION',
+        url: '/api/misiones/mis-rech-409/rechazar',
+        metodo: 'POST',
+        payload: { justificacion_rechazo: 'Falla mecánica' },
+        timestamp: new Date().toISOString(),
+        intentos: 0,
+      });
+      return { total: 1, exitosas: ejecutorResultado ? 1 : 0, fallidas: ejecutorResultado ? 0 : 1 };
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ message: 'Conflicto de estado' }), { status: 409 }));
+
+    const { result } = renderHook(() => useConnectivity());
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+
+    expect(ejecutorResultado).toBe(true);
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'mis-rech-409',
+        estado: 'EN_CURSO',
+        sincronizacionPendiente: false,
+        datosAdicionales: { trabajo: 'Verificar caída' },
+      })
+    );
+    expect(offlineQueue.eliminarAccionOutbox).toHaveBeenCalledWith('outbox-rech-409');
+    expect(obtenerDetalleMision).toHaveBeenCalledWith('mis-rech-409');
+    fetchSpy.mockRestore();
+  });
   it('sincroniza acción RECHAZAR_MISION y limpia sincronizacionPendiente en IndexedDB', async () => {
     vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
       id: 'mis-rech-1',
@@ -389,5 +554,73 @@ describe('useConnectivity hook', () => {
       })
     );
     fetchSpy?.mockRestore();
+  });
+
+  it('revierte estado local a DESPACHADA, limpia justificacionRechazo, elimina acción del outbox y refresca ante errores 409/403/400 en RECHAZAR_MISION (BUG-H41-PWA-03 / PWA-04)', async () => {
+    for (const statusError of [409, 403, 400]) {
+      vi.clearAllMocks();
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: 'mis-rech-err',
+        incidenteId: 'inc-1',
+        codigoIncidente: 'INC-2026-0001',
+        tipologia: 'Caída de árbol',
+        direccion: 'Valdivia',
+        prioridad: 'ALTA',
+        estado: 'RECHAZADA',
+        fechaDespacho: '2026-11-01T20:30:00Z',
+        sincronizacionPendiente: true,
+        datosAdicionales: {
+          justificacionRechazo: 'Falla mecánica optimista',
+          trabajo: 'Despeje',
+        },
+        actualizadoEn: '2026-11-01T20:30:00Z',
+      });
+
+      vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (callback) => {
+        global.fetch = vi.fn().mockResolvedValue({
+          ok: false,
+          status: statusError,
+          clone: () => ({ json: async () => ({ message: 'Conflicto o rechazo inválido' }) }),
+        } as unknown as Response);
+
+        const procesada = await callback({
+          id: `outbox-rech-err-${statusError}`,
+          tipo: 'RECHAZAR_MISION',
+          url: '/api/misiones/mis-rech-err/rechazar',
+          metodo: 'POST',
+          payload: { justificacion_rechazo: 'Falla mecánica optimista' },
+          timestamp: new Date().toISOString(),
+          intentos: 0,
+        });
+        expect(procesada).toBe(true);
+
+        return { total: 1, exitosas: 1, fallidas: 0 };
+      });
+
+      if (statusError === 409) {
+        vi.mocked(obtenerDetalleMision).mockRejectedValueOnce(new Error('Fallo de red al refrescar'));
+      } else {
+        vi.mocked(obtenerDetalleMision).mockResolvedValueOnce(null);
+      }
+
+      const { result } = renderHook(() => useConnectivity());
+
+      await act(async () => {
+        await result.current.sincronizar();
+      });
+
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'mis-rech-err',
+          estado: 'DESPACHADA',
+          sincronizacionPendiente: false,
+          datosAdicionales: { trabajo: 'Despeje' },
+        })
+      );
+      expect(offlineQueue.eliminarAccionOutbox).toHaveBeenCalledWith(
+        `outbox-rech-err-${statusError}`
+      );
+      expect(obtenerDetalleMision).toHaveBeenCalledWith('mis-rech-err');
+    }
   });
 });

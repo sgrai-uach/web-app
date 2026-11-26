@@ -58,14 +58,6 @@ export function useTerrenoSocket(): void {
       }
     };
 
-    const manejarMisionRechazada = (data?: { misionId?: string; cuadrillaId?: string }) => {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('sgrai:mision-rechazada', { detail: data })
-        );
-      }
-    };
-
     const manejarSincronizacionMision = (data?: unknown) => {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
@@ -83,14 +75,29 @@ export function useTerrenoSocket(): void {
       }
     };
 
+    const manejarMisionRechazada = (data?: {
+      misionId?: string;
+      cuadrillaId?: string | null;
+      patrullaId?: string | null;
+    }) => {
+      const unidadPayloadId = esCuadrilla ? data?.cuadrillaId : data?.patrullaId;
+      if (!unidadPayloadId || unidadPayloadId === usuario.unidadId) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('sgrai:mision-rechazada', { detail: data })
+          );
+        }
+      }
+    };
+
     socket.on('patrulla:desactivada', manejarDesactivacion);
     socket.on('cuadrilla:desactivada', manejarDesactivacion);
-    socket.on('mision:rechazada', manejarMisionRechazada);
     socket.on('mision:actualizada', manejarSincronizacionMision);
     socket.on('incidente:actualizado', manejarSincronizacionMision);
     socket.on('patrulla:actualizada', manejarSincronizacionMision);
     socket.on('patrulla:liberada', manejarSincronizacionMision);
     socket.on('mision:asignada', manejarSincronizacionMision);
+    socket.on('mision:rechazada', manejarMisionRechazada);
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', manejarVisibilidad);
     }
@@ -98,12 +105,12 @@ export function useTerrenoSocket(): void {
     return () => {
       socket.off('patrulla:desactivada', manejarDesactivacion);
       socket.off('cuadrilla:desactivada', manejarDesactivacion);
-      socket.off('mision:rechazada', manejarMisionRechazada);
       socket.off('mision:actualizada', manejarSincronizacionMision);
       socket.off('incidente:actualizado', manejarSincronizacionMision);
       socket.off('patrulla:actualizada', manejarSincronizacionMision);
       socket.off('patrulla:liberada', manejarSincronizacionMision);
       socket.off('mision:asignada', manejarSincronizacionMision);
+      socket.off('mision:rechazada', manejarMisionRechazada);
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', manejarVisibilidad);
       }

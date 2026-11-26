@@ -37,7 +37,9 @@ function getLocalDevOrigins(): string[] {
 const apiBackendUrl =
   process.env.INTERNAL_API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:4001";
+  (process.env.NODE_ENV === "development"
+    ? "http://localhost:3001"
+    : "http://localhost:4001");
 
 const nextConfig: NextConfig = {
   output: "standalone",

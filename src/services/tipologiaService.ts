@@ -326,24 +326,23 @@ export async function reclasificarTipologiaEnTerreno(
     );
 
     if (!error && data) {
-      const tipologiaServidor =
-        data.data?.incidente?.tipoAfectacion || nuevoNombre;
-      const hito = data.data?.hito as
-        | (Record<string, unknown> & {
-            creadoEn?: string;
+      const tipologiaServidor = data.data?.incidente?.tipoAfectacion || nuevoNombre;
+      const hitoRemoto = data.data?.hito as
+        | {
             metadatos?: { evaluador?: unknown };
             registradoPor?: unknown;
-          })
+            creadoEn?: string;
+          }
         | undefined;
       const evaluadorRemoto =
-        extraerEvaluadorDeObjeto(hito?.metadatos?.evaluador) ??
-        extraerEvaluadorDeObjeto(hito?.registradoPor);
+        extraerEvaluadorDeObjeto(hitoRemoto?.metadatos?.evaluador) ??
+        extraerEvaluadorDeObjeto(hitoRemoto?.registradoPor);
 
       const misionActualizada = await construirYGuardarMision({
         tipologiaNombre: tipologiaServidor,
         pendienteSync: false,
         actualizadoEn: data.data?.incidente?.actualizadoEn || ahoraIso,
-        fechaEvaluacion: hito?.creadoEn || ahoraIso,
+        fechaEvaluacion: hitoRemoto?.creadoEn || ahoraIso,
         evaluador: evaluadorRemoto,
         hitoReclasificacion: data.data?.hito,
       });

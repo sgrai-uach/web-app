@@ -72,6 +72,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
   const [seccionCategorizacionAbierta, setSeccionCategorizacionAbierta] = useState<boolean>(true);
   const [seccionPrioridadAbierta, setSeccionPrioridadAbierta] = useState<boolean>(false);
+  const [prioridadMontada, setPrioridadMontada] = useState<boolean>(false);
   const [seccionReporteCierreAbierta, setSeccionReporteCierreAbierta] = useState<boolean>(false);
   const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
   const [feedbackMensaje, setFeedbackMensaje] = useState<{
@@ -106,14 +107,18 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
             Boolean(reporteCierre) ||
             Boolean(encontrada.datosAdicionales?.reporteVerificacionEnviado);
 
+          const abrirPrioridad =
+            tipologiaYaEvaluada && !prioridadYaEvaluada && !yaCerrada;
           setSeccionCategorizacionAbierta(!tipologiaYaEvaluada && !yaCerrada);
-          setSeccionPrioridadAbierta(
-            tipologiaYaEvaluada && !prioridadYaEvaluada && !yaCerrada
-          );
+          setSeccionPrioridadAbierta(abrirPrioridad);
+          if (abrirPrioridad) {
+            setPrioridadMontada(true);
+          }
           setSeccionReporteCierreAbierta(
-            (tipologiaYaEvaluada && prioridadYaEvaluada) ||
+            ((tipologiaYaEvaluada && prioridadYaEvaluada) ||
               yaCerrada ||
-              cierreYaEnviado
+              cierreYaEnviado) &&
+              estadoNorm !== 'RECHAZADA'
           );
         } else {
           setMision(null);
@@ -246,7 +251,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
 
   const tienePermisoCrearReporte =
     typeof tienePermiso === 'function'
-      ? tienePermiso('reportes:crear') || tienePermiso('misiones:terreno:verificar')
+      ? tienePermiso('reportes:crear')
       : false;
 
   const mostrarBotonAceptar =
@@ -261,7 +266,8 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     estadoNormalizado === 'RECHAZADA';
   const esSoloLectura = !unidadActiva || esFinalizada;
   const mostrarFormulariosTecnicos =
-    (unidadActiva && esEnCurso) || (tieneUnidadAsignada && esFinalizada);
+    (unidadActiva && esEnCurso) ||
+    (tieneUnidadAsignada && esFinalizada && estadoNormalizado !== 'RECHAZADA');
 
   const esRechazable =
     unidadActiva &&
@@ -288,10 +294,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
               ...prev,
               estado: 'RECHAZADA',
               sincronizacionPendiente: Boolean(res.modoOffline),
-              actualizadoEn:
-                (res.mision && 'actualizadoEn' in res.mision
-                  ? res.mision.actualizadoEn
-                  : undefined) || new Date().toISOString(),
+              actualizadoEn: res.mision?.actualizadoEn || new Date().toISOString(),
               datosAdicionales: {
                 ...prev.datosAdicionales,
                 justificacionRechazo: motivo,
@@ -642,9 +645,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                         setSeccionCategorizacionAbierta(false);
                         if (!prioridadCompletada) {
                           setSeccionPrioridadAbierta(true);
+                          setPrioridadMontada(true);
                         } else if (!cierreCompletado) {
                           setSeccionReporteCierreAbierta(true);
                         }
+                        void actualizarPendientes();
                       }}
                     />
                   </SeccionDesplegable>
@@ -653,7 +658,12 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                     titulo="Evaluación en terreno y prioridad"
                     icono={<ShieldAlert size={18} />}
                     abierto={seccionPrioridadAbierta}
-                    onToggle={(abierto) => setSeccionPrioridadAbierta(abierto)}
+                    onToggle={(abierto) => {
+                      setSeccionPrioridadAbierta(abierto);
+                      if (abierto) {
+                        setPrioridadMontada(true);
+                      }
+                    }}
                     indicador={
                       prioridadCompletada ? (
                         <Chip
@@ -673,12 +683,13 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                       ) : null
                     }
                   >
-                    <EvaluacionPrioridadCard
-                      incidenteId={mision.incidenteId}
-                      misionActual={mision}
-                      usuarioActualId={usuario?.id}
-                      deshabilitado={esSoloLectura || !tienePermisoVerificar}
-                      onPrioridadActualizada={(resultado) => {
+                    {(prioridadMontada || seccionPrioridadAbierta) && (
+                      <EvaluacionPrioridadCard
+                        incidenteId={mision.incidenteId}
+                        misionActual={mision}
+                        usuarioActualId={usuario?.id}
+                        deshabilitado={esSoloLectura || !tienePermisoVerificar}
+                        onPrioridadActualizada={(resultado) => {
                           if (resultado.mision) {
                             setMision(resultado.mision);
                           }
@@ -689,6 +700,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                           void actualizarPendientes();
                         }}
                       />
+                    )}
                   </SeccionDesplegable>
 
                   <SeccionDesplegable
@@ -713,29 +725,51 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                     }
                   >
                     {seccionReporteCierreAbierta && (
-                      <EvaluacionReporteCierreCard
-                        misionActual={mision}
-                        usuarioActualId={usuario?.id}
-                        deshabilitado={esSoloLectura || !tienePermisoCrearReporte}
-                        onReporteEnviado={(resultado) => {
-                          if (resultado.mision) {
-                            setMision(resultado.mision);
-                          }
-                          setMensajeConfirmacion(resultado.mensaje);
-                          if (toast) {
-                            if (resultado.offline) {
-                              toast.showWarning(
-                                resultado.mensaje,
-                                'Guardado sin conexión'
-                              );
-                            } else {
-                              toast.showSuccess(resultado.mensaje, 'Misión cerrada');
+                      <>
+                        {!esSoloLectura && !tienePermisoCrearReporte && (
+                          <div
+                            role="alert"
+                            style={{
+                              padding: '0.75rem 1rem',
+                              marginBottom: '0.75rem',
+                              backgroundColor: 'var(--color-warning-bg, #FFF3E0)',
+                              border: '1px solid var(--color-warning, #E65100)',
+                              color: 'var(--color-text-dark, #2B2B2B)',
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            Su perfil no cuenta con el permiso{' '}
+                            <code>reportes:crear</code> necesario para enviar el informe
+                            técnico y cerrar la misión.
+                          </div>
+                        )}
+                        <EvaluacionReporteCierreCard
+                          misionActual={mision}
+                          usuarioActualId={usuario?.id}
+                          deshabilitado={esSoloLectura || !tienePermisoCrearReporte}
+                          onReporteEnviado={(resultado) => {
+                            if (resultado.mision) {
+                              setMision(resultado.mision);
                             }
-                          }
-                          void actualizarPendientes();
-                          router.push('/patrulla/misiones');
-                        }}
-                      />
+                            setMensajeConfirmacion(resultado.mensaje);
+                            if (toast) {
+                              if (resultado.offline) {
+                                toast.showWarning(
+                                  resultado.mensaje,
+                                  'Guardado sin conexión'
+                                );
+                              } else {
+                                toast.showSuccess(resultado.mensaje, 'Misión cerrada');
+                              }
+                            }
+                            if (typeof window !== 'undefined') {
+                              window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
+                            }
+                            void actualizarPendientes();
+                            router.push('/patrulla/misiones');
+                          }}
+                        />
+                      </>
                     )}
                   </SeccionDesplegable>
                 </>

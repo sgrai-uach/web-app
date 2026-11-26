@@ -307,4 +307,96 @@ describe('PatrullaMisionDetailPage — Informe Técnico de Verificación y Cierr
       expect(within(resumen).getAllByText(/Personal 1 \(p1@valdivia\.cl\) ·/i)).toHaveLength(1);
     });
   });
+
+  it('valida flujo NO_ABORDABLE (<15 vs >=15 chars), captura estado_terreno y cierra el modal automáticamente si llega sgrai:mision-sincronizada (BUG-H39-PWA-02/05)', async () => {
+    const misionCerradaConcurrente: MisionLocal = {
+      ...misionListaParaCierreMock,
+      estado: 'COMPLETADA',
+      datosAdicionales: {
+        ...misionListaParaCierreMock.datosAdicionales,
+        reporteVerificacionEnviado: true,
+        dictamenVerificacion: 'NO_ABORDABLE',
+        reportesTerreno: [
+          {
+            id: 'rep-cierre-conc',
+            tipoReporte: 'VERIFICACION_CIERRE',
+            dictamen: 'NO_ABORDABLE',
+            motivoNoAbordable: 'Predio privado inaccesible verificado por compañero.',
+            resumenTecnico: 'Cerrado concurrentemente.',
+            estadoTerreno: 'INACCESIBLE',
+            personasAfectadas: 0,
+            requiereAsistenciaSocial: false,
+            evaluador: { id: 'usr-p1', nombre: 'Personal 1', email: 'p1@valdivia.cl' },
+            adjuntos: [{ id: 'adj-1', nombreArchivo: 'porton_cerrado.jpg' }],
+            creadoEn: '2026-11-16T01:10:00Z',
+          },
+        ],
+      },
+    };
+
+    vi.mocked(misionesService.obtenerDetalleMision)
+      .mockResolvedValueOnce(misionListaParaCierreMock)
+      .mockResolvedValueOnce(misionCerradaConcurrente);
+
+    await act(async () => {
+      render(
+        <Suspense fallback={<div>Cargando...</div>}>
+          <PatrullaMisionDetailPage
+            params={Promise.resolve({ id: misionListaParaCierreMock.id })}
+          />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Estado del terreno/i)).toBeInTheDocument();
+    });
+
+    // Cambiar estado del terreno a INACCESIBLE y dictamen a NO_ABORDABLE
+    fireEvent.change(screen.getByLabelText(/Estado del terreno/i), {
+      target: { value: 'INACCESIBLE' },
+    });
+    fireEvent.click(screen.getByRole('radio', { name: /No abordable/i }));
+    fireEvent.change(screen.getByLabelText(/Resumen técnico del siniestro/i), {
+      target: { value: 'Inspección perimetral desde calle sin ingreso posible.' },
+    });
+
+    // Motivo corto (< 15 chars): al intentar enviar muestra alerta de validación y no abre modal
+    fireEvent.change(screen.getByLabelText(/Motivo de No Abordabilidad/i), {
+      target: { value: 'Muy corto' },
+    });
+    const btnEnviarCorto = screen.getByRole('button', {
+      name: /Enviar Reporte y Cerrar Tarea/i,
+    });
+    expect(btnEnviarCorto).not.toBeDisabled();
+    fireEvent.click(btnEnviarCorto);
+    expect(screen.getAllByRole('alert')[0]).toHaveTextContent(/al menos 15 caracteres/i);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // Motivo válido (>= 15 chars): abre modal de confirmación danger
+    fireEvent.change(screen.getByLabelText(/Motivo de No Abordabilidad/i), {
+      target: { value: 'Emergencia ubicada dentro de predio privado sin acceso.' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: /Enviar Reporte y Cerrar Tarea/i })
+    );
+
+    expect(
+      screen.getByText('Confirmar Cierre como No Abordable')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Estado del Terreno')).toBeInTheDocument();
+
+    // Simular cierre concurrente por otro patrullero -> el modal se cierra y aparece el resumen con adjunto
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('sgrai:mision-sincronizada'));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Confirmar Cierre como No Abordable')
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('resumen-reporte-cierre')).toBeInTheDocument();
+      expect(screen.getByText(/porton_cerrado\.jpg/i)).toBeInTheDocument();
+    });
+  });
 });

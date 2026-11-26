@@ -97,7 +97,7 @@ export function EvaluacionTipologiaCard({
     tipologiaOriginalRef.current = tipologiaOriginal;
   }, [tipologiaOriginal]);
 
-  // Carga inicial del catálogo de tipos (con fallback offline y protección de desmontaje)
+  // Carga inicial única del catálogo de tipos al montar (con fallback offline y protección de desmontaje)
   useEffect(() => {
     let isMounted = true;
 

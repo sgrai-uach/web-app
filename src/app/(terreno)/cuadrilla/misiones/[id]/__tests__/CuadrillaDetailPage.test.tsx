@@ -1,5 +1,5 @@
-import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import React, { Suspense } from 'react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CuadrillaMisionDetailPage from '../page';
 import { useAuth } from '@/context/AuthContext';
@@ -49,7 +49,8 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
   const actualizarPendientesMock = vi.fn().mockResolvedValue(0);
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    actualizarPendientesMock.mockResolvedValue(0);
 
     vi.mocked(useConnectivity).mockReturnValue({
       status: 'synced',
@@ -77,7 +78,13 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
   });
 
   it('muestra el botón Rechazar Misión cuando la misión está DESPACHADA y el delegado tiene permiso', async () => {
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />);
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();
@@ -98,7 +105,13 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
       tienePermiso: () => false,
     } as never);
 
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />);
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();
@@ -115,7 +128,13 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
       mensaje: 'Misión rechazada exitosamente.',
     });
 
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />);
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
 
     await waitFor(() => {
       expect(
@@ -153,7 +172,9 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
 
     await waitFor(() => {
       expect(actualizarPendientesMock).toHaveBeenCalled();
-      expect(mockPush).toHaveBeenCalledWith('/cuadrilla/misiones');
+      expect(mockPush).toHaveBeenCalledWith(
+        '/cuadrilla/misiones?rechazo=ok&msg=Misi%C3%B3n+rechazada+exitosamente.'
+      );
     });
   });
 
@@ -174,12 +195,18 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
         p === 'misiones:terreno:ejecutar' || p === 'reportes:crear',
     } as never);
 
-    vi.mocked(obtenerDetalleMision).mockResolvedValue({
+    vi.mocked(obtenerDetalleMision).mockResolvedValueOnce({
       ...misionDespachada,
       estado: 'EN_CURSO',
     });
 
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />);
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Evidencia Multimedia')).toBeInTheDocument();
@@ -189,12 +216,127 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
   });
 
   it('oculta los controles de carga de evidencia si la misión está DESPACHADA o falta permiso reportes:crear', async () => {
-    render(<CuadrillaMisionDetailPage params={{ id: misionDespachada.id } as unknown as Promise<{ id: string }>} />);
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
 
     await waitFor(() => {
       expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();
     });
 
     expect(screen.queryByText('Evidencia Multimedia')).not.toBeInTheDocument();
+  });
+
+  it('oculta acciones si el estado no es DESPACHADA, si unidadActiva es false, esCuadrilla es false o SIN_ASIGNACION, y muestra justificación en RECHAZADA (BUG-H41-PWA-04)', async () => {
+    // 1. Estado EN_CURSO
+    vi.mocked(obtenerDetalleMision).mockResolvedValueOnce({
+      ...misionDespachada,
+      estado: 'EN_CURSO',
+    });
+
+    let unmount1!: () => void;
+    await act(async () => {
+      ({ unmount: unmount1 } = render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      ));
+    });
+    await waitFor(() => expect(screen.getByText('INC-2026-0001')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /Rechazar Misión/i })).not.toBeInTheDocument();
+    unmount1();
+
+    // 2. Estado RECHAZADA con justificación
+    vi.mocked(obtenerDetalleMision).mockResolvedValueOnce({
+      ...misionDespachada,
+      estado: 'RECHAZADA',
+      datosAdicionales: { justificacionRechazo: 'Falla mecánica reportada previamente' },
+    });
+
+    let unmount2!: () => void;
+    await act(async () => {
+      ({ unmount: unmount2 } = render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      ));
+    });
+    await waitFor(() =>
+      expect(screen.getByText('Falla mecánica reportada previamente')).toBeInTheDocument()
+    );
+    expect(screen.getByText(/Solo lectura/i)).toBeInTheDocument();
+    unmount2();
+
+    // 3. SIN_ASIGNACION y esCuadrilla false
+    vi.mocked(useAuth).mockReturnValue({
+      usuario: { id: 'u-1', nombre: 'Juan' },
+      unidadActiva: false,
+      tieneUnidadAsignada: false,
+      estadoAsignacion: 'SIN_ASIGNACION',
+      esCuadrilla: false,
+      esPatrulla: false,
+      tienePermiso: () => true,
+    } as never);
+    vi.mocked(obtenerDetalleMision).mockResolvedValueOnce(misionDespachada);
+
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
+    await waitFor(() => expect(screen.getByText('INC-2026-0001')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /Rechazar Misión/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Solo lectura/i)).toBeInTheDocument();
+  });
+
+  it('propaga errores HTTP 409/403 dentro del modal sin redirigir y captura coordenadas GPS cuando están disponibles (BUG-H41-PWA-04)', async () => {
+    Object.defineProperty(navigator, 'geolocation', {
+      value: {
+        getCurrentPosition: vi.fn((ok) =>
+          ok({ coords: { latitude: -39.8142, longitude: -73.2458 } })
+        ),
+      },
+      configurable: true,
+    });
+
+    vi.mocked(rechazarMision).mockRejectedValueOnce(
+      new Error('No está autorizado para rechazar esta misión.')
+    );
+
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Rechazar Misión/i })).toBeInTheDocument()
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Rechazar Misión/i }));
+    fireEvent.change(screen.getByLabelText(/Motivo del Rechazo/i), {
+      target: { value: 'Camión tolva con falla eléctrica' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar Rechazo/i }));
+
+    await waitFor(() => {
+      expect(rechazarMision).toHaveBeenCalledWith(misionDespachada.id, {
+        justificacion_rechazo: 'Camión tolva con falla eléctrica',
+        latitud: -39.8142,
+        longitud: -73.2458,
+      });
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'No está autorizado para rechazar esta misión.'
+      );
+    });
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });

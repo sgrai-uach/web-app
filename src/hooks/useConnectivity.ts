@@ -22,8 +22,6 @@ import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge
 import type { EvidenciaOutboxPayload } from '@/types/offline';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
 import {
-  DEV_PATRULLA_TOKEN,
-  DEV_PATRULLA_USER_ID,
   extractUserIdFromJwt,
   handleUnauthorizedSession,
 } from '@/lib/api/client';
@@ -68,9 +66,7 @@ export function useConnectivity() {
 
       await sincronizarColaOutbox(async (accion) => {
         const authHeaders: Record<string, string> = {};
-        if (token === DEV_PATRULLA_TOKEN) {
-          authHeaders['x-user-id'] = DEV_PATRULLA_USER_ID;
-        } else if (token) {
+        if (token) {
           authHeaders['Authorization'] = `Bearer ${token}`;
           const userId = extractUserIdFromJwt(token);
           if (userId) {
@@ -126,7 +122,7 @@ export function useConnectivity() {
             } catch {
               esConflictoTerminal = true;
             }
-          } else {
+          } else if (accion.tipo !== 'ACTUALIZAR_TIPOLOGIA') {
             esConflictoTerminal = true;
           }
         }
@@ -252,6 +248,7 @@ export function useConnectivity() {
             }
           }
         }
+
         if (accion.tipo === 'ACEPTAR_MISION') {
           const match = accion.url.match(/\/api\/misiones\/([^/]+)\/aceptar/);
           const misionId = match?.[1];
@@ -302,39 +299,8 @@ export function useConnectivity() {
               }
             }
           }
-        } else if (accion.tipo === 'RECHAZAR_MISION') {
-          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/rechazar/);
-          const misionId = match?.[1];
-          if (misionId && (esExito || esConflictoTerminal || esErrorIrrecuperable)) {
-            try {
-              const local = await obtenerMisionLocalPorId(misionId);
-              if (local) {
-                let actualizadoServidor = local.actualizadoEn || new Date().toISOString();
-                if (esExito) {
-                  try {
-                    const bodyJson = await res.clone().json();
-                    if (bodyJson?.data?.mision?.actualizadoEn) {
-                      actualizadoServidor = bodyJson.data.mision.actualizadoEn;
-                    }
-                  } catch {
-                    // Ignorar si la respuesta no contiene JSON
-                  }
-                }
-                await guardarMisionLocal({
-                  ...local,
-                  estado: esExito ? 'RECHAZADA' : local.estado,
-                  sincronizacionPendiente: false,
-                  actualizadoEn: actualizadoServidor,
-                });
-              }
-              if (!esExito) {
-                await obtenerDetalleMision(misionId);
-              }
-            } catch {
-              // Ignorar fallos de lectura/escritura secundaria en IndexedDB
-            }
-          }
-        } else if (accion.tipo === 'SUBIR_EVIDENCIA') {
+        }
+        if (accion.tipo === 'SUBIR_EVIDENCIA') {
           const evPayload = accion.payload as EvidenciaOutboxPayload;
           if (esExito) {
             try {
@@ -368,22 +334,162 @@ export function useConnectivity() {
           const match = accion.url.match(/\/api\/misiones\/([^/]+)\/reporte/);
           const misionId = match?.[1];
           if (misionId) {
-            try {
-              const local = await obtenerMisionLocalPorId(misionId);
-              if (local) {
-                await guardarMisionLocal({
-                  ...local,
-                  ...(res.ok ? { estado: 'COMPLETADA' } : {}),
-                  sincronizacionPendiente: false,
-                  actualizadoEn: new Date().toISOString(),
-                });
+            if (esExito) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  const reportePrevio = local.datosAdicionales?.reporteVerificacion as
+                    | Record<string, unknown>
+                    | undefined;
+                  await guardarMisionLocal({
+                    ...local,
+                    estado: 'COMPLETADA',
+                    sincronizacionPendiente: false,
+                    actualizadoEn: new Date().toISOString(),
+                    datosAdicionales: {
+                      ...local.datosAdicionales,
+                      ...(reportePrevio
+                        ? {
+                            reporteVerificacion: {
+                              ...reportePrevio,
+                              sincronizado: true,
+                            },
+                          }
+                        : {}),
+                    },
+                  });
+                }
+                if (typeof eliminarAccionOutbox === 'function') {
+                  await eliminarAccionOutbox(accion.id);
+                }
+                await obtenerDetalleMision(misionId);
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(
+                    new CustomEvent('sgrai:mision-sincronizada', {
+                      detail: { misionId },
+                    })
+                  );
+                }
+              } catch {
+                // Ignorar fallos de persistencia secundaria
               }
-            } catch {
-              // Ignorar fallos de persistencia secundaria
+            } else if (esConflictoTerminal || esErrorIrrecuperable) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  const datosRestaurados = { ...(local.datosAdicionales || {}) };
+                  delete datosRestaurados.reporteVerificacionEnviado;
+                  delete datosRestaurados.reporteVerificacionEnviadoEn;
+                  delete datosRestaurados.dictamenVerificacion;
+                  delete datosRestaurados.reporteVerificacion;
+                  if (Array.isArray(datosRestaurados.reportesTerreno)) {
+                    datosRestaurados.reportesTerreno = (
+                      datosRestaurados.reportesTerreno as Array<Record<string, unknown>>
+                    ).filter((r) => r.tipoReporte !== 'VERIFICACION_CIERRE');
+                  }
+                  await guardarMisionLocal({
+                    ...local,
+                    estado: 'EN_CURSO',
+                    sincronizacionPendiente: false,
+                    datosAdicionales: datosRestaurados,
+                    actualizadoEn: new Date().toISOString(),
+                  });
+                }
+                if (typeof window !== 'undefined' && window.localStorage) {
+                  try {
+                    const rawCache = window.localStorage.getItem('sgrai_evaluaciones_mision_v1');
+                    if (rawCache) {
+                      const parsedCache = JSON.parse(rawCache) as Record<
+                        string,
+                        Record<string, unknown>
+                      >;
+                      if (parsedCache[misionId]) {
+                        delete parsedCache[misionId].reporteVerificacionEnviado;
+                        delete parsedCache[misionId].reporteVerificacion;
+                        delete parsedCache[misionId].dictamenVerificacion;
+                        window.localStorage.setItem(
+                          'sgrai_evaluaciones_mision_v1',
+                          JSON.stringify(parsedCache)
+                        );
+                      }
+                    }
+                  } catch {
+                    // Ignorar errores de localStorage
+                  }
+                }
+                if (typeof eliminarAccionOutbox === 'function') {
+                  await eliminarAccionOutbox(accion.id);
+                }
+                await obtenerDetalleMision(misionId);
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(
+                    new CustomEvent('sgrai:sync-error', {
+                      detail: {
+                        tipo: accion.tipo,
+                        misionId,
+                        status: res.status,
+                      },
+                    })
+                  );
+                }
+              } catch {
+                // Ignorar fallos al refrescar estado real
+              }
             }
           }
         }
 
+        if (accion.tipo === 'RECHAZAR_MISION') {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/rechazar/);
+          const misionId = match?.[1];
+          if (misionId) {
+            if (esExito) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  let actualizadoServidor = local.actualizadoEn || new Date().toISOString();
+                  try {
+                    const bodyJson = await res.clone().json();
+                    if (bodyJson?.data?.mision?.actualizadoEn) {
+                      actualizadoServidor = bodyJson.data.mision.actualizadoEn;
+                    }
+                  } catch {
+                    // Ignorar si la respuesta no contiene JSON
+                  }
+                  await guardarMisionLocal({
+                    ...local,
+                    estado: 'RECHAZADA',
+                    sincronizacionPendiente: false,
+                    actualizadoEn: actualizadoServidor,
+                  });
+                }
+              } catch {
+                // Ignorar fallos de lectura/escritura secundaria en IndexedDB
+              }
+            } else if (esConflictoTerminal || esErrorIrrecuperable) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  const datosRestaurados = { ...(local.datosAdicionales || {}) };
+                  delete datosRestaurados.justificacionRechazo;
+                  await guardarMisionLocal({
+                    ...local,
+                    estado: local.estado === 'RECHAZADA' ? 'DESPACHADA' : local.estado,
+                    sincronizacionPendiente: false,
+                    datosAdicionales: datosRestaurados,
+                    actualizadoEn: new Date().toISOString(),
+                  });
+                }
+                if (typeof eliminarAccionOutbox === 'function') {
+                  await eliminarAccionOutbox(accion.id);
+                }
+                await obtenerDetalleMision(misionId);
+              } catch {
+                // Ignorar fallos al refrescar estado real tras rollback local
+              }
+            }
+          }
+        }
         return procesada;
       });
 

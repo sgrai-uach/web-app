@@ -1,9 +1,4 @@
-import { getAuthCookie } from '@/lib/utils/cookieUtils';
-import {
-  DEV_PATRULLA_TOKEN,
-  DEV_PATRULLA_USER_ID,
-  handleUnauthorizedSession,
-} from '@/lib/api/client';
+import apiClient, { handleUnauthorizedSession } from '@/lib/api/client';
 import {
   encolarAccionOutbox,
   guardarMisionLocal,
@@ -17,30 +12,13 @@ import {
 } from '@/lib/validations/reporteVerificacion';
 import type {
   AdjuntoReportePreliminar,
+  CrearReporteVerificacionPayload,
   DictamenAtencion,
   EstadoTerrenoVerificacion,
   EvaluadorReporteTerreno,
   MisionLocal,
   ReporteVerificacionTerrenoLocal,
 } from '@/types/offline';
-
-function resolveApiUrl(): string {
-  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
-    return '';
-  }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
-}
-
-function buildAuthHeaders(): Record<string, string> {
-  const token = getAuthCookie();
-  if (token === DEV_PATRULLA_TOKEN) {
-    return { 'x-user-id': DEV_PATRULLA_USER_ID };
-  }
-  if (token) {
-    return { Authorization: `Bearer ${token}` };
-  }
-  return {};
-}
 
 function extraerEvaluadorDeObjeto(raw: unknown): EvaluadorReporteTerreno | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
@@ -218,29 +196,20 @@ export async function enviarReporteVerificacionTerreno(
   const danosLimpio = validado.danos_estimados?.trim() || null;
   const observacionesLimpio = validado.observaciones?.trim() || null;
 
-  const payloadMutacion: Record<string, unknown> = {
+  const payloadMutacion: CrearReporteVerificacionPayload = {
     dictamen: validado.dictamen,
     motivo_no_abordable: motivoLimpio,
-    motivoNoAbordable: motivoLimpio,
     resumen_tecnico: validado.resumen_tecnico.trim(),
-    resumenTecnico: validado.resumen_tecnico.trim(),
-    ...(validado.estado_terreno
-      ? {
-          estado_terreno: validado.estado_terreno,
-          estadoTerreno: validado.estado_terreno,
-        }
-      : {}),
+    estado_terreno: validado.estado_terreno,
     personas_afectadas: validado.personas_afectadas,
-    personasAfectadas: validado.personas_afectadas,
     danos_estimados: danosLimpio,
-    danosEstimados: danosLimpio,
     observaciones: observacionesLimpio,
     requiere_asistencia_social: validado.requiere_asistencia_social,
-    requiereAsistenciaSocial: validado.requiere_asistencia_social,
     adjuntoIds: validado.adjuntoIds || [],
     adjuntos: validado.adjuntos || [],
-    ...(typeof latitud === 'number' ? { latitud } : {}),
-    ...(typeof longitud === 'number' ? { longitud } : {}),
+    ...(typeof latitud === 'number' && typeof longitud === 'number'
+      ? { latitud, longitud }
+      : {}),
   };
 
   const ahoraIso = new Date().toISOString();
@@ -259,7 +228,7 @@ export async function enviarReporteVerificacionTerreno(
       dictamen: validado.dictamen,
       motivo_no_abordable: motivoLimpio || '',
       resumen_tecnico: validado.resumen_tecnico.trim(),
-      ...(validado.estado_terreno ? { estado_terreno: validado.estado_terreno } : {}),
+      estado_terreno: validado.estado_terreno,
       personas_afectadas: validado.personas_afectadas,
       danos_estimados: danosLimpio || '',
       observaciones: observacionesLimpio || '',
@@ -334,7 +303,7 @@ export async function enviarReporteVerificacionTerreno(
       tipo: 'ENVIAR_REPORTE',
       url: `/api/misiones/${misionId}/reporte`,
       metodo: 'POST',
-      payload: payloadMutacion,
+      payload: payloadMutacion as Record<string, unknown>,
     });
 
     const reporteOffline = construirReporteLocal(false);
@@ -351,43 +320,18 @@ export async function enviarReporteVerificacionTerreno(
   }
 
   try {
-    const apiUrl = resolveApiUrl();
-    const res = await fetch(`${apiUrl}/api/misiones/${misionId}/reporte`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...buildAuthHeaders(),
-      },
-      body: JSON.stringify(payloadMutacion),
-    });
+    const { data, error, response } = await apiClient.POST(
+      '/api/misiones/{id}/reporte',
+      {
+        params: {
+          path: { id: misionId },
+        },
+        body: payloadMutacion,
+      }
+    );
 
-    const body = (await res.json().catch(() => ({}))) as {
-      message?: string;
-      data?: {
-        reporteTerreno?: {
-          id?: string;
-          creadoEn?: string;
-          evaluador?: unknown;
-        };
-        mision?: {
-          id?: string;
-          estado?: string;
-          fechaCierre?: string;
-          actualizadoEn?: string;
-        };
-        patrulla?: {
-          id?: string;
-          estado?: string;
-        } | null;
-        incidente?: {
-          id?: string;
-          estado?: string;
-        } | null;
-      };
-    };
-
-    if (res.ok) {
-      const reporteRemoto = body?.data?.reporteTerreno;
+    if (response.ok && data) {
+      const reporteRemoto = data.data?.reporteTerreno;
       const evaluadorRemoto = extraerEvaluadorDeObjeto(reporteRemoto?.evaluador);
       const reporteOnline = construirReporteLocal(
         true,
@@ -398,7 +342,7 @@ export async function enviarReporteVerificacionTerreno(
       const misionActualizada = await actualizarMisionLocal(
         reporteOnline,
         false,
-        body?.data?.mision?.actualizadoEn
+        data.data?.mision?.actualizadoEn
       );
 
       const mensajeDefecto =
@@ -411,54 +355,44 @@ export async function enviarReporteVerificacionTerreno(
         offline: false,
         reporte: reporteOnline,
         mision: misionActualizada,
-        data: body?.data,
-        mensaje: body?.message || mensajeDefecto,
+        data: data.data,
+        mensaje: data.message || mensajeDefecto,
       };
     }
 
-    const tokenActual = typeof window !== 'undefined' ? getAuthCookie() : null;
-    const esModoDemoLocal =
-      Boolean(tokenActual) && tokenActual === (DEV_PATRULLA_TOKEN || 'dev-patrulla-token');
-    if (
-      esModoDemoLocal &&
-      (res.status === 401 || res.status === 403 || res.status === 404)
-    ) {
-      const reporteDemo = construirReporteLocal(true);
-      const misionActualizada = await actualizarMisionLocal(reporteDemo, false);
-      return {
-        ok: true,
-        offline: false,
-        reporte: reporteDemo,
-        mision: misionActualizada,
-        mensaje:
-          validado.dictamen === 'NO_ABORDABLE'
-            ? 'Informe técnico registrado, misión cerrada e incidente marcado como no abordable.'
-            : 'Informe técnico de verificación enviado y misión cerrada exitosamente.',
-      };
-    }
+    const errorBody = (error && typeof error === 'object' ? error : {}) as {
+      message?: string;
+    };
 
-    if (res.status === 401) {
+    if (response.status === 401) {
       handleUnauthorizedSession();
       throw new Error('Sesión expirada o no autorizada.');
     }
 
-    if (res.status === 403) {
+    if (response.status === 403) {
       throw new Error(
-        body?.message ||
+        errorBody.message ||
           'No posee los permisos requeridos (reportes:crear) o la misión pertenece a otra patrulla.'
       );
     }
 
-    if (res.status === 409) {
+    if (response.status === 404) {
       throw new Error(
-        body?.message ||
+        errorBody.message ||
+          'No se encontró la misión o alguno de los adjuntos indicados.'
+      );
+    }
+
+    if (response.status === 409) {
+      throw new Error(
+        errorBody.message ||
           'La misión debe estar en estado EN_CURSO para enviar el informe técnico y cerrar la tarea.'
       );
     }
 
     throw new Error(
-      body?.message ||
-        `Error del servidor (${res.status}) al enviar el informe técnico de verificación.`
+      errorBody.message ||
+        `Error del servidor (${response.status}) al enviar el informe técnico de verificación.`
     );
   } catch (err) {
     if (
@@ -469,7 +403,7 @@ export async function enviarReporteVerificacionTerreno(
         tipo: 'ENVIAR_REPORTE',
         url: `/api/misiones/${misionId}/reporte`,
         metodo: 'POST',
-        payload: payloadMutacion,
+        payload: payloadMutacion as Record<string, unknown>,
       });
 
       const reporteOffline = construirReporteLocal(false);

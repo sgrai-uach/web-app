@@ -223,7 +223,7 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 
 ---
 
-### 2.3 Enviar Informe Técnico de Verificación y Cerrar Misión (H39 / H86)
+### 2.4 Enviar Informe Técnico de Verificación y Cerrar Misión (H39 / H86)
 - **Historia:** H39 (fusión H39 / H86)
 - **Método:** `POST`
 - **Ruta:** `/api/misiones/{id}/reporte`
@@ -259,11 +259,11 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 
 ---
 
-### 2.4 Rechazo Motivado de Misión por Patrulla Verificadora / Cuadrilla (H41, H69)
+### 2.5 Rechazo Motivado de Misión en Terreno (H41, H69)
 - **Historia:** H41, H69
 - **Método:** `POST`
 - **Ruta:** `/api/misiones/{id}/rechazar`
-- **Permiso RBAC requerido:** `misiones:terreno:verificar` (Patrulla Verificadora) / `misiones:terreno:ejecutar` (Cuadrilla)
+- **Permiso RBAC requerido:** `misiones:terreno:verificar` (Patrulla Verificadora) / `misiones:terreno:ejecutar` (Delegado de Cuadrilla)
 - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
 
 #### Request Body
@@ -275,40 +275,61 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 }
 ```
 
-> **Regla de Negocio Crítica §3.3:** La justificación es obligatoria y debe contar con un mínimo de **5 caracteres** útiles (tras remover espacios en blanco circundantes). Las coordenadas GPS son opcionales y no bloqueantes.
+> **Regla de Negocio Crítica §3.3:** La justificación es obligatoria y debe contar con un mínimo de **5 caracteres** útiles (y máximo **1000** tras remover espacios en blanco circundantes). Las coordenadas GPS son opcionales y no bloqueantes, pero si se informan deben incluir paridad (`latitud` y `longitud`).
 
 #### Response Exitosa (200 OK)
 ```json
 {
-  "message": "Misión rechazada exitosamente.",
+  "message": "Misión rechazada exitosamente. La cuadrilla ha vuelto a estado DISPONIBLE y el incidente ha retornado a VERIFICANDO para su reasignación.",
   "data": {
     "mision": {
       "id": "60000000-0000-4000-8000-000000000001",
       "codigo": "MIS-2026-0001",
+      "tipoMision": "ATENCION_CUADRILLA",
       "estado": "RECHAZADA",
       "justificacionRechazo": "Desperfecto mecánico severo en vehículo de traslado.",
+      "fechaCierre": "2026-11-01T21:05:00.000Z",
       "actualizadoEn": "2026-11-01T21:05:00.000Z"
+    },
+    "cuadrilla": {
+      "id": "50000000-0000-4000-8000-000000000001",
+      "nombre": "Cuadrilla Vías y Canales 1",
+      "estado": "DISPONIBLE"
+    },
+    "incidente": {
+      "id": "30000000-0000-4000-8000-000000000001",
+      "codigo": "INC-2026-0001",
+      "estado": "VERIFICANDO",
+      "prioridad": "ALTA"
     }
   }
 }
 ```
 
 #### Códigos de Error HTTP
-- `400 Bad Request`: Formato de carga inválido o justificación menor a 5 caracteres (`VALIDATION_ERROR`).
+- `400 Bad Request`: Formato de carga inválido, body vacío, justificación menor a 5 caracteres o coordenadas GPS sin paridad (`VALIDATION_ERROR`).
 - `401 Unauthorized`: Token de sesión ausente, inválido o expirado.
-- `403 Forbidden`: Operador sin rol o sin permiso `misiones:terreno:verificar` / `misiones:terreno:ejecutar`, o unidad operativa en estado desactivada.
+- `403 Forbidden`: Operador sin rol o sin permiso (`misiones:terreno:verificar` para patrulla o `misiones:terreno:ejecutar` para cuadrilla), o sin pertenencia a la unidad asignada.
 - `404 Not Found`: Identificador de misión no registrado en el sistema.
-- `409 Conflict`: La misión ya no se encuentra en estado `DESPACHADA` o `ASIGNADA` (ej. ya aceptada previamente o cancelada por despacho).
+- `409 Conflict`: La misión ya no se encuentra en estado `DESPACHADA`, el incidente asociado ya está en estado terminal (`RESUELTO` / `NO_ABORDABLE`) o no posee unidad compatible.
 
 #### Efectos Colaterales en Tiempo Real (Socket.io)
-Al procesar exitosamente el rechazo, el backend emite el evento `mision:rechazada` hacia la sala `encargado`:
+Al procesar exitosamente el rechazo, el backend emite el evento `mision:rechazada` hacia `encargado`, `sala:encargados`, `supervisor` y la sala de la unidad (`cuadrilla:{id}` o `patrulla:{id}`):
 ```json
 {
   "misionId": "60000000-0000-4000-8000-000000000001",
   "codigo": "MIS-2026-0001",
-  "unidadId": "f1000000-0000-4000-8000-000000000001",
+  "tipoMision": "ATENCION_CUADRILLA",
   "motivo": "Desperfecto mecánico severo en vehículo de traslado.",
-  "timestamp": "2026-11-01T21:05:00.000Z"
+  "justificacionRechazo": "Desperfecto mecánico severo en vehículo de traslado.",
+  "cuadrillaId": "50000000-0000-4000-8000-000000000001",
+  "cuadrillaNombre": "Cuadrilla Vías y Canales 1",
+  "patrullaId": null,
+  "patrullaNombre": null,
+  "incidenteId": "30000000-0000-4000-8000-000000000001",
+  "incidenteCodigo": "INC-2026-0001",
+  "rechazadoPorId": "d0000000-0000-4000-8000-000000000001",
+  "rechazadoEn": "2026-11-01T21:05:00.000Z"
 }
 ```
 Esto notifica de inmediato al Encargado del Centro de Mando en `sgrai-web` para reasignar la misión a otra unidad disponible.

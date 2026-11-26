@@ -40,10 +40,7 @@ interface PageProps {
 }
 
 export default function CuadrillaMisionDetailPage({ params }: PageProps) {
-  const resolvedParams =
-    params && typeof (params as unknown as { then?: unknown }).then === 'function'
-      ? use(params)
-      : (params as unknown as { id: string });
+  const resolvedParams = use(params);
   const misionId = resolvedParams?.id;
   const router = useRouter();
 
@@ -142,14 +139,6 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     );
   }
 
-  const normPrioridad = mision.prioridad?.toUpperCase() || '';
-  let prioridadClase = styles.priorityNeutro;
-  if (normPrioridad === 'CRITICA') {
-    prioridadClase = styles.priorityCritica;
-  } else if (normPrioridad === 'ALTA') {
-    prioridadClase = styles.priorityAlta;
-  }
-
   const estadoNormalizado = mision.estado?.toUpperCase() || '';
   const tienePermisoEjecutar =
     typeof tienePermiso === 'function'
@@ -160,9 +149,9 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
 
   const esRechazable = Boolean(
     unidadActiva &&
-      esCuadrilla &&
-      tienePermisoEjecutar &&
-      estadoNormalizado === 'DESPACHADA'
+    esCuadrilla &&
+    tienePermisoEjecutar &&
+    estadoNormalizado === 'DESPACHADA'
   );
 
   const esMisionActivaParaEvidencia =
@@ -189,7 +178,6 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     typeof mision.datosAdicionales?.justificacionRechazo === 'string'
       ? mision.datosAdicionales.justificacionRechazo
       : null;
-
   const esSoloLectura =
     !unidadActiva ||
     estadoNormalizado === 'FINALIZADA' ||
@@ -210,21 +198,25 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     setMision((prev) =>
       prev
         ? {
-            ...prev,
-            estado: 'RECHAZADA',
-            sincronizacionPendiente: Boolean(res.modoOffline),
-            actualizadoEn: new Date().toISOString(),
-            datosAdicionales: {
-              ...prev.datosAdicionales,
-              justificacionRechazo: motivo,
-            },
-          }
+          ...prev,
+          estado: 'RECHAZADA',
+          sincronizacionPendiente: Boolean(res.modoOffline),
+          actualizadoEn: new Date().toISOString(),
+          datosAdicionales: {
+            ...prev.datosAdicionales,
+            justificacionRechazo: motivo,
+          },
+        }
         : null
     );
     setMensajeConfirmacion(res.mensaje);
     setModalRechazoAbierto(false);
     await actualizarPendientes();
-    router.push('/cuadrilla/misiones');
+    const params = new URLSearchParams({
+      rechazo: res.modoOffline ? 'offline' : 'ok',
+      msg: res.mensaje,
+    });
+    router.push(`/cuadrilla/misiones?${params.toString()}`);
   };
 
   const handleEvidenciaCargada = async (adjunto: AdjuntoLocal) => {

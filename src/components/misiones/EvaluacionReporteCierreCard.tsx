@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
+import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { CargaEvidenciaCard } from './CargaEvidenciaCard';
 import { ModalConfirmacionReporteCierre } from './ModalConfirmacionReporteCierre';
@@ -27,6 +28,7 @@ import {
 } from './ReporteTerrenoBase';
 import {
   DICTAMENES_ATENCION,
+  ESTADOS_TERRENO_VERIFICACION,
   MOTIVO_NO_ABORDABLE_MIN,
   RESUMEN_TECNICO_MIN,
   VALORES_INICIALES_REPORTE_VERIFICACION,
@@ -37,11 +39,15 @@ import {
   obtenerReporteVerificacionMision,
   type ResultadoEnvioReporteVerificacion,
 } from '@/services/reporteVerificacionService';
-import { formatearDictamenAtencion } from '@/lib/utils/formatters';
+import {
+  formatearDictamenAtencion,
+  formatearEstadoTerreno,
+} from '@/lib/utils/formatters';
 import { extraerAdjuntosDeMision } from '@/services/offlineQueue';
 import type {
   AdjuntoLocal,
   DictamenAtencion,
+  EstadoTerrenoVerificacion,
   MisionLocal,
   ReporteVerificacionTerrenoForm,
 } from '@/types/offline';
@@ -63,6 +69,7 @@ export function EvaluacionReporteCierreCard({
 }: EvaluacionReporteCierreCardProps) {
   const motivoId = useId();
   const resumenId = useId();
+  const estadoTerrenoId = useId();
   const personasId = useId();
   const danosId = useId();
   const observacionesId = useId();
@@ -111,6 +118,13 @@ export function EvaluacionReporteCierreCard({
       }));
     }
   }, [infoPersonasPrevias.cantidad, yaEnviado, personasEditadasManualmente]);
+
+  // Cerrar modal de confirmación automáticamente si la misión se cierra o deshabilita concurrentemente
+  useEffect(() => {
+    if ((yaEnviado || deshabilitado) && modalConfirmacionAbierto) {
+      setModalConfirmacionAbierto(false);
+    }
+  }, [yaEnviado, deshabilitado, modalConfirmacionAbierto]);
 
   const fechaReporteCierre =
     reporteExistente?.creadoEn ||
@@ -296,6 +310,13 @@ export function EvaluacionReporteCierreCard({
                 esBloqueTexto
               />
 
+              {reporteExistente.estado_terreno && (
+                <CampoResumenReporte
+                  label="Estado del Terreno"
+                  valor={formatearEstadoTerreno(reporteExistente.estado_terreno)}
+                />
+              )}
+
               <CampoResumenReporte
                 label="Personas Damnificadas"
                 valor={reporteExistente.personas_afectadas}
@@ -325,6 +346,16 @@ export function EvaluacionReporteCierreCard({
                   esBloqueTexto
                 />
               )}
+
+              {Array.isArray(reporteExistente.adjuntos) &&
+                reporteExistente.adjuntos.length > 0 && (
+                  <CampoResumenReporte
+                    label="Evidencia Adjunta"
+                    valor={reporteExistente.adjuntos
+                      .map((a, idx) => a.nombreArchivo || `Adjunto #${idx + 1}`)
+                      .join(', ')}
+                  />
+                )}
             </>
           )}
         </ResumenReporteTerreno>
@@ -463,6 +494,27 @@ export function EvaluacionReporteCierreCard({
                   {resumenLimpio.length} / {TEXTAREA_MAX}
                 </span>
               </div>
+            </div>
+
+            <div className={styles.fieldGroup}>
+              <Select
+                id={estadoTerrenoId}
+                label="Estado del terreno"
+                requiredIndicator
+                value={form.estado_terreno ?? 'ESTABLE'}
+                disabled={deshabilitado || guardando}
+                onChange={(e) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    estado_terreno: e.target.value as EstadoTerrenoVerificacion,
+                  }));
+                  setErrorValidacion(null);
+                }}
+                options={ESTADOS_TERRENO_VERIFICACION.map((opcion) => ({
+                  value: opcion,
+                  label: formatearEstadoTerreno(opcion),
+                }))}
+              />
             </div>
           </div>
 
@@ -680,6 +732,7 @@ export function EvaluacionReporteCierreCard({
         abierto={modalConfirmacionAbierto}
         dictamen={form.dictamen}
         motivoNoAbordable={esNoAbordable ? motivoLimpio : undefined}
+        estadoTerreno={form.estado_terreno ?? 'ESTABLE'}
         resumenTecnico={resumenLimpio}
         personasAfectadas={form.personas_afectadas}
         requiereAsistenciaSocial={form.requiere_asistencia_social}

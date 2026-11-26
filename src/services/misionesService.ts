@@ -197,8 +197,8 @@ function resolverEsReclasificacionHito(
 
 /**
  * Identifica las misiones e incidentes que mantienen mutaciones pendientes
- * (`ACEPTAR_MISION` o `ACTUALIZAR_TIPOLOGIA`) en la cola local `outbox` para
- * evitar sobreescribir su estado optimista al refrescar desde la API.
+ * (`ACEPTAR_MISION`, `RECHAZAR_MISION`, `ACTUALIZAR_TIPOLOGIA` o `AJUSTAR_PRIORIDAD`)
+ * en la cola local `outbox` para evitar sobreescribir su estado optimista al refrescar desde la API.
  */
 async function obtenerReferenciasOutboxPendientes(): Promise<{
   misionesConOutbox: Set<string>;
@@ -216,7 +216,10 @@ async function obtenerReferenciasOutboxPendientes(): Promise<{
     for (const accion of acciones) {
       if (
         accion.tipo !== 'ACEPTAR_MISION' &&
-        accion.tipo !== 'ACTUALIZAR_TIPOLOGIA'
+        accion.tipo !== 'ACTUALIZAR_TIPOLOGIA' &&
+        accion.tipo !== 'AJUSTAR_PRIORIDAD' &&
+        accion.tipo !== 'ENVIAR_REPORTE' &&
+        accion.tipo !== 'RECHAZAR_MISION'
       ) {
         continue;
       }
@@ -267,20 +270,18 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
     });
 
     if (!error && data && Array.isArray(data.data)) {
-      const [localesPreviasRaw, outboxRefs] = await Promise.all([
-        Promise.resolve(obtenerMisionesLocales()).catch(() => [] as MisionLocal[]),
-        Promise.resolve(obtenerReferenciasOutboxPendientes()).catch(() => ({
-          misionesConOutbox: new Set<string>(),
-          incidentesConOutbox: new Set<string>(),
-        })),
-      ]);
-      const misionesConOutbox = outboxRefs?.misionesConOutbox ?? new Set<string>();
-      const incidentesConOutbox = outboxRefs?.incidentesConOutbox ?? new Set<string>();
-      const localesPrevias = localesPreviasRaw || [];
-      const mapaLocales = new Map(localesPrevias.map((m) => [m.id, m]));
+      let localesPreviasRaw: MisionLocal[] = [];
+      try {
+        localesPreviasRaw = (await obtenerMisionesLocales()) || [];
+      } catch {
+        localesPreviasRaw = [];
+      }
+      const { misionesConOutbox, incidentesConOutbox } =
+        await obtenerReferenciasOutboxPendientes();
+      const localesPreviasMap = new Map(localesPreviasRaw.map((m) => [m.id, m]));
 
       const remotas: MisionLocal[] = data.data.map((item: MisionApiItem) => {
-        const previa = mapaLocales.get(item.id);
+        const previa = localesPreviasMap.get(item.id);
         const incidenteId = item.incidenteId || '';
         const tieneOutboxPendiente =
           misionesConOutbox.has(item.id) ||
@@ -311,44 +312,42 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
             : undefined;
 
         const tipologiaFinal =
-          previa?.sincronizacionPendiente &&
-          datosPrevios.tipologiaEvaluada === true &&
-          tipologiaConstatadaPrevia
-            ? tipologiaConstatadaPrevia
-            : tipologiaRemota || tipologiaConstatadaPrevia || limpiarTituloMision(item.titulo);
-
-        const baseDatosAdicionales = {
-          trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
-          titulo: item.titulo,
-          patrullaId: (item as Record<string, unknown>).patrullaId as string | null | undefined,
-          patrullaNombre: (item as Record<string, unknown>).patrullaNombre as string | null | undefined,
-          cuadrillaId: (item as Record<string, unknown>).cuadrillaId as string | null | undefined,
-          cuadrillaNombre: (item as Record<string, unknown>).cuadrillaNombre as string | null | undefined,
-        };
+          mantenerOptimista && previa?.tipologia
+            ? previa.tipologia
+            : previa?.sincronizacionPendiente &&
+                datosPrevios.tipologiaEvaluada === true &&
+                tipologiaConstatadaPrevia
+              ? tipologiaConstatadaPrevia
+              : tipologiaRemota || tipologiaConstatadaPrevia || limpiarTituloMision(item.titulo);
 
         return {
           id: item.id,
           incidenteId: item.incidenteId || '',
           codigoIncidente: item.incidenteCodigo || item.codigo,
-          tipologia:
-            mantenerOptimista && previa
-              ? previa.tipologia
-              : tipologiaFinal,
+          tipologia: tipologiaFinal,
           direccion:
             item.descripcion ||
             (item.delegacionNombre ? `Sector ${item.delegacionNombre}` : 'Valdivia'),
-          prioridad: item.prioridad,
+          prioridad:
+            mantenerOptimista && previa?.prioridad ? previa.prioridad : item.prioridad,
           estado: mantenerOptimista && previa?.estado ? previa.estado : item.estado,
           fechaDespacho: item.fechaInicio || item.creadoEn,
           fechaInicio:
             mantenerOptimista && previa
               ? (previa.fechaInicio ?? item.fechaInicio ?? null)
               : item.fechaInicio || null,
-          sincronizacionPendiente: mantenerOptimista,
-          datosAdicionales:
-            mantenerOptimista && previa?.datosAdicionales
-              ? { ...baseDatosAdicionales, ...datosPrevios, ...previa.datosAdicionales }
-              : { ...datosPrevios, ...baseDatosAdicionales },
+          sincronizacionPendiente: mantenerOptimista
+            ? true
+            : Boolean(previa?.sincronizacionPendiente),
+          datosAdicionales: {
+            ...datosPrevios,
+            trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
+            titulo: item.titulo,
+            patrullaId: (item as Record<string, unknown>).patrullaId as string | null | undefined,
+            patrullaNombre: (item as Record<string, unknown>).patrullaNombre as string | null | undefined,
+            cuadrillaId: (item as Record<string, unknown>).cuadrillaId as string | null | undefined,
+            cuadrillaNombre: (item as Record<string, unknown>).cuadrillaNombre as string | null | undefined,
+          },
           actualizadoEn: item.actualizadoEn,
         };
       });
@@ -403,15 +402,9 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
 
     if (!error && data && data.data) {
       const d: MisionDetalleApi = data.data;
-      const outboxRefs = await Promise.resolve(obtenerReferenciasOutboxPendientes()).catch(
-        () => ({
-          misionesConOutbox: new Set<string>(),
-          incidentesConOutbox: new Set<string>(),
-        })
-      );
-      const misionesConOutbox = outboxRefs?.misionesConOutbox ?? new Set<string>();
-      const incidentesConOutbox = outboxRefs?.incidentesConOutbox ?? new Set<string>();
       const previa = previaLocal;
+      const { misionesConOutbox, incidentesConOutbox } =
+        await obtenerReferenciasOutboxPendientes();
       const incidenteIdRemoto = d.incidente?.id || previa?.incidenteId || '';
       const tieneOutboxPendiente =
         misionesConOutbox.has(d.id) ||
@@ -550,12 +543,21 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
           d.incidente?.descripcion ||
           'Sin instrucciones adicionales especificadas.',
         titulo: d.titulo,
-        estadoPatrulla: d.patrulla?.estado || 'EN_VERIFICACION',
+        ...(d.patrulla?.estado ? { estadoPatrulla: d.patrulla.estado } : {}),
+        ...(d.cuadrilla?.estado ? { estadoCuadrilla: d.cuadrilla.estado } : {}),
         estadoIncidente: d.incidente?.estado || 'VERIFICANDO',
+        ...(d.justificacionRechazo
+          ? { justificacionRechazo: d.justificacionRechazo }
+          : {}),
         reporteTerrenoId:
           reportesRemotos.length > 0 ? reportesRemotos[0].id : undefined,
         adjuntos: adjuntosCombinados,
-        reportesTerreno: reportesRemotos,
+        reportesTerreno:
+          mantenerOptimista &&
+          reportesCierreRemotos.length === 0 &&
+          Array.isArray(datosPrevios.reportesTerreno)
+            ? datosPrevios.reportesTerreno
+            : reportesRemotos,
         ...(reportesPrioridadRemotos.length > 0
           ? { reportesPrioridad: reportesPrioridadLocalesPendientes }
           : reportesPrioridadLocales.length > 0
@@ -603,7 +605,8 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
           d.incidente?.latitud && d.incidente?.longitud
             ? { lat: d.incidente.latitud, lng: d.incidente.longitud }
             : undefined,
-        prioridad: d.prioridad,
+        prioridad:
+          mantenerOptimista && previa?.prioridad ? previa.prioridad : d.prioridad,
         estado: mantenerOptimista && previa?.estado ? previa.estado : d.estado,
         fechaDespacho: d.fechaInicio || d.creadoEn,
         fechaInicio:
@@ -612,8 +615,8 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
             : d.fechaInicio || null,
         sincronizacionPendiente: mantenerOptimista,
         datosAdicionales:
-          mantenerOptimista && previaLocal?.datosAdicionales
-            ? { ...datosBaseMision, ...previaLocal.datosAdicionales }
+          mantenerOptimista && previa?.datosAdicionales
+            ? { ...datosBaseMision, ...previa.datosAdicionales }
             : datosBaseMision,
         actualizadoEn: d.actualizadoEn,
       };
@@ -631,19 +634,6 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
   return typeof fusionarDatosAdicionalesMision === 'function'
     ? fusionarDatosAdicionalesMision(local, cachePrevia)
     : local;
-}
-
-export interface RechazoMisionResultado {
-  exito: boolean;
-  mensaje: string;
-  modoOffline?: boolean;
-  mision?: {
-    id: string;
-    codigo: string;
-    estado: string;
-    justificacionRechazo: string;
-    actualizadoEn?: string;
-  };
 }
 
 /**
@@ -839,8 +829,11 @@ export interface ResultadoRechazarMision {
     codigo: string;
     estado: string;
     justificacionRechazo: string;
+    actualizadoEn?: string;
   };
 }
+
+export type RechazoMisionResultado = ResultadoRechazarMision;
 
 /**
  * Ejecuta el rechazo motivado de una misión asignada (H41 Cuadrilla / H69 Patrulla).
@@ -865,16 +858,27 @@ export async function rechazarMision(
   const persistirRechazoLocal = async (
     sincronizacionPendiente: boolean,
     actualizadoEn?: string
-  ): Promise<MisionLocal | null> => {
+  ): Promise<MisionLocal> => {
     const local = await obtenerMisionLocalPorId(id);
-    if (!local) return null;
+    const ahoraIso = actualizadoEn || new Date().toISOString();
+    const base: MisionLocal = local || {
+      id,
+      incidenteId: '',
+      codigoIncidente: id,
+      tipologia: 'Atención de cuadrilla',
+      direccion: 'Valdivia',
+      prioridad: 'ALTA',
+      estado: 'DESPACHADA',
+      fechaDespacho: ahoraIso,
+      actualizadoEn: ahoraIso,
+    };
     const actualizado: MisionLocal = {
-      ...local,
+      ...base,
       estado: 'RECHAZADA',
       sincronizacionPendiente,
-      actualizadoEn: actualizadoEn || new Date().toISOString(),
+      actualizadoEn: ahoraIso,
       datosAdicionales: {
-        ...local.datosAdicionales,
+        ...(base.datosAdicionales || {}),
         justificacionRechazo: datosValidados.justificacion_rechazo,
       },
     };
