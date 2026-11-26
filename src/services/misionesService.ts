@@ -140,8 +140,8 @@ export async function obtenerCoordenadasOpcionales(
 
 /**
  * Identifica las misiones e incidentes que mantienen mutaciones pendientes
- * (`ACEPTAR_MISION` o `ACTUALIZAR_TIPOLOGIA`) en la cola local `outbox` para
- * evitar sobreescribir su estado optimista al refrescar desde la API.
+ * (`ACEPTAR_MISION`, `RECHAZAR_MISION`, `ACTUALIZAR_TIPOLOGIA` o `AJUSTAR_PRIORIDAD`)
+ * en la cola local `outbox` para evitar sobreescribir su estado optimista al refrescar desde la API.
  */
 async function obtenerReferenciasOutboxPendientes(): Promise<{
   misionesConOutbox: Set<string>;
@@ -159,7 +159,9 @@ async function obtenerReferenciasOutboxPendientes(): Promise<{
     for (const accion of acciones) {
       if (
         accion.tipo !== 'ACEPTAR_MISION' &&
-        accion.tipo !== 'ACTUALIZAR_TIPOLOGIA'
+        accion.tipo !== 'RECHAZAR_MISION' &&
+        accion.tipo !== 'ACTUALIZAR_TIPOLOGIA' &&
+        accion.tipo !== 'AJUSTAR_PRIORIDAD'
       ) {
         continue;
       }
@@ -257,7 +259,8 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
           direccion:
             item.descripcion ||
             (item.delegacionNombre ? `Sector ${item.delegacionNombre}` : 'Valdivia'),
-          prioridad: item.prioridad,
+          prioridad:
+            mantenerOptimista && previa?.prioridad ? previa.prioridad : item.prioridad,
           estado: mantenerOptimista && previa?.estado ? previa.estado : item.estado,
           fechaDespacho: item.fechaInicio || item.creadoEn,
           fechaInicio:
@@ -418,7 +421,8 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
           d.incidente?.latitud && d.incidente?.longitud
             ? { lat: d.incidente.latitud, lng: d.incidente.longitud }
             : undefined,
-        prioridad: d.prioridad,
+        prioridad:
+          mantenerOptimista && previa?.prioridad ? previa.prioridad : d.prioridad,
         estado: mantenerOptimista && previa?.estado ? previa.estado : d.estado,
         fechaDespacho: d.fechaInicio || d.creadoEn,
         fechaInicio:

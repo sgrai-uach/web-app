@@ -117,6 +117,7 @@ export async function guardarMisionesLocales(misiones: MisionLocal[]): Promise<v
       await tx.store.put({
         ...mision,
         tipologia: local.tipologia || mision.tipologia,
+        prioridad: local.prioridad || mision.prioridad,
         estado: local.estado || mision.estado,
         fechaInicio: local.fechaInicio ?? mision.fechaInicio,
         sincronizacionPendiente: true,
@@ -182,6 +183,20 @@ export async function obtenerCatalogoLocal<T = unknown>(clave: string): Promise<
 // COLA OUTBOX (MUTACIONES OFFLINE)
 // ==========================================
 
+let ultimoTimestampOutboxMs = 0;
+
+function generarTimestampMonotonico(existentes: AccionOutbox[]): string {
+  let siguienteMs = Math.max(Date.now(), ultimoTimestampOutboxMs + 1);
+  for (const item of existentes) {
+    const itemMs = Date.parse(item.timestamp);
+    if (Number.isFinite(itemMs) && itemMs >= siguienteMs) {
+      siguienteMs = itemMs + 1;
+    }
+  }
+  ultimoTimestampOutboxMs = siguienteMs;
+  return new Date(siguienteMs).toISOString();
+}
+
 export async function encolarAccionOutbox(
   accion: Omit<AccionOutbox, 'id' | 'timestamp' | 'intentos'>
 ): Promise<AccionOutbox> {
@@ -195,7 +210,6 @@ export async function encolarAccionOutbox(
     const actualizada: AccionOutbox = {
       ...duplicada,
       payload: accion.payload,
-      timestamp: new Date().toISOString(),
     };
     await db.put('outbox', actualizada);
     return actualizada;
@@ -204,7 +218,7 @@ export async function encolarAccionOutbox(
   const nuevaAccion: AccionOutbox = {
     ...accion,
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `outbox-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    timestamp: new Date().toISOString(),
+    timestamp: generarTimestampMonotonico(existentes),
     intentos: 0,
   };
 

@@ -895,6 +895,177 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
       expect(detalle?.datosAdicionales?.prioridadEvaluada).toBe(true);
       expect(detalle?.datosAdicionales?.versionReportePrioridad).toBe(1);
     });
+
+    it('preserva prioridad optimista y estado RECHAZADA en sincronizarMisiones y obtenerDetalleMision cuando existen AJUSTAR_PRIORIDAD o RECHAZAR_MISION en outbox (BUG-INT-PWA-09)', async () => {
+      const misionPrioridadLocal = {
+        id: '60000000-0000-4000-8000-000000000808',
+        incidenteId: 'a0000000-0000-4000-8000-000000000808',
+        codigoIncidente: 'INC-2026-0808',
+        tipologia: 'Inundación',
+        direccion: 'Av. Picarte 808',
+        prioridad: 'CRITICA',
+        estado: 'EN_CURSO',
+        fechaDespacho: '2026-11-24T10:00:00Z',
+        fechaInicio: '2026-11-24T10:05:00Z',
+        sincronizacionPendiente: false,
+        datosAdicionales: {
+          prioridadEvaluada: true,
+          versionReportePrioridad: 1,
+        },
+        actualizadoEn: '2026-11-24T10:15:00Z',
+      };
+
+      const misionRechazoLocal = {
+        id: '60000000-0000-4000-8000-000000000809',
+        incidenteId: 'a0000000-0000-4000-8000-000000000809',
+        codigoIncidente: 'INC-2026-0809',
+        tipologia: 'Caída de árbol',
+        direccion: 'Calle Bueras 100',
+        prioridad: 'ALTA',
+        estado: 'RECHAZADA',
+        fechaDespacho: '2026-11-24T10:00:00Z',
+        sincronizacionPendiente: false,
+        datosAdicionales: {
+          justificacionRechazo: 'Falla mecánica en móvil',
+        },
+        actualizadoEn: '2026-11-24T10:12:00Z',
+      };
+
+      vi.mocked(offlineQueue.obtenerMisionesLocales)
+        .mockResolvedValueOnce([misionPrioridadLocal, misionRechazoLocal])
+        .mockResolvedValueOnce([]);
+      vi.mocked(offlineQueue.obtenerAccionesOutbox).mockResolvedValueOnce([
+        {
+          id: 'outbox-prio-808',
+          tipo: 'AJUSTAR_PRIORIDAD',
+          url: '/api/incidentes/a0000000-0000-4000-8000-000000000808/prioridad',
+          metodo: 'PATCH',
+          payload: {
+            misionId: misionPrioridadLocal.id,
+            prioridad: 'CRITICA',
+          },
+          timestamp: '2026-11-24T10:15:00Z',
+          intentos: 0,
+        },
+        {
+          id: 'outbox-rech-809',
+          tipo: 'RECHAZAR_MISION',
+          url: `/api/misiones/${misionRechazoLocal.id}/rechazar`,
+          metodo: 'POST',
+          payload: {
+            justificacion_rechazo: 'Falla mecánica en móvil',
+          },
+          timestamp: '2026-11-24T10:12:00Z',
+          intentos: 0,
+        },
+      ]);
+
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: [
+            {
+              id: misionPrioridadLocal.id,
+              codigo: 'MIS-2026-0808',
+              titulo: 'Verificación: Inundación',
+              descripcion: 'Av. Picarte 808',
+              tipoMision: 'VERIFICACION',
+              estado: 'EN_CURSO',
+              prioridad: 'MEDIA',
+              incidenteId: misionPrioridadLocal.incidenteId,
+              incidenteCodigo: 'INC-2026-0808',
+              fechaInicio: '2026-11-24T10:05:00Z',
+              creadoEn: '2026-11-24T10:00:00Z',
+              actualizadoEn: '2026-11-24T10:05:00Z',
+            },
+            {
+              id: misionRechazoLocal.id,
+              codigo: 'MIS-2026-0809',
+              titulo: 'Verificación: Caída de árbol',
+              descripcion: 'Calle Bueras 100',
+              tipoMision: 'VERIFICACION',
+              estado: 'DESPACHADA',
+              prioridad: 'ALTA',
+              incidenteId: misionRechazoLocal.incidenteId,
+              incidenteCodigo: 'INC-2026-0809',
+              fechaInicio: null,
+              creadoEn: '2026-11-24T10:00:00Z',
+              actualizadoEn: '2026-11-24T10:00:00Z',
+            },
+          ],
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const lista = await sincronizarMisiones({ tipoMision: 'VERIFICACION' });
+      expect(lista[0].prioridad).toBe('CRITICA');
+      expect(lista[0].sincronizacionPendiente).toBe(true);
+      expect(lista[1].estado).toBe('RECHAZADA');
+      expect(lista[1].sincronizacionPendiente).toBe(true);
+
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValueOnce(misionPrioridadLocal);
+      vi.mocked(offlineQueue.obtenerAccionesOutbox).mockResolvedValueOnce([
+        {
+          id: 'outbox-prio-808',
+          tipo: 'AJUSTAR_PRIORIDAD',
+          url: '/api/incidentes/a0000000-0000-4000-8000-000000000808/prioridad',
+          metodo: 'PATCH',
+          payload: {
+            misionId: misionPrioridadLocal.id,
+            prioridad: 'CRITICA',
+          },
+          timestamp: '2026-11-24T10:15:00Z',
+          intentos: 0,
+        },
+      ]);
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: {
+            id: misionPrioridadLocal.id,
+            codigo: 'MIS-2026-0808',
+            titulo: 'Verificación: Inundación',
+            descripcion: 'Av. Picarte 808',
+            tipoMision: 'VERIFICACION',
+            estado: 'EN_CURSO',
+            prioridad: 'MEDIA',
+            justificacionRechazo: null,
+            fechaInicio: '2026-11-24T10:05:00Z',
+            fechaCierre: null,
+            creadoEn: '2026-11-24T10:00:00Z',
+            actualizadoEn: '2026-11-24T10:05:00Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: {
+              id: misionPrioridadLocal.incidenteId,
+              codigo: 'INC-2026-0808',
+              codigoSeguimiento: 'SEG-808',
+              tipoAfectacion: 'Inundación',
+              descripcion: 'Agua en calzada',
+              direccion: 'Av. Picarte 808',
+              latitud: -39.81,
+              longitud: -73.24,
+              estado: 'VERIFICANDO',
+              prioridad: 'MEDIA',
+              requiereAsistenciaSocial: false,
+              delegacionNombre: 'Centro',
+            },
+            prevencion: null,
+            cuadrilla: null,
+            patrulla: null,
+            bitacoraTiempos: [],
+            reportesTerreno: [],
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle = await obtenerDetalleMision(misionPrioridadLocal.id);
+      expect(detalle?.prioridad).toBe('CRITICA');
+      expect(detalle?.sincronizacionPendiente).toBe(true);
+    });
   });
 
   describe('rechazarMision (H41, H69)', () => {
