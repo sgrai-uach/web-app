@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   subirEvidenciaMultimedia,
+  extraerMensajeErrorHttp,
   EvidenciaServiceError,
 } from '@/services/evidenciaService';
+import * as cookieUtils from '@/lib/utils/cookieUtils';
 import {
   obtenerAccionesOutbox,
   limpiarAlmacenamientoOffline,
@@ -154,5 +156,56 @@ describe('evidenciaService (H43)', () => {
 
     const outbox = await obtenerAccionesOutbox();
     expect(outbox).toHaveLength(2);
+  });
+
+  it('inyecta x-user-id desde JWT, normaliza incidenteId vacío y mapea errores 409 (BUG-H43-PWA-03/06)', async () => {
+    vi.stubGlobal('navigator', { onLine: true });
+    const headerObj = { sub: 'u-patrulla-jwt' };
+    const encodeB64Url = (obj: unknown) =>
+      btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const jwtFalso = `${encodeB64Url({ alg: 'HS256' })}.${encodeB64Url(headerObj)}.sig`;
+    vi.spyOn(cookieUtils, 'getAuthCookie').mockReturnValue(jwtFalso);
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        id: '33333333-3333-4333-8333-333333333333',
+        nombreArchivo: 'terreno.mp4',
+        url: '/uploads/evidencia/terreno.mp4',
+        tipoMime: 'video/mp4',
+        tamanoBytes: 1024,
+        creadoEn: '2026-11-18T12:00:00.000Z',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const archivo = new File(['v1'], 'video1.mp4', { type: 'video/mp4' });
+    await subirEvidenciaMultimedia({
+      archivo,
+      misionId: MISION_ID,
+      incidenteId: '   ',
+      reporteTerrenoId: '44444444-4444-4444-8444-444444444444',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/evidencia/adjuntos',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${jwtFalso}`,
+          'x-user-id': 'u-patrulla-jwt',
+        }),
+      })
+    );
+
+    const fdSent = fetchMock.mock.calls[0]?.[1]?.body as FormData;
+    expect(fdSent.get('incidente_id')).toBeNull();
+    expect(fdSent.get('reporte_terreno_id')).toBe('44444444-4444-4444-8444-444444444444');
+
+    expect(extraerMensajeErrorHttp(409)).toContain('cerrado');
+    expect(extraerMensajeErrorHttp(409, 'Incidente ya resuelto')).toBe(
+      'Incidente ya resuelto'
+    );
   });
 });

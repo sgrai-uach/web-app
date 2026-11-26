@@ -339,4 +339,34 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
     });
     expect(mockPush).not.toHaveBeenCalled();
   });
+
+  it('BUG-H43-PWA-03: deshabilita carga de evidencia cuando la misión no tiene incidenteId ni reporteTerrenoId válidos', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      usuario: { id: 'u-1', nombre: 'Juan' },
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      esCuadrilla: true,
+      esPatrulla: false,
+      tienePermiso: () => true,
+    } as never);
+
+    vi.mocked(obtenerDetalleMision).mockResolvedValueOnce({
+      ...misionDespachada,
+      incidenteId: '   ',
+      estado: 'EN_CURSO',
+      datosAdicionales: { reporteTerrenoId: '' },
+    });
+
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => expect(screen.getByText('INC-2026-0001')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /Tomar Foto/i })).not.toBeInTheDocument();
+  });
 });

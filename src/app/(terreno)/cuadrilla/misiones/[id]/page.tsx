@@ -159,18 +159,24 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     estadoNormalizado === 'EN_TERRENO' ||
     estadoNormalizado === 'ACEPTADA';
 
+  const adjuntosMision = extraerAdjuntosDeMision(mision);
+  const incidenteIdMision =
+    typeof mision.incidenteId === 'string' && mision.incidenteId.trim().length > 0
+      ? mision.incidenteId.trim()
+      : undefined;
+  const reporteTerrenoIdMision =
+    typeof mision.datosAdicionales?.reporteTerrenoId === 'string' &&
+    mision.datosAdicionales.reporteTerrenoId.trim().length > 0
+      ? mision.datosAdicionales.reporteTerrenoId.trim()
+      : undefined;
+
   const puedeAdjuntarEvidencia = Boolean(
     unidadActiva &&
       esCuadrilla &&
       tienePermisoEvidencia &&
-      esMisionActivaParaEvidencia
+      esMisionActivaParaEvidencia &&
+      (incidenteIdMision || reporteTerrenoIdMision)
   );
-
-  const adjuntosMision = extraerAdjuntosDeMision(mision);
-  const reporteTerrenoIdMision =
-    typeof mision.datosAdicionales?.reporteTerrenoId === 'string'
-      ? mision.datosAdicionales.reporteTerrenoId
-      : undefined;
 
   const trabajoTexto =
     (mision.datosAdicionales?.trabajo as string) || mision.direccion;
@@ -372,7 +378,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       {(puedeAdjuntarEvidencia || adjuntosMision.length > 0) && (
         <CargaEvidenciaCard
           misionId={mision.id}
-          incidenteId={mision.incidenteId}
+          incidenteId={incidenteIdMision}
           reporteTerrenoId={reporteTerrenoIdMision}
           adjuntos={adjuntosMision}
           soloLectura={!puedeAdjuntarEvidencia}

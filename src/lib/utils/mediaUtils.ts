@@ -33,22 +33,33 @@ export interface EvidenciaPreparada {
   comprimida: boolean;
 }
 
+export function normalizarMimeBase(tipoMime: string): string {
+  if (!tipoMime) return '';
+  return tipoMime.split(';')[0].trim().toLowerCase();
+}
+
 export function esMimeImagen(tipoMime: string): boolean {
-  return (MIME_PERMITIDOS_IMAGEN as readonly string[]).includes(tipoMime);
+  return (MIME_PERMITIDOS_IMAGEN as readonly string[]).includes(
+    normalizarMimeBase(tipoMime)
+  );
 }
 
 export function esMimeVideo(tipoMime: string): boolean {
-  return (MIME_PERMITIDOS_VIDEO as readonly string[]).includes(tipoMime);
+  return (MIME_PERMITIDOS_VIDEO as readonly string[]).includes(
+    normalizarMimeBase(tipoMime)
+  );
 }
 
 export function esMimePdf(tipoMime: string): boolean {
-  return tipoMime === 'application/pdf';
+  return normalizarMimeBase(tipoMime) === 'application/pdf';
 }
 
 export function esMimePermitidoEvidencia(
   tipoMime: string
 ): tipoMime is MimePermitidoEvidencia {
-  return (MIME_PERMITIDOS_EVIDENCIA as readonly string[]).includes(tipoMime);
+  return (MIME_PERMITIDOS_EVIDENCIA as readonly string[]).includes(
+    normalizarMimeBase(tipoMime)
+  );
 }
 
 /**
@@ -212,6 +223,9 @@ export async function prepararEvidenciaParaSubida(
   if (esMimeImagen(archivo.type)) {
     const comprimida = await comprimirImagenEnCliente(archivo);
     const blob = dataUrlToBlob(comprimida.base64);
+    if (blob.size <= 0) {
+      throw new Error('La imagen comprimida resultó vacía (0 bytes).');
+    }
     if (blob.size > MAX_BYTES_EVIDENCIA) {
       throw new Error('La imagen comprimida supera el límite máximo permitido de 10 MB.');
     }
@@ -227,12 +241,16 @@ export async function prepararEvidenciaParaSubida(
     };
   }
 
+  if (archivo.size <= 0) {
+    throw new Error('El archivo seleccionado está vacío.');
+  }
+
   const dataUrl = await blobToDataUrl(archivo);
   return {
     blob: archivo,
     dataUrl,
     nombreArchivo: archivo.name,
-    tipoMime: archivo.type as MimePermitidoEvidencia,
+    tipoMime: normalizarMimeBase(archivo.type) as MimePermitidoEvidencia,
     tamanoOriginalBytes: archivo.size,
     tamanoFinalBytes: archivo.size,
     comprimida: false,

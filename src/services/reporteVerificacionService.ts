@@ -173,12 +173,34 @@ export interface ResultadoEnvioReporteVerificacion {
  * - En modo online invoca `POST /api/misiones/{id}/reporte` (`201 Created`).
  * - En modo offline o caída de red encola la mutación `ENVIAR_REPORTE` en IndexedDB (`outbox`).
  */
+const UUID_REPORTE_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function enviarReporteVerificacionTerreno(
   misionId: string,
   input: CrearReporteVerificacionInput,
   misionActual?: MisionLocal
 ): Promise<ResultadoEnvioReporteVerificacion> {
-  const validado = crearReporteVerificacionSchema.parse(input);
+  const inputSanitizado: CrearReporteVerificacionInput = {
+    ...input,
+    adjuntoIds: Array.isArray(input.adjuntoIds)
+      ? input.adjuntoIds.filter(
+          (id) => typeof id === 'string' && UUID_REPORTE_REGEX.test(id)
+        )
+      : undefined,
+    adjuntos: Array.isArray(input.adjuntos)
+      ? input.adjuntos.filter(
+          (adj) =>
+            typeof adj.id === 'string' &&
+            UUID_REPORTE_REGEX.test(adj.id) &&
+            typeof adj.url === 'string' &&
+            !adj.url.startsWith('data:') &&
+            !adj.url.startsWith('blob:') &&
+            adj.url.length <= 500
+        )
+      : undefined,
+  };
+  const validado = crearReporteVerificacionSchema.parse(inputSanitizado);
   const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
   let latitud = validado.latitud;
@@ -299,11 +321,34 @@ export async function enviarReporteVerificacionTerreno(
   };
 
   if (!isOnline) {
+    const adjuntosLocalesPendientes = Array.isArray(
+      misionActual?.datosAdicionales?.adjuntos
+    )
+      ? (
+          misionActual.datosAdicionales.adjuntos as Array<{
+            id?: string;
+            sincronizacionPendiente?: boolean;
+          }>
+        )
+          .filter(
+            (a) =>
+              a?.sincronizacionPendiente &&
+              typeof a.id === 'string' &&
+              a.id.startsWith('local-')
+          )
+          .map((a) => a.id as string)
+      : [];
+
     await encolarAccionOutbox({
       tipo: 'ENVIAR_REPORTE',
       url: `/api/misiones/${misionId}/reporte`,
       metodo: 'POST',
-      payload: payloadMutacion as Record<string, unknown>,
+      payload: {
+        ...payloadMutacion,
+        ...(adjuntosLocalesPendientes.length > 0
+          ? { __adjuntosLocalesPendientes: adjuntosLocalesPendientes }
+          : {}),
+      } as Record<string, unknown>,
     });
 
     const reporteOffline = construirReporteLocal(false);

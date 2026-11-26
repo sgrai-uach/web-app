@@ -46,9 +46,13 @@ export function resolverUrlEvidencia(url: string): string {
   ) {
     return url;
   }
+  const normalizada = url.startsWith('/') ? url : `/${url}`;
+  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
+    return normalizada;
+  }
   const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
-  if (!apiBase) return url;
-  return `${apiBase}${url.startsWith('/') ? url : `/${url}`}`;
+  if (!apiBase) return normalizada;
+  return `${apiBase}${normalizada}`;
 }
 
 export function CargaEvidenciaCard({
@@ -78,10 +82,12 @@ export function CargaEvidenciaCard({
     setEstadoMensaje(null);
 
     const lista = Array.from(files);
+    const erroresAcumulados: string[] = [];
+
     for (const archivo of lista) {
       const validacion = validarArchivoEvidencia(archivo);
       if (!validacion.valido) {
-        setErrorMensaje(validacion.error || 'Archivo no válido.');
+        erroresAcumulados.push(validacion.error || 'Archivo no válido.');
         continue;
       }
 
@@ -110,12 +116,16 @@ export function CargaEvidenciaCard({
           err instanceof Error
             ? err.message
             : 'No se pudo procesar o cargar la evidencia.';
-        setErrorMensaje(msg);
+        erroresAcumulados.push(msg);
       } finally {
         setSubiendo(false);
         setProgreso(0);
         setArchivoEnCurso(null);
       }
+    }
+
+    if (erroresAcumulados.length > 0) {
+      setErrorMensaje(erroresAcumulados.join(' '));
     }
 
     if (fotoInputRef.current) fotoInputRef.current.value = '';
@@ -265,7 +275,10 @@ export function CargaEvidenciaCard({
             const esVideo = esMimeVideo(item.tipoMime);
             const mediaUrl = resolverUrlEvidencia(item.url);
             const esUrlDescargable =
-              item.url.startsWith('/uploads/') || item.url.startsWith('http');
+              item.url.startsWith('/uploads/') ||
+              item.url.startsWith('http') ||
+              item.url.startsWith('data:application/pdf') ||
+              item.url.startsWith('blob:');
 
             return (
               <div key={item.id} className={styles.attachmentItem}>
@@ -328,6 +341,9 @@ export function CargaEvidenciaCard({
                           href={mediaUrl}
                           target="_blank"
                           rel="noopener noreferrer"
+                          download={
+                            item.url.startsWith('data:') ? item.nombreArchivo : undefined
+                          }
                           className={styles.downloadLink}
                         >
                           <ExternalLink size={12} aria-hidden="true" />

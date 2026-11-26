@@ -235,4 +235,107 @@ describe('EvaluacionReporteCierreCard (H39)', () => {
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  it('BUG-H43-PWA-04/05: actualiza lista de evidencias cuando cambia misionActual, excluye local-* del envío Zod y muestra visor multimedia en yaEnviado', async () => {
+    const enviandoSpy = vi
+      .spyOn(reporteService, 'enviarReporteVerificacionTerreno')
+      .mockResolvedValue({
+        ok: true,
+        offline: true,
+        mensaje: 'Guardado offline',
+        reporte: {
+          id: 'rep-cierre-offline',
+          misionId: misionConPrioridadMock.id,
+          dictamen: 'REQUIERE_CUADRILLA',
+          motivo_no_abordable: '',
+          resumen_tecnico: 'Evaluación técnica completa en terreno.',
+          estado_terreno: 'ESTABLE',
+          personas_afectadas: 6,
+          danos_estimados: '',
+          observaciones: '',
+          requiere_asistencia_social: false,
+          adjuntoIds: [],
+          adjuntos: [],
+          creadoEn: '2026-11-20T11:00:00.000Z',
+          sincronizado: false,
+        },
+      });
+
+    const misionConAdjuntoOffline: MisionLocal = {
+      ...misionConPrioridadMock,
+      datosAdicionales: {
+        ...misionConPrioridadMock.datosAdicionales,
+        adjuntos: [
+          {
+            id: 'local-offline-img-1',
+            nombreArchivo: 'offline-foto.jpg',
+            url: 'data:image/jpeg;base64,AAA',
+            tipoMime: 'image/jpeg',
+            tamanoBytes: 1200,
+            creadoEn: '2026-11-20T10:55:00.000Z',
+            sincronizacionPendiente: true,
+          },
+        ],
+      },
+    };
+
+    const { rerender } = render(
+      <EvaluacionReporteCierreCard misionActual={misionConPrioridadMock} />
+    );
+
+    rerender(
+      <EvaluacionReporteCierreCard misionActual={misionConAdjuntoOffline} />
+    );
+
+    expect(screen.getByText('offline-foto.jpg')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Resumen técnico del siniestro/i), {
+      target: { value: 'Evaluación técnica completa en terreno.' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: /Enviar Reporte y Cerrar Tarea/i })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Confirmar y Cerrar Misión/i })
+    );
+
+    await waitFor(() => {
+      expect(enviandoSpy).toHaveBeenCalled();
+    });
+    expect(enviandoSpy.mock.calls[0]?.[1].adjuntoIds).toEqual([]);
+
+    const misionYaEnviada: MisionLocal = {
+      ...misionConPrioridadMock,
+      estado: 'COMPLETADA',
+      datosAdicionales: {
+        reporteVerificacionEnviado: true,
+        dictamenVerificacion: 'REQUIERE_CUADRILLA',
+        reportesTerreno: [
+          {
+            id: 'rep-cierre-view',
+            tipoReporte: 'VERIFICACION_CIERRE',
+            dictamen: 'REQUIERE_CUADRILLA',
+            resumenTecnico: 'Árbol caído verificado.',
+            estadoTerreno: 'ESTABLE',
+            personasAfectadas: 1,
+            requiereAsistenciaSocial: false,
+            adjuntos: [
+              {
+                id: '88888888-8888-4888-8888-888888888888',
+                nombreArchivo: 'miniatura-cierre.jpg',
+                url: '/uploads/evidencia/miniatura-cierre.jpg',
+                tipoMime: 'image/jpeg',
+                tamanoBytes: 2048,
+                creadoEn: '2026-11-20T11:05:00.000Z',
+              },
+            ],
+            creadoEn: '2026-11-20T11:05:00.000Z',
+          },
+        ],
+      },
+    };
+
+    rerender(<EvaluacionReporteCierreCard misionActual={misionYaEnviada} />);
+    expect(screen.getByAltText('Miniatura de miniatura-cierre.jpg')).toBeInTheDocument();
+  });
 });

@@ -480,6 +480,12 @@ export async function contarAccionesPendientes(): Promise<number> {
 }
 
 function obtenerClaveCausalAccion(accion: AccionOutbox): string | null {
+  if (accion.tipo === 'SUBIR_EVIDENCIA') {
+    const misionIdEvidencia = accion.payload?.misionId;
+    if (typeof misionIdEvidencia === 'string' && misionIdEvidencia.trim()) {
+      return `mision:${misionIdEvidencia.trim()}`;
+    }
+  }
   const payloadMisionId = accion.payload?.misionId;
   if (typeof payloadMisionId === 'string' && payloadMisionId) {
     return `mision:${payloadMisionId}`;

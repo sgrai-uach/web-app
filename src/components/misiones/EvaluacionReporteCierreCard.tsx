@@ -54,6 +54,12 @@ import type {
 import styles from './EvaluacionReporteCierreCard.module.css';
 
 const TEXTAREA_MAX = 2000;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function esUuidValido(val?: string | null): val is string {
+  return typeof val === 'string' && UUID_REGEX.test(val.trim());
+}
 
 export interface EvaluacionReporteCierreCardProps {
   misionActual: MisionLocal;
@@ -104,10 +110,20 @@ export function EvaluacionReporteCierreCard({
     extraerAdjuntosDeMision(misionActual)
   );
   const reporteTerrenoIdActual =
-    typeof misionActual.datosAdicionales?.reporteTerrenoId === 'string'
-      ? misionActual.datosAdicionales.reporteTerrenoId
+    typeof misionActual.datosAdicionales?.reporteTerrenoId === 'string' &&
+    misionActual.datosAdicionales.reporteTerrenoId.trim().length > 0
+      ? misionActual.datosAdicionales.reporteTerrenoId.trim()
+      : undefined;
+  const incidenteIdActual =
+    typeof misionActual.incidenteId === 'string' &&
+    misionActual.incidenteId.trim().length > 0
+      ? misionActual.incidenteId.trim()
       : undefined;
   const [feedback, setFeedback] = useState<FeedbackReporteState | null>(null);
+
+  useEffect(() => {
+    setAdjuntosEvidencia(extraerAdjuntosDeMision(misionActual));
+  }, [misionActual]);
 
   // Sincronizar personas_afectadas desde HU-38 si el usuario no ha modificado el campo manualmente
   useEffect(() => {
@@ -137,6 +153,44 @@ export function EvaluacionReporteCierreCard({
     String(
       misionActual?.datosAdicionales?.dictamenVerificacion || 'REQUIERE_CUADRILLA'
     );
+
+  const adjuntosResumenCierre = useMemo<AdjuntoLocal[]>(() => {
+    const mapa = new Map<string, AdjuntoLocal>();
+    const existentesReporte = Array.isArray(reporteExistente?.adjuntos)
+      ? reporteExistente.adjuntos
+      : [];
+
+    existentesReporte.forEach((a, idx) => {
+      const id = a.id || `rep-adj-${idx}`;
+      if (!mapa.has(id)) {
+        mapa.set(id, {
+          id,
+          nombreArchivo: a.nombreArchivo || `Adjunto #${idx + 1}`,
+          url: typeof a.url === 'string' ? a.url : '',
+          tipoMime:
+            typeof a.tipoMime === 'string'
+              ? a.tipoMime
+              : 'application/octet-stream',
+          tamanoBytes: typeof a.tamanoBytes === 'number' ? a.tamanoBytes : 0,
+          creadoEn: fechaReporteCierre || misionActual.actualizadoEn,
+          sincronizacionPendiente: false,
+        });
+      }
+    });
+
+    for (const adj of adjuntosEvidencia) {
+      if (adj.id && !mapa.has(adj.id)) {
+        mapa.set(adj.id, adj);
+      }
+    }
+
+    return Array.from(mapa.values());
+  }, [
+    adjuntosEvidencia,
+    fechaReporteCierre,
+    misionActual.actualizadoEn,
+    reporteExistente,
+  ]);
 
   const esNoAbordable = form.dictamen === 'NO_ABORDABLE';
   const resumenLimpio = form.resumen_tecnico.trim();
@@ -347,15 +401,17 @@ export function EvaluacionReporteCierreCard({
                 />
               )}
 
-              {Array.isArray(reporteExistente.adjuntos) &&
-                reporteExistente.adjuntos.length > 0 && (
-                  <CampoResumenReporte
-                    label="Evidencia Adjunta"
-                    valor={reporteExistente.adjuntos
-                      .map((a, idx) => a.nombreArchivo || `Adjunto #${idx + 1}`)
-                      .join(', ')}
+              {adjuntosResumenCierre.length > 0 && (
+                <div style={{ marginTop: 'var(--space-2, 8px)' }}>
+                  <CargaEvidenciaCard
+                    misionId={misionActual.id}
+                    incidenteId={incidenteIdActual}
+                    reporteTerrenoId={reporteExistente?.id || reporteTerrenoIdActual}
+                    adjuntos={adjuntosResumenCierre}
+                    soloLectura
                   />
-                )}
+                </div>
+              )}
             </>
           )}
         </ResumenReporteTerreno>
@@ -650,7 +706,7 @@ export function EvaluacionReporteCierreCard({
 
             <CargaEvidenciaCard
               misionId={misionActual.id}
-              incidenteId={misionActual.incidenteId}
+              incidenteId={incidenteIdActual}
               reporteTerrenoId={reporteTerrenoIdActual}
               adjuntos={adjuntosEvidencia}
               soloLectura={deshabilitado || guardando}
@@ -659,22 +715,29 @@ export function EvaluacionReporteCierreCard({
                   adjunto,
                   ...prev.filter((item) => item.id !== adjunto.id),
                 ]);
-                setForm((prev) => ({
-                  ...prev,
-                  adjuntoIds: prev.adjuntoIds?.includes(adjunto.id)
-                    ? prev.adjuntoIds
-                    : [...(prev.adjuntoIds ?? []), adjunto.id],
-                  adjuntos: [
-                    ...(prev.adjuntos ?? []).filter((item) => item.id !== adjunto.id),
-                    {
-                      id: adjunto.id,
-                      nombreArchivo: adjunto.nombreArchivo,
-                      url: adjunto.url,
-                      tipoMime: adjunto.tipoMime,
-                      tamanoBytes: adjunto.tamanoBytes,
-                    },
-                  ],
-                }));
+                if (
+                  !adjunto.sincronizacionPendiente &&
+                  esUuidValido(adjunto.id) &&
+                  !adjunto.url.startsWith('data:') &&
+                  !adjunto.url.startsWith('blob:')
+                ) {
+                  setForm((prev) => ({
+                    ...prev,
+                    adjuntoIds: prev.adjuntoIds?.includes(adjunto.id)
+                      ? prev.adjuntoIds
+                      : [...(prev.adjuntoIds ?? []), adjunto.id],
+                    adjuntos: [
+                      ...(prev.adjuntos ?? []).filter((item) => item.id !== adjunto.id),
+                      {
+                        id: adjunto.id,
+                        nombreArchivo: adjunto.nombreArchivo,
+                        url: adjunto.url,
+                        tipoMime: adjunto.tipoMime,
+                        tamanoBytes: adjunto.tamanoBytes,
+                      },
+                    ],
+                  }));
+                }
               }}
             />
           </div>

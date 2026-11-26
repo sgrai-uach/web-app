@@ -1,5 +1,5 @@
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
-import { handleUnauthorizedSession } from '@/lib/api/client';
+import { extractUserIdFromJwt, handleUnauthorizedSession } from '@/lib/api/client';
 import { prepararEvidenciaParaSubida } from '@/lib/utils/mediaUtils';
 import { evidenciaOutboxPayloadSchema } from '@/lib/validations/evidencia';
 import {
@@ -7,6 +7,7 @@ import {
   encolarAccionOutbox,
   reemplazarAdjuntoLocalEnMision,
 } from '@/services/offlineQueue';
+import type { paths } from '@/types/api-generated';
 import type { AdjuntoLocal, EvidenciaOutboxPayload } from '@/types/offline';
 
 export const ENDPOINT_ADJUNTOS = '/api/evidencia/adjuntos';
@@ -35,24 +36,18 @@ export interface ResultadoSubidaEvidencia {
   mensaje: string;
 }
 
-interface RespuestaAdjuntoApi {
-  id?: string;
-  nombreArchivo?: string;
-  url?: string;
-  tipoMime?: string;
-  tamanoBytes?: number;
-  creadoEn?: string;
+export type AdjuntoCreadoOpenApi =
+  paths['/api/evidencia/adjuntos']['post']['responses']['201']['content']['application/json'];
+
+type ErrorHttpApi = {
   message?: string;
   error?: string;
-  data?: {
-    id?: string;
-    nombreArchivo?: string;
-    url?: string;
-    tipoMime?: string;
-    tamanoBytes?: number;
-    creadoEn?: string;
+};
+
+type RespuestaAdjuntoApi = Partial<AdjuntoCreadoOpenApi> &
+  ErrorHttpApi & {
+    data?: Partial<AdjuntoCreadoOpenApi>;
   };
-}
 
 function resolveApiBaseUrl(): string {
   if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
@@ -112,6 +107,12 @@ export function extraerMensajeErrorHttp(status: number, fallbackMsg?: string): s
   if (status === 404) {
     return 'El incidente o reporte de terreno asociado no fue encontrado.';
   }
+  if (status === 409) {
+    return (
+      fallbackMsg ||
+      'No se puede adjuntar evidencia porque el incidente o reporte ya se encuentra cerrado o no coincide.'
+    );
+  }
   if (status === 413) {
     return 'El archivo excede el tamaño máximo de 10 MB permitido por el servidor.';
   }
@@ -153,6 +154,8 @@ export async function subirEvidenciaMultimedia({
   onProgress,
 }: SubirEvidenciaParams): Promise<ResultadoSubidaEvidencia> {
   onProgress?.(10);
+  const incidenteIdLimpio = incidenteId?.trim() || undefined;
+  const reporteTerrenoIdLimpio = reporteTerrenoId?.trim() || undefined;
   const preparada = await prepararEvidenciaParaSubida(archivo);
   onProgress?.(35);
 
@@ -160,8 +163,8 @@ export async function subirEvidenciaMultimedia({
   const payloadValidado = evidenciaOutboxPayloadSchema.parse({
     adjuntoLocalId,
     misionId,
-    incidente_id: incidenteId,
-    reporte_terreno_id: reporteTerrenoId,
+    incidente_id: incidenteIdLimpio,
+    reporte_terreno_id: reporteTerrenoIdLimpio,
     nombreArchivo: preparada.nombreArchivo,
     tipoMime: preparada.tipoMime,
     tamanoBytes: preparada.tamanoFinalBytes,
@@ -213,13 +216,17 @@ export async function subirEvidenciaMultimedia({
     const formData = construirFormDataEvidencia(
       preparada.blob,
       preparada.nombreArchivo,
-      incidenteId,
-      reporteTerrenoId
+      incidenteIdLimpio,
+      reporteTerrenoIdLimpio
     );
 
     const headers: Record<string, string> = {};
     if (token) {
       headers.Authorization = `Bearer ${token}`;
+      const userId = extractUserIdFromJwt(token);
+      if (userId) {
+        headers['x-user-id'] = userId;
+      }
     }
 
     const res = await fetch(`${resolveApiBaseUrl()}${ENDPOINT_ADJUNTOS}`, {

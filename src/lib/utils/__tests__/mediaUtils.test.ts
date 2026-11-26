@@ -4,6 +4,9 @@ import {
   prepararEvidenciaParaSubida,
   formatearTamanoBytes,
   dataUrlToBlob,
+  normalizarMimeBase,
+  esMimeVideo,
+  esMimePermitidoEvidencia,
 } from '@/lib/utils/mediaUtils';
 import { MAX_BYTES_EVIDENCIA } from '@/lib/validations/evidencia';
 
@@ -156,6 +159,53 @@ describe('mediaUtils (H43)', () => {
       const blob = dataUrlToBlob(dataUrl);
       expect(blob.type).toBe('application/pdf');
       expect(blob.size).toBe(8);
+    });
+
+    it('BUG-H43-PWA-06: normaliza MIME con parámetros de codec (ej. video/webm;codecs=vp9) y rechaza compresión de 0 bytes', async () => {
+      expect(normalizarMimeBase('video/webm;codecs=vp9')).toBe('video/webm');
+      expect(esMimeVideo('video/webm;codecs=vp9')).toBe(true);
+      expect(esMimePermitidoEvidencia('IMAGE/JPEG; charset=utf-8')).toBe(true);
+
+      const webmCodec = new File(['webm-bytes'], 'clip.webm', {
+        type: 'video/webm;codecs=vp9',
+      });
+      expect(validarArchivoEvidencia(webmCodec).valido).toBe(true);
+
+      const mockCanvasVacio = {
+        width: 0,
+        height: 0,
+        getContext: () => ({ drawImage: vi.fn() }),
+        toDataURL: () => 'data:image/jpeg;base64,',
+      };
+      const originalCreateElement = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+        if (tagName === 'canvas') {
+          return mockCanvasVacio as unknown as HTMLCanvasElement;
+        }
+        return originalCreateElement(tagName);
+      });
+
+      class MockFileReaderVacio {
+        result: string | null = null;
+        onload: ((e: { target: { result: string } }) => void) | null = null;
+        readAsDataURL() {
+          this.result = 'data:image/jpeg;base64,' + btoa('x');
+          this.onload?.({ target: { result: this.result } });
+        }
+      }
+      class MockImageVacia {
+        width = 800;
+        height = 600;
+        onload: (() => void) | null = null;
+        set src(_val: string) {
+          this.onload?.();
+        }
+      }
+      vi.stubGlobal('FileReader', MockFileReaderVacio);
+      vi.stubGlobal('Image', MockImageVacia);
+
+      const img = new File(['jpg-bytes'], 'vacio.jpg', { type: 'image/jpeg' });
+      await expect(prepararEvidenciaParaSubida(img)).rejects.toThrow(/0 bytes/i);
     });
   });
 });

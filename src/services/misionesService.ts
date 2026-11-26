@@ -418,7 +418,19 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
           estadoPermiteOptimista
       );
 
-      const adjuntosRemotos: AdjuntoLocal[] = Array.isArray(d.reportesTerreno)
+      const adjuntosDirectosRemotos: AdjuntoLocal[] = Array.isArray(d.adjuntos)
+        ? d.adjuntos.map((adj) => ({
+            id: adj.id,
+            nombreArchivo: adj.nombreArchivo,
+            url: adj.url,
+            tipoMime: adj.tipoMime,
+            tamanoBytes: adj.tamanoBytes,
+            creadoEn: adj.creadoEn,
+            sincronizacionPendiente: false,
+          }))
+        : [];
+
+      const adjuntosDeReportesRemotos: AdjuntoLocal[] = Array.isArray(d.reportesTerreno)
         ? d.reportesTerreno.flatMap((rep) =>
             Array.isArray(rep.adjuntos)
               ? rep.adjuntos.map((adj) => ({
@@ -434,19 +446,31 @@ export async function obtenerDetalleMision(id: string): Promise<MisionLocal | nu
           )
         : [];
 
+      const mapaRemotos = new Map<string, AdjuntoLocal>();
+      for (const adj of [...adjuntosDirectosRemotos, ...adjuntosDeReportesRemotos]) {
+        if (adj.id && !mapaRemotos.has(adj.id)) {
+          mapaRemotos.set(adj.id, adj);
+        }
+      }
+      const adjuntosRemotos = Array.from(mapaRemotos.values());
+
       const adjuntosPrevios = Array.isArray(previaLocal?.datosAdicionales?.adjuntos)
         ? (previaLocal.datosAdicionales.adjuntos as AdjuntoLocal[])
         : [];
-      const adjuntosPendientesLocales = adjuntosPrevios.filter(
-        (item) => item.sincronizacionPendiente
+      const adjuntosLocalesConservados = adjuntosPrevios.filter(
+        (item) =>
+          item.sincronizacionPendiente ||
+          Boolean(item.errorSincronizacion) ||
+          (!item.id.startsWith('local-') && !mapaRemotos.has(item.id))
       );
 
-      const adjuntosCombinados = [
-        ...adjuntosPendientesLocales,
-        ...adjuntosRemotos.filter(
-          (rem) => !adjuntosPendientesLocales.some((loc) => loc.id === rem.id)
-        ),
-      ];
+      const mapaCombinados = new Map<string, AdjuntoLocal>();
+      for (const adj of [...adjuntosLocalesConservados, ...adjuntosRemotos]) {
+        if (adj.id && !mapaCombinados.has(adj.id)) {
+          mapaCombinados.set(adj.id, adj);
+        }
+      }
+      const adjuntosCombinados = Array.from(mapaCombinados.values());
 
       const reportesRemotos = Array.isArray(d.reportesTerreno) ? d.reportesTerreno : [];
       const reportesPrioridadRemotos = reportesRemotos.filter(

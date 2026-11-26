@@ -19,7 +19,7 @@ import {
 import { dataUrlToBlob } from '@/lib/utils/mediaUtils';
 import { obtenerDetalleMision } from '@/services/misionesService';
 import type { ConnectionStatus } from '@/components/common/ConnectionStatusBadge';
-import type { EvidenciaOutboxPayload } from '@/types/offline';
+import type { AdjuntoLocal, EvidenciaOutboxPayload } from '@/types/offline';
 import { getAuthCookie } from '@/lib/utils/cookieUtils';
 import {
   extractUserIdFromJwt,
@@ -36,6 +36,7 @@ export function useConnectivity() {
   const [sincronizando, setSincronizando] = useState<boolean>(false);
   const [pendientes, setPendientes] = useState<number>(0);
   const sincronizandoRef = useRef<boolean>(false);
+  const sesionExpiradaRef = useRef<boolean>(false);
 
   const actualizarPendientes = useCallback(async (): Promise<number> => {
     try {
@@ -49,6 +50,7 @@ export function useConnectivity() {
 
   const sincronizar = useCallback(async () => {
     if (
+      sesionExpiradaRef.current ||
       (typeof navigator !== 'undefined' && !navigator.onLine) ||
       sincronizandoRef.current
     ) {
@@ -63,6 +65,7 @@ export function useConnectivity() {
         typeof window !== 'undefined' && process.env.NODE_ENV !== 'test'
           ? ''
           : process.env.NEXT_PUBLIC_API_URL || '';
+      const mapaAdjuntosResueltos = new Map<string, AdjuntoLocal>();
 
       await sincronizarColaOutbox(async (accion) => {
         const authHeaders: Record<string, string> = {};
@@ -90,17 +93,104 @@ export function useConnectivity() {
             body: formData,
           });
         } else {
+          let payloadAEnviar: Record<string, unknown> = accion.payload;
+          if (accion.tipo === 'ENVIAR_REPORTE') {
+            const clon: Record<string, unknown> = { ...accion.payload };
+            const idsPendientes = Array.isArray(clon.__adjuntosLocalesPendientes)
+              ? (clon.__adjuntosLocalesPendientes as unknown[]).filter(
+                  (id): id is string => typeof id === 'string' && id.length > 0
+                )
+              : [];
+            delete clon.__adjuntosLocalesPendientes;
+
+            const idsOrig = Array.isArray(clon.adjuntoIds)
+              ? (clon.adjuntoIds as unknown[]).filter(
+                  (id): id is string => typeof id === 'string' && id.length > 0
+                )
+              : [];
+            const adjsOrig = Array.isArray(clon.adjuntos)
+              ? (clon.adjuntos as Array<Record<string, unknown>>)
+              : [];
+
+            const idsResueltos: string[] = [];
+            const adjsResueltos: Array<Record<string, unknown>> = [];
+
+            for (const id of idsOrig) {
+              const resuelto = mapaAdjuntosResueltos.get(id);
+              if (resuelto) {
+                if (!idsResueltos.includes(resuelto.id)) {
+                  idsResueltos.push(resuelto.id);
+                }
+                adjsResueltos.push({
+                  id: resuelto.id,
+                  nombreArchivo: resuelto.nombreArchivo,
+                  url: resuelto.url,
+                  tipoMime: resuelto.tipoMime,
+                  tamanoBytes: resuelto.tamanoBytes,
+                });
+              } else if (!id.startsWith('local-') && !idsResueltos.includes(id)) {
+                idsResueltos.push(id);
+              }
+            }
+
+            for (const localId of idsPendientes) {
+              const resuelto = mapaAdjuntosResueltos.get(localId);
+              if (resuelto) {
+                if (!idsResueltos.includes(resuelto.id)) {
+                  idsResueltos.push(resuelto.id);
+                }
+                adjsResueltos.push({
+                  id: resuelto.id,
+                  nombreArchivo: resuelto.nombreArchivo,
+                  url: resuelto.url,
+                  tipoMime: resuelto.tipoMime,
+                  tamanoBytes: resuelto.tamanoBytes,
+                });
+              }
+            }
+
+            for (const adj of adjsOrig) {
+              const adjId = typeof adj.id === 'string' ? adj.id : undefined;
+              const adjUrl = typeof adj.url === 'string' ? adj.url : '';
+              if (adjId && mapaAdjuntosResueltos.has(adjId)) {
+                const resuelto = mapaAdjuntosResueltos.get(adjId)!;
+                if (!adjsResueltos.some((item) => item.id === resuelto.id)) {
+                  adjsResueltos.push({
+                    id: resuelto.id,
+                    nombreArchivo: resuelto.nombreArchivo,
+                    url: resuelto.url,
+                    tipoMime: resuelto.tipoMime,
+                    tamanoBytes: resuelto.tamanoBytes,
+                  });
+                }
+              } else if (
+                adjId &&
+                !adjId.startsWith('local-') &&
+                !adjUrl.startsWith('data:') &&
+                !adjUrl.startsWith('blob:') &&
+                !adjsResueltos.some((item) => item.id === adjId)
+              ) {
+                adjsResueltos.push(adj);
+              }
+            }
+
+            clon.adjuntoIds = idsResueltos;
+            clon.adjuntos = adjsResueltos;
+            payloadAEnviar = clon;
+          }
+
           res = await fetch(`${apiUrl}${accion.url}`, {
             method: accion.metodo,
             headers: {
               'Content-Type': 'application/json',
               ...authHeaders,
             },
-            body: JSON.stringify(accion.payload),
+            body: JSON.stringify(payloadAEnviar),
           });
         }
 
         if (res.status === 401) {
+          sesionExpiradaRef.current = true;
           handleUnauthorizedSession();
           return false;
         }
@@ -314,6 +404,7 @@ export function useConnectivity() {
                 creadoEn: new Date().toISOString(),
                 sincronizacionPendiente: false,
               });
+              mapaAdjuntosResueltos.set(evPayload.adjuntoLocalId, adjuntoDefinitivo);
               await reemplazarAdjuntoLocalEnMision(
                 evPayload.misionId,
                 evPayload.adjuntoLocalId,
@@ -323,10 +414,24 @@ export function useConnectivity() {
               // Ignorar fallos secundarios al actualizar caché de misión
             }
           } else if (esErrorIrrecuperable || esConflictoTerminal) {
+            let serverMsg: string | undefined;
+            try {
+              const bodyErr = (await res.clone().json()) as {
+                message?: unknown;
+                error?: unknown;
+              } | null;
+              if (typeof bodyErr?.message === 'string' && bodyErr.message.trim()) {
+                serverMsg = bodyErr.message.trim();
+              } else if (typeof bodyErr?.error === 'string' && bodyErr.error.trim()) {
+                serverMsg = bodyErr.error.trim();
+              }
+            } catch {
+              // Sin cuerpo JSON legible
+            }
             await marcarErrorAdjuntoLocalEnMision(
               evPayload.misionId,
               evPayload.adjuntoLocalId,
-              extraerMensajeErrorHttp(res.status)
+              extraerMensajeErrorHttp(res.status, serverMsg)
             );
           }
         }
@@ -508,8 +613,10 @@ export function useConnectivity() {
 
   useEffect(() => {
     const verificarYSincronizar = async () => {
+      if (sesionExpiradaRef.current) return;
       const total = await actualizarPendientes();
       if (
+        !sesionExpiradaRef.current &&
         typeof navigator !== 'undefined' &&
         navigator.onLine &&
         total > 0 &&

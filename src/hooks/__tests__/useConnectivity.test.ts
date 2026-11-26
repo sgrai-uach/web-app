@@ -623,4 +623,166 @@ describe('useConnectivity hook', () => {
       expect(obtenerDetalleMision).toHaveBeenCalledWith('mis-rech-err');
     }
   });
+
+  it('BUG-H43-PWA-04/06: propaga message del servidor al fallar SUBIR_EVIDENCIA, detiene polling tras 401 y resuelve UUID reales en ENVIAR_REPORTE', async () => {
+    vi.clearAllMocks();
+    const realUuid = '77777777-7777-4777-8777-777777777777';
+    const captured: { reportePayload: Record<string, unknown> | null } = {
+      reportePayload: null,
+    };
+
+    vi.mocked(offlineQueue.reemplazarAdjuntoLocalEnMision).mockResolvedValue(undefined);
+    vi.mocked(offlineQueue.guardarMisionLocal).mockResolvedValue(undefined);
+    vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue(undefined);
+    vi.mocked(offlineQueue.eliminarAccionOutbox).mockResolvedValue(undefined);
+    vi.mocked(obtenerDetalleMision).mockResolvedValue(null);
+
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (callback) => {
+      global.fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        const u = String(url);
+        if (u.endsWith('/api/evidencia/adjuntos')) {
+          return {
+            ok: true,
+            status: 201,
+            clone: () => ({
+              json: async () => ({
+                id: realUuid,
+                nombreArchivo: 'evidencia.jpg',
+                url: '/uploads/evidencia/evidencia.jpg',
+                tipoMime: 'image/jpeg',
+                tamanoBytes: 1024,
+                creadoEn: '2026-11-20T10:00:00.000Z',
+              }),
+            }),
+          } as unknown as Response;
+        }
+        captured.reportePayload = JSON.parse(String(init?.body || '{}')) as Record<
+          string,
+          unknown
+        >;
+        return {
+          ok: true,
+          status: 201,
+          clone: () => ({ json: async () => ({ data: {} }) }),
+        } as unknown as Response;
+      }) as unknown as typeof fetch;
+
+      const ok1 = await callback({
+        id: 'out-ev-1',
+        tipo: 'SUBIR_EVIDENCIA',
+        url: '/api/evidencia/adjuntos',
+        metodo: 'POST',
+        payload: {
+          adjuntoLocalId: 'local-1',
+          misionId: 'mis-sync-1',
+          incidente_id: 'inc-sync-1',
+          nombreArchivo: 'evidencia.jpg',
+          tipoMime: 'image/jpeg',
+          tamanoBytes: 1024,
+          dataUrl: `data:image/jpeg;base64,${btoa('abc')}`,
+        },
+        timestamp: '2026-11-20T09:59:00.000Z',
+        intentos: 0,
+      });
+      const ok2 = await callback({
+        id: 'out-rep-1',
+        tipo: 'ENVIAR_REPORTE',
+        url: '/api/misiones/mis-sync-1/reporte',
+        metodo: 'POST',
+        payload: {
+          dictamen: 'REQUIERE_CUADRILLA',
+          resumen_tecnico: 'Resumen válido en terreno',
+          adjuntoIds: ['local-unresolved'],
+          adjuntos: [{ id: 'local-unresolved', url: 'data:image/jpeg;base64,xxx' }],
+          __adjuntosLocalesPendientes: ['local-1'],
+        },
+        timestamp: '2026-11-20T09:59:01.000Z',
+        intentos: 0,
+      });
+
+      expect(ok1).toBe(true);
+      expect(ok2).toBe(true);
+      return { total: 2, exitosas: 2, fallidas: 0 };
+    });
+
+    const { result } = renderHook(() => useConnectivity());
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+
+    expect(captured.reportePayload).not.toBeNull();
+    expect(captured.reportePayload?.adjuntoIds).toEqual([realUuid]);
+    expect(captured.reportePayload?.__adjuntosLocalesPendientes).toBeUndefined();
+    expect(captured.reportePayload?.adjuntos).toEqual([
+      expect.objectContaining({
+        id: realUuid,
+        url: '/uploads/evidencia/evidencia.jpg',
+      }),
+    ]);
+
+    // Caso 2: 409 en SUBIR_EVIDENCIA propaga mensaje específico y 401 detiene sincronizaciones posteriores
+    vi.clearAllMocks();
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementationOnce(async (cb) => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        clone: () => ({ json: async () => ({ message: 'Incidente ya resuelto en servidor' }) }),
+      } as unknown as Response);
+
+      const procesada = await cb({
+        id: 'out-ev-409',
+        tipo: 'SUBIR_EVIDENCIA',
+        url: '/api/evidencia/adjuntos',
+        metodo: 'POST',
+        payload: {
+          adjuntoLocalId: 'local-409',
+          misionId: 'mis-409',
+          nombreArchivo: 'falla.jpg',
+          tipoMime: 'image/jpeg',
+          tamanoBytes: 100,
+          dataUrl: `data:image/jpeg;base64,${btoa('abc')}`,
+        },
+        timestamp: '2026-11-20T10:01:00.000Z',
+        intentos: 0,
+      });
+      expect(procesada).toBe(true);
+      return { total: 1, exitosas: 1, fallidas: 0 };
+    });
+
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+    expect(offlineQueue.marcarErrorAdjuntoLocalEnMision).toHaveBeenCalledWith(
+      'mis-409',
+      'local-409',
+      'Incidente ya resuelto en servidor'
+    );
+
+    vi.clearAllMocks();
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementationOnce(async (cb) => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+      } as unknown as Response);
+      await cb({
+        id: 'out-401',
+        tipo: 'ACEPTAR_MISION',
+        url: '/api/misiones/mis-401/aceptar',
+        metodo: 'POST',
+        payload: {},
+        timestamp: '2026-11-20T10:02:00.000Z',
+        intentos: 0,
+      });
+      return { total: 1, exitosas: 0, fallidas: 1 };
+    });
+
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+    vi.clearAllMocks();
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+    expect(offlineQueue.sincronizarColaOutbox).not.toHaveBeenCalled();
+  });
 });

@@ -1,7 +1,10 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { CargaEvidenciaCard } from '@/components/misiones/CargaEvidenciaCard';
+import {
+  CargaEvidenciaCard,
+  resolverUrlEvidencia,
+} from '@/components/misiones/CargaEvidenciaCard';
 import * as evidenciaService from '@/services/evidenciaService';
 import type { AdjuntoLocal } from '@/types/offline';
 
@@ -210,5 +213,55 @@ describe('CargaEvidenciaCard (H43)', () => {
     } finally {
       process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
     }
+  });
+
+  it('BUG-H43-PWA-05/06: acumula errores de lote múltiple, renderiza enlace Ver PDF para data:application/pdf y usa ruta relativa en producción navegador', async () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
+    process.env.NEXT_PUBLIC_API_URL = 'http://localhost:4001/';
+    vi.stubEnv('NODE_ENV', 'production');
+
+    try {
+      expect(resolverUrlEvidencia('/uploads/evidencia/prod.jpg')).toBe(
+        '/uploads/evidencia/prod.jpg'
+      );
+    } finally {
+      vi.stubEnv('NODE_ENV', originalEnv || 'test');
+      process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
+    }
+
+    render(
+      <CargaEvidenciaCard
+        misionId="mision-lote"
+        incidenteId="22222222-2222-4222-8222-222222222222"
+        adjuntos={[
+          {
+            id: 'local-pdf-1',
+            nombreArchivo: 'acta-offline.pdf',
+            url: `data:application/pdf;base64,${btoa('pdf')}`,
+            tipoMime: 'application/pdf',
+            tamanoBytes: 512,
+            creadoEn: '2026-11-20T12:00:00.000Z',
+            sincronizacionPendiente: true,
+          },
+        ]}
+      />
+    );
+
+    const pdfLink = screen.getByRole('link', { name: /Ver PDF/i });
+    expect(pdfLink).toHaveAttribute('download', 'acta-offline.pdf');
+
+    const inputArchivo = screen.getByTestId('input-seleccion-archivo');
+    const badMime = new File(['abc'], 'mal.exe', { type: 'application/x-msdownload' });
+    const badSize = new File(['x'], 'pesado.pdf', { type: 'application/pdf' });
+    Object.defineProperty(badSize, 'size', { value: 11 * 1024 * 1024 });
+
+    fireEvent.change(inputArchivo, { target: { files: [badMime, badSize] } });
+
+    await waitFor(() => {
+      const alerta = screen.getByRole('alert').textContent || '';
+      expect(alerta).toContain('Formato no permitido');
+      expect(alerta).toContain('supera el máximo permitido de 10 MB');
+    });
   });
 });
