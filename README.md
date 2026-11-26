@@ -84,6 +84,7 @@ cp .env.example .env.local
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | URL base de la API REST (`sgrai-api`) | `http://localhost:3001` |
 | `NEXT_PUBLIC_SOCKET_URL` | URL del servidor Socket.io | `http://localhost:3001` |
+| `INTERNAL_API_URL` | Destino de los rewrites de Next.js en el servidor | `http://localhost:3001` |
 
 > [!IMPORTANT]
 > **Requisito de HTTPS para Geolocation y Cámara:**
@@ -92,7 +93,7 @@ cp .env.example .env.local
 ### Scripts Disponibles
 
 ```bash
-# Iniciar servidor de desarrollo en http://localhost:3000
+# Iniciar servidor de desarrollo en http://localhost:3002
 npm run dev
 
 # Ejecutar la suite de pruebas unitarias y de componentes con Vitest

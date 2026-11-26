@@ -23,6 +23,10 @@ export type AceptarMisionPayload = NonNullable<
   paths['/api/misiones/{id}/aceptar']['post']['requestBody']
 >['content']['application/json'];
 
+export type RechazarMisionPayload = NonNullable<
+  paths['/api/misiones/{id}/rechazar']['post']['requestBody']
+>['content']['application/json'];
+
 export interface AccionOutbox {
   id: string;
   tipo: AccionOutboxTipo;

@@ -308,6 +308,7 @@ export function useConnectivity() {
                   delete datosRestaurados.justificacionRechazo;
                   await guardarMisionLocal({
                     ...local,
+                    estado: local.estado === 'RECHAZADA' ? 'DESPACHADA' : local.estado,
                     sincronizacionPendiente: false,
                     datosAdicionales: datosRestaurados,
                     actualizadoEn: new Date().toISOString(),
@@ -318,7 +319,7 @@ export function useConnectivity() {
                 }
                 await obtenerDetalleMision(misionId);
               } catch {
-                // Ignorar fallos al refrescar estado real
+                // Ignorar fallos al refrescar estado real tras rollback local
               }
             }
           }

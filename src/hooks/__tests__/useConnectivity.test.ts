@@ -448,4 +448,72 @@ describe('useConnectivity hook', () => {
       })
     );
   });
+
+  it('revierte estado local a DESPACHADA, limpia justificacionRechazo, elimina acción del outbox y refresca ante errores 409/403/400 en RECHAZAR_MISION (BUG-H41-PWA-03 / PWA-04)', async () => {
+    for (const statusError of [409, 403, 400]) {
+      vi.clearAllMocks();
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: 'mis-rech-err',
+        incidenteId: 'inc-1',
+        codigoIncidente: 'INC-2026-0001',
+        tipologia: 'Caída de árbol',
+        direccion: 'Valdivia',
+        prioridad: 'ALTA',
+        estado: 'RECHAZADA',
+        fechaDespacho: '2026-11-01T20:30:00Z',
+        sincronizacionPendiente: true,
+        datosAdicionales: {
+          justificacionRechazo: 'Falla mecánica optimista',
+          trabajo: 'Despeje',
+        },
+        actualizadoEn: '2026-11-01T20:30:00Z',
+      });
+
+      vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (callback) => {
+        global.fetch = vi.fn().mockResolvedValue({
+          ok: false,
+          status: statusError,
+          clone: () => ({ json: async () => ({ message: 'Conflicto o rechazo inválido' }) }),
+        } as unknown as Response);
+
+        const procesada = await callback({
+          id: `outbox-rech-err-${statusError}`,
+          tipo: 'RECHAZAR_MISION',
+          url: '/api/misiones/mis-rech-err/rechazar',
+          metodo: 'POST',
+          payload: { justificacion_rechazo: 'Falla mecánica optimista' },
+          timestamp: new Date().toISOString(),
+          intentos: 0,
+        });
+        expect(procesada).toBe(true);
+
+        return { total: 1, exitosas: 1, fallidas: 0 };
+      });
+
+      if (statusError === 409) {
+        vi.mocked(obtenerDetalleMision).mockRejectedValueOnce(new Error('Fallo de red al refrescar'));
+      } else {
+        vi.mocked(obtenerDetalleMision).mockResolvedValueOnce(null);
+      }
+
+      const { result } = renderHook(() => useConnectivity());
+
+      await act(async () => {
+        await result.current.sincronizar();
+      });
+
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'mis-rech-err',
+          estado: 'DESPACHADA',
+          sincronizacionPendiente: false,
+          datosAdicionales: { trabajo: 'Despeje' },
+        })
+      );
+      expect(offlineQueue.eliminarAccionOutbox).toHaveBeenCalledWith(
+        `outbox-rech-err-${statusError}`
+      );
+      expect(obtenerDetalleMision).toHaveBeenCalledWith('mis-rech-err');
+    }
+  });
 });
