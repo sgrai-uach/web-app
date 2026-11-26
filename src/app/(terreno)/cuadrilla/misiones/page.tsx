@@ -78,9 +78,13 @@ function CuadrillaMisionesContenido() {
     };
     window.addEventListener('sgrai:outbox-synced', refrescar);
     window.addEventListener('sgrai:mision-rechazada', refrescar);
+    window.addEventListener('sgrai:mision-sincronizada', refrescar);
+    window.addEventListener('sgrai:mision_actualizada', refrescar);
     return () => {
       window.removeEventListener('sgrai:outbox-synced', refrescar);
       window.removeEventListener('sgrai:mision-rechazada', refrescar);
+      window.removeEventListener('sgrai:mision-sincronizada', refrescar);
+      window.removeEventListener('sgrai:mision_actualizada', refrescar);
     };
   }, [cargarMisiones]);
 

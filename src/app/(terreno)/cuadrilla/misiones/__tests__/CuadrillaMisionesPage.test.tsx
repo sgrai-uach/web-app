@@ -185,10 +185,12 @@ describe('CuadrillaMisionesPage — Modo Histórico Cuadrilla Desactivada (H82)'
     act(() => {
       window.dispatchEvent(new CustomEvent('sgrai:mision-rechazada'));
       window.dispatchEvent(new CustomEvent('sgrai:outbox-synced'));
+      window.dispatchEvent(new CustomEvent('sgrai:mision-sincronizada'));
+      window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
     });
 
     await waitFor(() => {
-      expect(misionesService.sincronizarMisiones).toHaveBeenCalledTimes(3);
+      expect(misionesService.sincronizarMisiones).toHaveBeenCalledTimes(5);
     });
   });
 

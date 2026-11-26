@@ -146,9 +146,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     };
     window.addEventListener('sgrai:outbox-synced', handleOutboxSynced);
     window.addEventListener('sgrai:mision-sincronizada', handleMisionSincronizada);
+    window.addEventListener('sgrai:mision-rechazada', handleMisionSincronizada);
     return () => {
       window.removeEventListener('sgrai:outbox-synced', handleOutboxSynced);
       window.removeEventListener('sgrai:mision-sincronizada', handleMisionSincronizada);
+      window.removeEventListener('sgrai:mision-rechazada', handleMisionSincronizada);
     };
   }, [cargarDetalle]);
 
