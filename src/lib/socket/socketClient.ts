@@ -6,12 +6,16 @@ let socketInstance: Socket | null = null;
 let currentPatrullaId: string | null = null;
 
 function resolveSocketUrl(): string {
-  if (typeof window === 'undefined') return 'http://localhost:3001';
-  return (
-    process.env.NEXT_PUBLIC_SOCKET_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    'http://localhost:3001'
-  );
+  if (process.env.NEXT_PUBLIC_SOCKET_URL) {
+    return process.env.NEXT_PUBLIC_SOCKET_URL;
+  }
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  return 'http://localhost:4001';
 }
 
 /**

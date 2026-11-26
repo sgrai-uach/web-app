@@ -303,6 +303,7 @@ export async function guardarMisionesLocales(misiones: MisionLocal[]): Promise<v
         ? {
             ...baseFusionada,
             tipologia: local.tipologia || baseFusionada.tipologia,
+            prioridad: local.prioridad || baseFusionada.prioridad,
             estado: local.estado || baseFusionada.estado,
             fechaInicio: local.fechaInicio ?? baseFusionada.fechaInicio,
             sincronizacionPendiente: true,
@@ -396,6 +397,20 @@ export async function obtenerCatalogoLocal<T = unknown>(clave: string): Promise<
 // COLA OUTBOX (MUTACIONES OFFLINE)
 // ==========================================
 
+let ultimoTimestampOutboxMs = 0;
+
+function generarTimestampMonotonico(existentes: AccionOutbox[]): string {
+  let siguienteMs = Math.max(Date.now(), ultimoTimestampOutboxMs + 1);
+  for (const item of existentes) {
+    const itemMs = Date.parse(item.timestamp);
+    if (Number.isFinite(itemMs) && itemMs >= siguienteMs) {
+      siguienteMs = itemMs + 1;
+    }
+  }
+  ultimoTimestampOutboxMs = siguienteMs;
+  return new Date(siguienteMs).toISOString();
+}
+
 export async function encolarAccionOutbox(
   accion: Omit<AccionOutbox, 'id' | 'timestamp' | 'intentos'>
 ): Promise<AccionOutbox> {
@@ -405,19 +420,11 @@ export async function encolarAccionOutbox(
     (item) => item.tipo === accion.tipo && item.url === accion.url
   );
 
-  const maxTimestampMs = existentes.reduce((max, item) => {
-    const ms = Date.parse(item.timestamp);
-    return Number.isFinite(ms) && ms > max ? ms : max;
-  }, 0);
-  const timestampIso = new Date(
-    Math.max(Date.now(), maxTimestampMs + 1)
-  ).toISOString();
-
   if (duplicada) {
     const actualizada: AccionOutbox = {
       ...duplicada,
       payload: accion.payload,
-      timestamp: timestampIso,
+      timestamp: generarTimestampMonotonico(existentes),
     };
     await db.put('outbox', actualizada);
     return actualizada;
@@ -426,7 +433,7 @@ export async function encolarAccionOutbox(
   const nuevaAccion: AccionOutbox = {
     ...accion,
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `outbox-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    timestamp: timestampIso,
+    timestamp: generarTimestampMonotonico(existentes),
     intentos: 0,
   };
 

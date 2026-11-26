@@ -9403,8 +9403,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Rechazar misión de verificación por patrulla en terreno (HU-69)
-         * @description Permite a una patrulla verificadora rechazar una misión asignada ingresando una justificación obligatoria (mínimo 5 caracteres según Regla Crítica §3.3). Ejecuta una transacción atómica que: (1) actualiza la misión a estado RECHAZADA y persiste la justificación, (2) transiciona la patrulla a DISPONIBLE, (3) revierte el incidente a REPORTADO para su inmediata reasignación, y (4) registra el hito en mision_hito. Emite la notificación WebSocket mision:rechazada hacia la sala encargado.
+         * Rechazar asignación de misión en terreno (HU-41 / HU-69)
+         * @description Permite al Delegado de cuadrilla (permiso 'misiones:terreno:ejecutar') o a una patrulla verificadora (permiso 'misiones:terreno:verificar') rechazar una misión asignada ingresando una justificación técnica obligatoria (mínimo 5 caracteres según Regla §3.3). Ejecuta una transacción atómica que: (1) actualiza mision.estado = 'RECHAZADA' y persiste justificacion_rechazo, (2) devuelve la cuadrilla/dotación o patrulla a DISPONIBLE, (3) retorna el incidente a VERIFICANDO o REPORTADO para reasignación, y (4) registra el hito 'RECHAZADA' en mision_hito. Emite la alerta WebSocket mision:rechazada hacia la sala encargado.
          */
         post: {
             parameters: {
@@ -9416,71 +9416,22 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: {
+            requestBody: {
                 content: {
-                    "application/json": {
-                        /**
-                         * @description Motivo obligatorio del rechazo de la misión (mínimo 5 caracteres según Regla Crítica §3.3)
-                         * @example Desperfecto mecánico en el neumático delantero del vehículo institucional.
-                         */
-                        justificacion_rechazo: string;
-                        /**
-                         * @description Latitud WGS84 de la patrulla (-90 a 90)
-                         * @example -39.81422
-                         */
-                        latitud?: number;
-                        /**
-                         * @description Longitud WGS84 de la patrulla (-180 a 180)
-                         * @example -73.24589
-                         */
-                        longitud?: number;
-                    };
+                    "application/json": components["schemas"]["RechazarMisionBody"];
                 };
             };
             responses: {
-                /** @description Misión rechazada exitosamente y devuelta a estado REPORTADO para reasignación */
+                /** @description Misión rechazada exitosamente, unidad liberada e incidente retornado para reasignación */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /** @example Misión rechazada exitosamente. El incidente ha vuelto a estado REPORTADO para su reasignación. */
-                            message: string;
-                            data: {
-                                mision: {
-                                    /** Format: uuid */
-                                    id: string;
-                                    codigo: string;
-                                    estado: string;
-                                    justificacionRechazo: string;
-                                    actualizadoEn: string;
-                                };
-                                patrulla: {
-                                    /** Format: uuid */
-                                    id: string;
-                                    nombre: string;
-                                    estado: string;
-                                };
-                                incidente: {
-                                    /** Format: uuid */
-                                    id: string;
-                                    codigo: string;
-                                    estado: string;
-                                    prioridad?: string;
-                                };
-                                hito: {
-                                    /** Format: uuid */
-                                    id: string;
-                                    hito: string;
-                                    descripcion: string;
-                                    creadoEn: string;
-                                };
-                            };
-                        };
+                        "application/json": components["schemas"]["RechazarMisionResponse"];
                     };
                 };
-                /** @description Datos de entrada inválidos, justificación menor a 5 caracteres o coordenadas geográficas fuera de rango WGS84 */
+                /** @description Datos de entrada inválidos, justificación vacía o menor a 5 caracteres (Regla §3.3), o coordenadas WGS84 inválidas */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9494,7 +9445,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Acceso denegado. Se requiere pertenecer a la patrulla asignada o rol Administrador */
+                /** @description Acceso denegado. Se requiere permiso 'misiones:terreno:ejecutar' (cuadrilla) o 'misiones:terreno:verificar' (patrulla) y pertenecer a la unidad asignada (o rol Administrador) */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -9508,7 +9459,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Conflicto: la misión ya fue rechazada, no se encuentra en estado DESPACHADA, o no es de tipo VERIFICACION / no tiene patrulla asignada */
+                /** @description Conflicto: la misión ya fue rechazada, no está en estado DESPACHADA, o no tiene una unidad asignada compatible */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -14634,51 +14585,81 @@ export interface components {
         };
         RechazarMisionBody: {
             /**
-             * @description Motivo obligatorio del rechazo de la misión (mínimo 5 caracteres según Regla Crítica §3.3)
-             * @example Desperfecto mecánico en el neumático delantero del vehículo institucional.
+             * @description Justificación técnica obligatoria del rechazo de la misión (mínimo 5 caracteres según Regla §3.3)
+             * @example Camión tolva presenta falla hidráulica en ruta de salida desde base.
              */
             justificacion_rechazo: string;
             /**
-             * @description Latitud WGS84 de la patrulla (-90 a 90)
+             * @description Latitud WGS84 opcional de la unidad al momento del rechazo (-90 a 90)
              * @example -39.81422
              */
             latitud?: number;
             /**
-             * @description Longitud WGS84 de la patrulla (-180 a 180)
+             * @description Longitud WGS84 opcional de la unidad al momento del rechazo (-180 a 180)
              * @example -73.24589
              */
             longitud?: number;
         };
         RechazarMisionResponse: {
-            /** @example Misión rechazada exitosamente. El incidente ha vuelto a estado REPORTADO para su reasignación. */
+            /** @example Misión rechazada exitosamente. La unidad ha vuelto a estado DISPONIBLE y el incidente ha retornado para su reasignación. */
             message: string;
             data: {
                 mision: {
                     /** Format: uuid */
                     id: string;
                     codigo: string;
-                    estado: string;
+                    /** @enum {string} */
+                    tipoMision?: "VERIFICACION" | "ATENCION_CUADRILLA" | "PREVENCION" | "RECUPERACION" | "ASISTENCIA_SOCIAL";
+                    /**
+                     * @example RECHAZADA
+                     * @enum {string}
+                     */
+                    estado: "PLANIFICADA" | "DESPACHADA" | "EN_CURSO" | "COMPLETADA" | "CANCELADA" | "RECHAZADA";
                     justificacionRechazo: string;
+                    fechaCierre?: string;
                     actualizadoEn: string;
                 };
-                patrulla: {
+                cuadrilla?: {
                     /** Format: uuid */
                     id: string;
                     nombre: string;
+                    /** @example DISPONIBLE */
                     estado: string;
-                };
+                    /** Format: uuid */
+                    delegacionId?: string | null;
+                    /** Format: uuid */
+                    usuarioDelegadoId?: string | null;
+                } | null;
+                patrulla?: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /** @example DISPONIBLE */
+                    estado: string;
+                    /** Format: uuid */
+                    delegacionId?: string | null;
+                    /** Format: uuid */
+                    usuarioLiderId?: string | null;
+                } | null;
                 incidente: {
                     /** Format: uuid */
                     id: string;
                     codigo: string;
+                    /** @example VERIFICANDO */
                     estado: string;
                     prioridad?: string;
-                };
+                } | null;
                 hito: {
                     /** Format: uuid */
                     id: string;
+                    /** Format: uuid */
+                    misionId?: string;
                     hito: string;
                     descripcion: string;
+                    /** Format: uuid */
+                    registradoPorId?: string | null;
+                    latitud?: number | null;
+                    longitud?: number | null;
                     creadoEn: string;
                 };
             };

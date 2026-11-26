@@ -13,6 +13,8 @@ export interface CoordenadasGPS {
 export interface RechazoMisionModalProps {
   abierto: boolean;
   codigoMision: string;
+  titulo?: string;
+  unidadEtiqueta?: string;
   alConfirmar: (justificacion: string, coordenadas?: CoordenadasGPS) => Promise<void>;
   alCancelar: () => void;
 }
@@ -20,6 +22,8 @@ export interface RechazoMisionModalProps {
 export function RechazoMisionModal({
   abierto,
   codigoMision,
+  titulo = 'Rechazar Misión de Verificación',
+  unidadEtiqueta = 'patrulla',
   alConfirmar,
   alCancelar,
 }: RechazoMisionModalProps) {
@@ -38,13 +42,17 @@ export function RechazoMisionModal({
       setCargando(false);
       setTocado(false);
       setCoordenadas(undefined);
+      setObteniendoGps(false);
       return;
     }
+
+    let cancelado = false;
 
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       setObteniendoGps(true);
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          if (cancelado) return;
           setCoordenadas({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
@@ -52,12 +60,17 @@ export function RechazoMisionModal({
           setObteniendoGps(false);
         },
         () => {
+          if (cancelado) return;
           // Si el GPS falla o el usuario no da permiso, se continúa sin coordenadas
           setObteniendoGps(false);
         },
         { timeout: 5000, enableHighAccuracy: true }
       );
     }
+
+    return () => {
+      cancelado = true;
+    };
   }, [abierto]);
 
   // Manejador para cerrar con Escape
@@ -121,7 +134,7 @@ export function RechazoMisionModal({
           </div>
           <div className={styles.titleContent}>
             <h2 id="rechazo-modal-title" className={styles.title}>
-              Rechazar Misión de Verificación
+              {titulo}
             </h2>
             <p className={styles.subtitle}>{codigoMision}</p>
           </div>
@@ -131,8 +144,8 @@ export function RechazoMisionModal({
         <p id="rechazo-modal-desc" className={styles.description}>
           Por normativa de despacho de emergencia, el rechazo de una misión
           exige una justificación técnica obligatoria (desperfecto de vehículo, corte de
-          ruta, emergencia crítica) para liberar la patrulla y permitir la reasignación
-          inmediata en el Centro de Mando.
+          ruta, emergencia crítica) para liberar la {unidadEtiqueta} y permitir la
+          reasignación inmediata en el Centro de Mando.
         </p>
 
         {/* Mensaje de error retornado por la API */}
@@ -190,8 +203,8 @@ export function RechazoMisionModal({
               {obteniendoGps
                 ? 'Obteniendo coordenadas GPS de terreno...'
                 : coordenadas
-                ? `GPS registrado (${coordenadas.lat.toFixed(4)}, ${coordenadas.lng.toFixed(4)})`
-                : 'Ubicación GPS no disponible (se registrará sin coordenadas)'}
+                  ? `GPS registrado (${coordenadas.lat.toFixed(4)}, ${coordenadas.lng.toFixed(4)})`
+                  : 'Ubicación GPS no disponible (se registrará sin coordenadas)'}
             </span>
           </div>
 
@@ -223,4 +236,3 @@ export function RechazoMisionModal({
 }
 
 export default RechazoMisionModal;
-

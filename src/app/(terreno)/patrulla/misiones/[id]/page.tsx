@@ -649,6 +649,7 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                         } else if (!cierreCompletado) {
                           setSeccionReporteCierreAbierta(true);
                         }
+                        void actualizarPendientes();
                       }}
                     />
                   </SeccionDesplegable>

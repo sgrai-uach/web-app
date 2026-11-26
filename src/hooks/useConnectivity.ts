@@ -96,7 +96,7 @@ export function useConnectivity() {
             } catch {
               esConflictoTerminal = true;
             }
-          } else {
+          } else if (accion.tipo !== 'ACTUALIZAR_TIPOLOGIA') {
             esConflictoTerminal = true;
           }
         }
@@ -402,15 +402,15 @@ export function useConnectivity() {
           }
         }
 
-        if (procesada && accion.tipo === 'RECHAZAR_MISION') {
+        if (accion.tipo === 'RECHAZAR_MISION') {
           const match = accion.url.match(/\/api\/misiones\/([^/]+)\/rechazar/);
           const misionId = match?.[1];
           if (misionId) {
-            try {
-              const local = await obtenerMisionLocalPorId(misionId);
-              if (local) {
-                let actualizadoServidor = local.actualizadoEn || new Date().toISOString();
-                if (res.ok) {
+            if (esExito) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  let actualizadoServidor = local.actualizadoEn || new Date().toISOString();
                   try {
                     const bodyJson = await res.clone().json();
                     if (bodyJson?.data?.mision?.actualizadoEn) {
@@ -419,16 +419,37 @@ export function useConnectivity() {
                   } catch {
                     // Ignorar si la respuesta no contiene JSON
                   }
+                  await guardarMisionLocal({
+                    ...local,
+                    estado: 'RECHAZADA',
+                    sincronizacionPendiente: false,
+                    actualizadoEn: actualizadoServidor,
+                  });
                 }
-                await guardarMisionLocal({
-                  ...local,
-                  estado: res.status === 422 ? local.estado : 'RECHAZADA',
-                  sincronizacionPendiente: false,
-                  actualizadoEn: actualizadoServidor,
-                });
+              } catch {
+                // Ignorar fallos de lectura/escritura secundaria en IndexedDB
               }
-            } catch {
-              // Ignorar fallos de lectura/escritura secundaria en IndexedDB
+            } else if (esConflictoTerminal || esErrorIrrecuperable) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  const datosRestaurados = { ...(local.datosAdicionales || {}) };
+                  delete datosRestaurados.justificacionRechazo;
+                  await guardarMisionLocal({
+                    ...local,
+                    estado: local.estado === 'RECHAZADA' ? 'DESPACHADA' : local.estado,
+                    sincronizacionPendiente: false,
+                    datosAdicionales: datosRestaurados,
+                    actualizadoEn: new Date().toISOString(),
+                  });
+                }
+                if (typeof eliminarAccionOutbox === 'function') {
+                  await eliminarAccionOutbox(accion.id);
+                }
+                await obtenerDetalleMision(misionId);
+              } catch {
+                // Ignorar fallos al refrescar estado real tras rollback local
+              }
             }
           }
         }
