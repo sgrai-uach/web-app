@@ -169,6 +169,61 @@ describe('useConnectivity hook', () => {
     fetchSpy.mockRestore();
   });
 
+  it('reconcilia ENVIAR_REPORTE exitoso (201) y revierte cierre optimista ante rechazo 403/409 (BUG-H39-PWA-03)', async () => {
+    const misionId = '60000000-0000-4000-8000-000000000039';
+    vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+      id: misionId,
+      incidenteId: 'inc-39',
+      codigoIncidente: 'INC-2026-0039',
+      tipologia: 'Inundación',
+      direccion: 'Valdivia',
+      prioridad: 'ALTA',
+      estado: 'COMPLETADA',
+      fechaDespacho: '2026-11-10T01:00:00Z',
+      sincronizacionPendiente: true,
+      datosAdicionales: {
+        trabajo: 'Verificar',
+        reporteVerificacionEnviado: true,
+        dictamenVerificacion: 'REQUIERE_CUADRILLA',
+        reporteVerificacion: { id: 'rep-local', sincronizado: false },
+      },
+      actualizadoEn: '2026-11-10T01:10:00Z',
+    });
+
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (ejecutor) => {
+      await ejecutor({
+        id: 'act-rep-403',
+        tipo: 'ENVIAR_REPORTE',
+        url: `/api/misiones/${misionId}/reporte`,
+        metodo: 'POST',
+        payload: { dictamen: 'REQUIERE_CUADRILLA', resumen_tecnico: 'Test rollback.' },
+        timestamp: new Date().toISOString(),
+        intentos: 0,
+      });
+      return { total: 1, exitosas: 1, fallidas: 0 };
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ message: 'Forbidden' }), { status: 403 }));
+
+    const { result } = renderHook(() => useConnectivity());
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: misionId,
+        estado: 'EN_CURSO',
+        sincronizacionPendiente: false,
+      })
+    );
+    expect(offlineQueue.eliminarAccionOutbox).toHaveBeenCalledWith('act-rep-403');
+    expect(obtenerDetalleMision).toHaveBeenCalledWith(misionId);
+    fetchSpy.mockRestore();
+  });
+
   it('dispara sincronización automática al montar con conexión si hay pendientes y reporta status syncing mientras existan pendientes (BUG-H36-PWA-04)', async () => {
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
     vi.mocked(offlineQueue.contarAccionesPendientes)
@@ -393,6 +448,61 @@ describe('useConnectivity hook', () => {
     );
     expect(offlineQueue.eliminarAccionOutbox).toHaveBeenCalledWith('outbox-rech-409');
     expect(obtenerDetalleMision).toHaveBeenCalledWith('mis-rech-409');
+    fetchSpy.mockRestore();
+  });
+
+  it('reconcilia ENVIAR_REPORTE exitoso (201) y revierte cierre optimista ante rechazo 403/409 (BUG-H39-PWA-03)', async () => {
+    const misionId = '60000000-0000-4000-8000-000000000039';
+    vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+      id: misionId,
+      incidenteId: 'inc-39',
+      codigoIncidente: 'INC-2026-0039',
+      tipologia: 'Inundación',
+      direccion: 'Valdivia',
+      prioridad: 'ALTA',
+      estado: 'COMPLETADA',
+      fechaDespacho: '2026-11-10T01:00:00Z',
+      sincronizacionPendiente: true,
+      datosAdicionales: {
+        trabajo: 'Verificar',
+        reporteVerificacionEnviado: true,
+        dictamenVerificacion: 'REQUIERE_CUADRILLA',
+        reporteVerificacion: { id: 'rep-local', sincronizado: false },
+      },
+      actualizadoEn: '2026-11-10T01:10:00Z',
+    });
+
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (ejecutor) => {
+      await ejecutor({
+        id: 'act-rep-403',
+        tipo: 'ENVIAR_REPORTE',
+        url: `/api/misiones/${misionId}/reporte`,
+        metodo: 'POST',
+        payload: { dictamen: 'REQUIERE_CUADRILLA', resumen_tecnico: 'Test rollback.' },
+        timestamp: new Date().toISOString(),
+        intentos: 0,
+      });
+      return { total: 1, exitosas: 1, fallidas: 0 };
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ message: 'Forbidden' }), { status: 403 }));
+
+    const { result } = renderHook(() => useConnectivity());
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: misionId,
+        estado: 'EN_CURSO',
+        sincronizacionPendiente: false,
+      })
+    );
+    expect(offlineQueue.eliminarAccionOutbox).toHaveBeenCalledWith('act-rep-403');
+    expect(obtenerDetalleMision).toHaveBeenCalledWith(misionId);
     fetchSpy.mockRestore();
   });
 

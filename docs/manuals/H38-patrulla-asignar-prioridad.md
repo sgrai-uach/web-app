@@ -65,7 +65,8 @@ Los puntajes se suman para determinar la prioridad sugerida según los siguiente
      - Viviendas afectadas
    - Seleccione el **Nivel de compromiso de vivienda** (`Sin daño habitacional`, `Daño leve`, `Daño moderado` o `Grave / Inhabitable`).
 4. **Paso 2 — Peligros Activos y Requerimientos:**
-   - Active los interruptores táctiles (`Sí` / `No`) correspondientes a las amenazas presentes en el punto (`Riesgo eléctrico activo`, `Riesgo estructural / derrumbe`, `Riesgo químico o sanitario`, `Requiere evacuación inmediata`, `Aislamiento vial`, `Requiere asistencia social (FIBE)`).
+   - Active los interruptores táctiles (`Sí` / `No`) correspondientes a las amenazas presentes en el punto (`Riesgo eléctrico activo`, `Riesgo estructural / derrumbe`, `Riesgo químico o sanitario`, `Requiere evacuación inmediata`, `Aislamiento vial`).
+   - *(Nota: La casilla de solicitud de asistencia social / Ficha FIBE se gestiona en el Paso 3 — Informe técnico de verificación y cierre, H39).*
 5. **Paso 3 — Revisión de Prioridad Sugerida y Selección Canónica:**
    - Observe el recuadro **Prioridad Sugerida por el Sistema**, que exhibe el nivel calculado (`Baja`, `Media`, `Alta` o `Crítica`) junto con el listado de **factores gatillantes**.
    - En el selector táctil de cuatro niveles, la prioridad sugerida se encuentra pre-seleccionada por defecto.
@@ -74,8 +75,9 @@ Los puntajes se suman para determinar la prioridad sugerida según los siguiente
 6. **Paso 4 — Detalles Adicionales y Confirmación:**
    - Opcionalmente, complete el campo **Detalles adicionales del reporte** con referencias operativas para el Encargado del Centro de Mando.
    - Presione **"Confirmar prioridad y enviar reporte"** y verifique el resumen en el modal de confirmación antes de pulsar **"Confirmar y Enviar"**.
-7. **Edición y Reenvío Versionado (`Reporte #N+1`):**
-   - Una vez enviado el reporte, la sección muestra el **Resumen de Evaluación y Prioridad** con el distintivo `Reporte #1`.
+7. **Edición, Reenvío Versionado (`Reporte #N+1`) y Visibilidad entre Patrulleros:**
+   - Una vez enviado el reporte, la sección muestra el **Resumen de Evaluación y Prioridad** con el distintivo `Reporte #1`, indicando claramente en el campo **Registrado por** el nombre del funcionario que subió el reporte junto con la fecha y hora.
+   - Si otro integrante de la misma patrulla ingresa a la misión (o la tiene abierta en pantalla), el estado se sincroniza automáticamente vía WebSocket mostrando quién registró la evaluación previa.
    - Si las condiciones en terreno evolucionan, pulse **"Modificar y reenviar reporte"**. El formulario precargará los datos del último reporte y mostrará el aviso:
      > *"Enviando actualización (Reporte #2) — Los cambios quedarán registrados como un reporte distinto en el Centro de Mando y actualizarán la prioridad del incidente."*
 

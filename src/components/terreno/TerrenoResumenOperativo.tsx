@@ -100,11 +100,15 @@ export function TerrenoResumenOperativo() {
 
     window.addEventListener('sgrai:mision_asignada', handleActualizar);
     window.addEventListener('sgrai:mision_actualizada', handleActualizar);
+    window.addEventListener('sgrai:mision-sincronizada', handleActualizar);
+    window.addEventListener('sgrai:outbox-synced', handleActualizar);
 
     return () => {
       cancelado = true;
       window.removeEventListener('sgrai:mision_asignada', handleActualizar);
       window.removeEventListener('sgrai:mision_actualizada', handleActualizar);
+      window.removeEventListener('sgrai:mision-sincronizada', handleActualizar);
+      window.removeEventListener('sgrai:outbox-synced', handleActualizar);
     };
   }, [esCuadrilla, tieneUnidadAsignada, usuario?.unidadId, actualizarUnidadAsignada]);
 

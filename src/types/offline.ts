@@ -87,7 +87,6 @@ export interface FamiliaAfectadaItem {
   personasElectrodependientes: number;
   mascotasAfectadas: number;
   nivelCompromisoVivienda: NivelCompromisoVivienda;
-  requiereAsistenciaSocial: boolean;
 }
 
 export interface EvaluacionTerrenoPrioridadForm {
@@ -105,9 +104,15 @@ export interface EvaluacionTerrenoPrioridadForm {
   riesgoQuimicoSanitario: boolean;
   aislamientoVial: boolean;
   requiereEvacuacion: boolean;
-  requiereAsistenciaSocial: boolean;
   requiereApoyoAdicional: boolean;
   detallesAdicionales: string;
+}
+
+export interface EvaluadorReporteTerreno {
+  id?: string;
+  nombre: string;
+  email?: string;
+  rut?: string | null;
 }
 
 export interface ReportePrioridadTerrenoLocal {
@@ -118,6 +123,7 @@ export interface ReportePrioridadTerrenoLocal {
   prioridadAsignada: PrioridadIncidente;
   factoresGatillantes: string[];
   justificacionPrioridad: string;
+  evaluador?: EvaluadorReporteTerreno;
   creadoEn: string;
   sincronizado: boolean;
 }
@@ -128,6 +134,48 @@ export type CalcularPrioridadPayload = NonNullable<
 
 export type AsignarPrioridadPayload = NonNullable<
   paths['/api/incidentes/{id}/prioridad']['patch']['requestBody']
+>['content']['application/json'];
+
+export type DictamenAtencion = 'REQUIERE_CUADRILLA' | 'NO_ABORDABLE';
+
+export type EstadoTerrenoVerificacion =
+  | 'CRITICO'
+  | 'ESTABLE'
+  | 'INACCESIBLE'
+  | 'CONTROLADO'
+  | 'FINALIZADO';
+
+export interface AdjuntoReportePreliminar {
+  id?: string;
+  nombreArchivo?: string;
+  url?: string;
+  tipoMime?: string;
+  tamanoBytes?: number;
+}
+
+export interface ReporteVerificacionTerrenoForm {
+  dictamen: DictamenAtencion;
+  motivo_no_abordable: string;
+  resumen_tecnico: string;
+  estado_terreno: EstadoTerrenoVerificacion;
+  personas_afectadas: number;
+  danos_estimados: string;
+  observaciones: string;
+  requiere_asistencia_social: boolean;
+  adjuntoIds: string[];
+  adjuntos: AdjuntoReportePreliminar[];
+}
+
+export interface ReporteVerificacionTerrenoLocal extends ReporteVerificacionTerrenoForm {
+  id?: string;
+  misionId: string;
+  evaluador?: EvaluadorReporteTerreno;
+  creadoEn: string;
+  sincronizado: boolean;
+}
+
+export type CrearReporteVerificacionPayload = NonNullable<
+  paths['/api/misiones/{id}/reporte']['post']['requestBody']
 >['content']['application/json'];
 
 

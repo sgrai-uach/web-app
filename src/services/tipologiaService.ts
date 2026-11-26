@@ -11,10 +11,36 @@ import {
   type ReclasificarTipologiaInput,
 } from '@/lib/validations/tipologia';
 import type {
+  EvaluadorReporteTerreno,
   TipoIncidenteCatalogoItem,
   MisionLocal,
   ReclasificarTipologiaPayload,
 } from '@/types/offline';
+
+function extraerEvaluadorDeObjeto(raw: unknown): EvaluadorReporteTerreno | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const ev = raw as Record<string, unknown>;
+  const nombre = typeof ev.nombre === 'string' ? ev.nombre.trim() : '';
+  if (!nombre) return undefined;
+  return {
+    id: typeof ev.id === 'string' ? ev.id : undefined,
+    nombre,
+    email: typeof ev.email === 'string' ? ev.email : undefined,
+    rut: typeof ev.rut === 'string' ? ev.rut : null,
+  };
+}
+
+function obtenerEvaluadorSesionLocal(): EvaluadorReporteTerreno | undefined {
+  if (typeof window === 'undefined' || !window.sessionStorage) return undefined;
+  try {
+    const raw = window.sessionStorage.getItem('sgrai_usuario_sesion');
+    if (!raw) return undefined;
+    const parsed: unknown = JSON.parse(raw);
+    return extraerEvaluadorDeObjeto(parsed);
+  } catch {
+    return undefined;
+  }
+}
 
 export const CLAVE_CATALOGO_TIPOS = 'tipos_incidente';
 
@@ -230,6 +256,42 @@ export async function reclasificarTipologiaEnTerreno(
     ...(validado.misionId ? { misionId: validado.misionId } : {}),
   };
 
+  const ahoraIso = new Date().toISOString();
+  const evaluadorSesion = obtenerEvaluadorSesionLocal();
+
+  const construirYGuardarMision = async (opciones: {
+    tipologiaNombre: string;
+    pendienteSync: boolean;
+    actualizadoEn?: string;
+    fechaEvaluacion?: string;
+    evaluador?: EvaluadorReporteTerreno;
+    hitoReclasificacion?: unknown;
+  }): Promise<MisionLocal | undefined> => {
+    if (!misionActual) return undefined;
+    const evaluadorFinal = opciones.evaluador ?? evaluadorSesion;
+    const misionActualizada: MisionLocal = {
+      ...misionActual,
+      tipologia: opciones.tipologiaNombre,
+      sincronizacionPendiente: opciones.pendienteSync,
+      actualizadoEn: opciones.actualizadoEn || ahoraIso,
+      datosAdicionales: {
+        ...misionActual.datosAdicionales,
+        tipologiaEvaluada: true,
+        tipologiaConstatada: opciones.tipologiaNombre,
+        tipoIncidenteId: validado.tipoIncidenteId,
+        justificacionTipologia: justificacionFinal,
+        fechaEvaluacionTipologia: opciones.fechaEvaluacion || ahoraIso,
+        esReclasificacion: Boolean(validado.esCambio),
+        ...(evaluadorFinal ? { evaluadorTipologia: evaluadorFinal } : {}),
+        ...(opciones.hitoReclasificacion !== undefined
+          ? { hitoReclasificacion: opciones.hitoReclasificacion }
+          : {}),
+      },
+    };
+    await guardarMisionLocal(misionActualizada);
+    return misionActualizada;
+  };
+
   if (!isOnline) {
     await encolarAccionOutbox({
       tipo: 'ACTUALIZAR_TIPOLOGIA',
@@ -238,24 +300,10 @@ export async function reclasificarTipologiaEnTerreno(
       payload: payloadMutacion as Record<string, unknown>,
     });
 
-    let misionActualizada: MisionLocal | undefined = undefined;
-    if (misionActual) {
-      misionActualizada = {
-        ...misionActual,
-        tipologia: nuevoNombre,
-        sincronizacionPendiente: true,
-        actualizadoEn: new Date().toISOString(),
-        datosAdicionales: {
-          ...misionActual.datosAdicionales,
-          tipologiaEvaluada: true,
-          tipoIncidenteId: validado.tipoIncidenteId,
-          justificacionTipologia: justificacionFinal,
-          fechaEvaluacionTipologia: new Date().toISOString(),
-          esReclasificacion: Boolean(validado.esCambio),
-        },
-      };
-      await guardarMisionLocal(misionActualizada);
-    }
+    const misionActualizada = await construirYGuardarMision({
+      tipologiaNombre: nuevoNombre,
+      pendienteSync: true,
+    });
 
     return {
       ok: true,
@@ -279,26 +327,25 @@ export async function reclasificarTipologiaEnTerreno(
 
     if (!error && data) {
       const tipologiaServidor = data.data?.incidente?.tipoAfectacion || nuevoNombre;
+      const hitoRemoto = data.data?.hito as
+        | {
+            metadatos?: { evaluador?: unknown };
+            registradoPor?: unknown;
+            creadoEn?: string;
+          }
+        | undefined;
+      const evaluadorRemoto =
+        extraerEvaluadorDeObjeto(hitoRemoto?.metadatos?.evaluador) ??
+        extraerEvaluadorDeObjeto(hitoRemoto?.registradoPor);
 
-      let misionActualizada: MisionLocal | undefined = undefined;
-      if (misionActual) {
-        misionActualizada = {
-          ...misionActual,
-          tipologia: tipologiaServidor,
-          sincronizacionPendiente: false,
-          actualizadoEn: data.data?.incidente?.actualizadoEn || new Date().toISOString(),
-          datosAdicionales: {
-            ...misionActual.datosAdicionales,
-            tipologiaEvaluada: true,
-            tipoIncidenteId: validado.tipoIncidenteId,
-            justificacionTipologia: justificacionFinal,
-            fechaEvaluacionTipologia: new Date().toISOString(),
-            esReclasificacion: Boolean(validado.esCambio),
-            hitoReclasificacion: data.data?.hito,
-          },
-        };
-        await guardarMisionLocal(misionActualizada);
-      }
+      const misionActualizada = await construirYGuardarMision({
+        tipologiaNombre: tipologiaServidor,
+        pendienteSync: false,
+        actualizadoEn: data.data?.incidente?.actualizadoEn || ahoraIso,
+        fechaEvaluacion: hitoRemoto?.creadoEn || ahoraIso,
+        evaluador: evaluadorRemoto,
+        hitoReclasificacion: data.data?.hito,
+      });
 
       return {
         ok: true,
@@ -348,24 +395,10 @@ export async function reclasificarTipologiaEnTerreno(
         payload: payloadMutacion as Record<string, unknown>,
       });
 
-      let misionActualizada: MisionLocal | undefined = undefined;
-      if (misionActual) {
-        misionActualizada = {
-          ...misionActual,
-          tipologia: nuevoNombre,
-          sincronizacionPendiente: true,
-          actualizadoEn: new Date().toISOString(),
-          datosAdicionales: {
-            ...misionActual.datosAdicionales,
-            tipologiaEvaluada: true,
-            tipoIncidenteId: validado.tipoIncidenteId,
-            justificacionTipologia: justificacionFinal,
-            fechaEvaluacionTipologia: new Date().toISOString(),
-            esReclasificacion: Boolean(validado.esCambio),
-          },
-        };
-        await guardarMisionLocal(misionActualizada);
-      }
+      const misionActualizada = await construirYGuardarMision({
+        tipologiaNombre: nuevoNombre,
+        pendienteSync: true,
+      });
 
       return {
         ok: true,

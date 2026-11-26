@@ -272,6 +272,135 @@ export function useConnectivity() {
             }
           }
         }
+        if (procesada && accion.tipo === 'AJUSTAR_PRIORIDAD') {
+          const misionId = accion.payload?.misionId as string | undefined;
+          const match = accion.url.match(/\/api\/incidentes\/([^/]+)\/prioridad/);
+          const incidenteId = match?.[1];
+          try {
+            let local = misionId ? await obtenerMisionLocalPorId(misionId) : undefined;
+            if (!local && incidenteId) {
+              const todas = await obtenerMisionesLocales();
+              local = todas.find((m) => m.incidenteId === incidenteId);
+            }
+            if (local) {
+              await guardarMisionLocal({
+                ...local,
+                sincronizacionPendiente: false,
+                actualizadoEn: new Date().toISOString(),
+              });
+            }
+          } catch {
+            // Ignorar fallos de persistencia secundaria
+          }
+        }
+        if (procesada && accion.tipo === 'ENVIAR_REPORTE') {
+          const match = accion.url.match(/\/api\/misiones\/([^/]+)\/reporte/);
+          const misionId = match?.[1];
+          if (misionId) {
+            if (esExito) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  const reportePrevio = local.datosAdicionales?.reporteVerificacion as
+                    | Record<string, unknown>
+                    | undefined;
+                  await guardarMisionLocal({
+                    ...local,
+                    estado: 'COMPLETADA',
+                    sincronizacionPendiente: false,
+                    actualizadoEn: new Date().toISOString(),
+                    datosAdicionales: {
+                      ...local.datosAdicionales,
+                      ...(reportePrevio
+                        ? {
+                            reporteVerificacion: {
+                              ...reportePrevio,
+                              sincronizado: true,
+                            },
+                          }
+                        : {}),
+                    },
+                  });
+                }
+                if (typeof eliminarAccionOutbox === 'function') {
+                  await eliminarAccionOutbox(accion.id);
+                }
+                await obtenerDetalleMision(misionId);
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(
+                    new CustomEvent('sgrai:mision-sincronizada', {
+                      detail: { misionId },
+                    })
+                  );
+                }
+              } catch {
+                // Ignorar fallos de persistencia secundaria
+              }
+            } else if (esConflictoTerminal || esErrorIrrecuperable) {
+              try {
+                const local = await obtenerMisionLocalPorId(misionId);
+                if (local) {
+                  const datosRestaurados = { ...(local.datosAdicionales || {}) };
+                  delete datosRestaurados.reporteVerificacionEnviado;
+                  delete datosRestaurados.reporteVerificacionEnviadoEn;
+                  delete datosRestaurados.dictamenVerificacion;
+                  delete datosRestaurados.reporteVerificacion;
+                  if (Array.isArray(datosRestaurados.reportesTerreno)) {
+                    datosRestaurados.reportesTerreno = (
+                      datosRestaurados.reportesTerreno as Array<Record<string, unknown>>
+                    ).filter((r) => r.tipoReporte !== 'VERIFICACION_CIERRE');
+                  }
+                  await guardarMisionLocal({
+                    ...local,
+                    estado: 'EN_CURSO',
+                    sincronizacionPendiente: false,
+                    datosAdicionales: datosRestaurados,
+                    actualizadoEn: new Date().toISOString(),
+                  });
+                }
+                if (typeof window !== 'undefined' && window.localStorage) {
+                  try {
+                    const rawCache = window.localStorage.getItem('sgrai_evaluaciones_mision_v1');
+                    if (rawCache) {
+                      const parsedCache = JSON.parse(rawCache) as Record<
+                        string,
+                        Record<string, unknown>
+                      >;
+                      if (parsedCache[misionId]) {
+                        delete parsedCache[misionId].reporteVerificacionEnviado;
+                        delete parsedCache[misionId].reporteVerificacion;
+                        delete parsedCache[misionId].dictamenVerificacion;
+                        window.localStorage.setItem(
+                          'sgrai_evaluaciones_mision_v1',
+                          JSON.stringify(parsedCache)
+                        );
+                      }
+                    }
+                  } catch {
+                    // Ignorar errores de localStorage
+                  }
+                }
+                if (typeof eliminarAccionOutbox === 'function') {
+                  await eliminarAccionOutbox(accion.id);
+                }
+                await obtenerDetalleMision(misionId);
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(
+                    new CustomEvent('sgrai:sync-error', {
+                      detail: {
+                        tipo: accion.tipo,
+                        misionId,
+                        status: res.status,
+                      },
+                    })
+                  );
+                }
+              } catch {
+                // Ignorar fallos al refrescar estado real
+              }
+            }
+          }
+        }
 
         if (accion.tipo === 'RECHAZAR_MISION') {
           const match = accion.url.match(/\/api\/misiones\/([^/]+)\/rechazar/);

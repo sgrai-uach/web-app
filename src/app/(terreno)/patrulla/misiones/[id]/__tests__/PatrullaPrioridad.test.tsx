@@ -234,9 +234,10 @@ describe('PatrullaMisionDetailPage — Evaluación en Terreno y Prioridad (H38)'
     });
 
     const detailsElements = container.querySelectorAll('details');
-    expect(detailsElements.length).toBe(2);
+    expect(detailsElements.length).toBe(3);
     expect(detailsElements[0]?.hasAttribute('open')).toBe(false);
     expect(detailsElements[1]?.hasAttribute('open')).toBe(false);
+    expect(detailsElements[2]?.hasAttribute('open')).toBe(true);
   });
 
   it('deshabilita EvaluacionPrioridadCard cuando falta el permiso misiones:terreno:verificar', async () => {
@@ -327,7 +328,7 @@ describe('PatrullaMisionDetailPage — Evaluación en Terreno y Prioridad (H38)'
     expect(switchElectrico).toHaveAttribute('aria-checked', 'true');
 
     const detailsElements = container.querySelectorAll('details');
-    expect(detailsElements.length).toBe(2);
+    expect(detailsElements.length).toBe(3);
     expect(detailsElements[1]?.hasAttribute('open')).toBe(true);
 
     const resumenPrioridad = screen.getByText('Evaluación en terreno y prioridad');

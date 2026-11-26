@@ -4,6 +4,7 @@ import {
   solicitarCalculoPrioridad,
   obtenerUltimoReportePrioridad,
   obtenerReportesPrioridadMision,
+  obtenerPersonasAfectadasPrevias,
 } from '../prioridadService';
 import { VALORES_INICIALES_EVALUACION_PRIORIDAD } from '@/lib/validations/prioridad';
 import * as offlineQueue from '../offlineQueue';
@@ -318,6 +319,65 @@ describe('prioridadService (H38)', () => {
           misionMock
         )
       ).rejects.toThrow(/misiones:terreno:verificar/i);
+    });
+  });
+
+  describe('reconciliación multi-operador y personas afectadas previas', () => {
+    it('reconcilia reportes remotos (reportesTerreno) conservando evaluador y excluyendo VERIFICACION_CIERRE', () => {
+      const misionCompartida: MisionLocal = {
+        ...misionMock,
+        datosAdicionales: {
+          prioridadEvaluada: true,
+          reportesTerreno: [
+            {
+              id: 'rep-prio-p1',
+              tipoReporte: 'EVALUACION_PRIORIDAD',
+              versionReporte: 1,
+              prioridadSugerida: 'ALTA',
+              prioridadAsignada: 'ALTA',
+              justificacionPrioridad: 'Adultos mayores afectados',
+              personasAfectadas: 5,
+              detallesEvaluacion: {
+                ...VALORES_INICIALES_EVALUACION_PRIORIDAD,
+                nucleoFamiliarTotal: 5,
+                cantidadAdultosMayores: 2,
+              },
+              evaluador: {
+                id: 'usr-p1',
+                nombre: 'Personal 1',
+                email: 'p1@valdivia.cl',
+              },
+              creadoEn: '2026-11-16T00:15:00Z',
+            },
+            {
+              id: 'rep-cierre-p1',
+              tipoReporte: 'VERIFICACION_CIERRE',
+              dictamen: 'REQUIERE_CUADRILLA',
+              resumenTecnico: 'Cierre de verificación',
+              personasAfectadas: 5,
+              evaluador: {
+                id: 'usr-p1',
+                nombre: 'Personal 1',
+                email: 'p1@valdivia.cl',
+              },
+              creadoEn: '2026-11-16T00:45:00Z',
+            },
+          ],
+        },
+      };
+
+      const lista = obtenerReportesPrioridadMision(misionCompartida);
+      expect(lista).toHaveLength(1);
+      expect(lista[0]?.evaluador?.nombre).toBe('Personal 1');
+      expect(lista[0]?.evaluacion.nucleoFamiliarTotal).toBe(5);
+
+      const previas = obtenerPersonasAfectadasPrevias(misionCompartida);
+      expect(previas).toEqual({
+        cantidad: 5,
+        tieneEvaluacionPrevia: true,
+        versionReporte: 1,
+        evaluadorNombre: 'Personal 1',
+      });
     });
   });
 });

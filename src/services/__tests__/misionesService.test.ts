@@ -26,6 +26,18 @@ vi.mock('@/services/offlineQueue', () => ({
   obtenerMisionLocalPorId: vi.fn(),
   obtenerAccionesOutbox: vi.fn(),
   encolarAccionOutbox: vi.fn(),
+  obtenerEvaluacionMisionCache: vi.fn(),
+  fusionarDatosAdicionalesMision: vi.fn((mision, previos) =>
+    previos
+      ? {
+          ...mision,
+          datosAdicionales: {
+            ...previos,
+            ...(mision.datosAdicionales || {}),
+          },
+        }
+      : mision
+  ),
 }));
 
 describe('misionesService — Sincronización remota y persistencia IndexedDB (Offline-First)', () => {
@@ -368,6 +380,84 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
           sincronizacionPendiente: true,
         })
       );
+    });
+
+    it('preserva estado optimista COMPLETADA mientras exista ENVIAR_REPORTE pendiente en outbox (BUG-H39-PWA-03)', async () => {
+      const misionId = '60000000-0000-4000-8000-000000000099';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: misionId,
+        incidenteId: 'a0000000-0000-4000-8000-000000000099',
+        codigoIncidente: 'INC-2026-0099',
+        tipologia: 'Inundación',
+        direccion: 'Costanera 420',
+        prioridad: 'ALTA',
+        estado: 'COMPLETADA',
+        fechaDespacho: '2026-10-30T04:00:00Z',
+        sincronizacionPendiente: true,
+        datosAdicionales: {
+          reporteVerificacionEnviado: true,
+          dictamenVerificacion: 'REQUIERE_CUADRILLA',
+        },
+        actualizadoEn: '2026-10-30T04:10:00Z',
+      });
+      vi.mocked(offlineQueue.obtenerAccionesOutbox).mockResolvedValue([
+        {
+          id: 'outbox-rep-99',
+          tipo: 'ENVIAR_REPORTE',
+          url: `/api/misiones/${misionId}/reporte`,
+          metodo: 'POST',
+          payload: {},
+          timestamp: '2026-10-30T04:10:00Z',
+          intentos: 0,
+        },
+      ]);
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: {
+            id: misionId,
+            codigo: 'MIS-2026-0099',
+            titulo: 'Inundación',
+            descripcion: 'Verificar',
+            tipoMision: 'VERIFICACION',
+            estado: 'EN_CURSO',
+            prioridad: 'ALTA',
+            justificacionRechazo: null,
+            fechaInicio: '2026-10-30T04:05:00Z',
+            fechaCierre: null,
+            creadoEn: '2026-10-30T04:00:00Z',
+            actualizadoEn: '2026-10-30T04:05:00Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: {
+              id: 'a0000000-0000-4000-8000-000000000099',
+              codigo: 'INC-2026-0099',
+              codigoSeguimiento: 'SEG-099',
+              tipoAfectacion: 'INUNDACION',
+              descripcion: 'Agua en calzada',
+              direccion: 'Costanera 420',
+              latitud: -39.8123,
+              longitud: -73.2467,
+              estado: 'VERIFICANDO',
+              prioridad: 'ALTA',
+              requiereAsistenciaSocial: false,
+              delegacionNombre: 'Norte',
+            },
+            prevencion: null,
+            cuadrilla: null,
+            patrulla: null,
+            bitacoraTiempos: [],
+            reportesTerreno: [],
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle = await obtenerDetalleMision(misionId);
+
+      expect(detalle?.estado).toBe('COMPLETADA');
+      expect(detalle?.sincronizacionPendiente).toBe(true);
     });
   });
 
@@ -896,6 +986,183 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
       expect(detalle?.datosAdicionales?.versionReportePrioridad).toBe(1);
     });
 
+    it('extrae autoría de categorización (evaluadorTipologia) y preserva reportes cacheados tras cambio de usuario ante 403 en detalle', async () => {
+      vi.mocked(offlineQueue.obtenerEvaluacionMisionCache).mockReturnValue({
+        tipologiaEvaluada: true,
+        esReclasificacion: true,
+        justificacionTipologia: 'Cauce desbordado verificado.',
+        fechaEvaluacionTipologia: '2026-11-16T15:00:00Z',
+        evaluadorTipologia: {
+          id: 'usr-p1',
+          nombre: 'Patrullero 1',
+          email: 'patrulla@valdivia.cl',
+        },
+        prioridadEvaluada: true,
+        versionReportePrioridad: 1,
+        reportesPrioridad: [
+          {
+            id: 'rep-prio-1',
+            versionReporte: 1,
+            prioridadSugerida: 'ALTA',
+            prioridadAsignada: 'CRITICA',
+            evaluador: {
+              id: 'usr-p1',
+              nombre: 'Patrullero 1',
+              email: 'patrulla@valdivia.cl',
+            },
+          },
+        ],
+      });
+
+      // 1. sincronizarMisiones conserva caché tras logout -> login de patrulla2@valdivia.cl
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: [
+            {
+              id: 'mis-sync-patrulla',
+              codigo: 'MIS-2026-888',
+              titulo: 'Verificación: Inundación - INC-888',
+              descripcion: 'Sector Las Ánimas',
+              tipoMision: 'VERIFICACION',
+              estado: 'EN_CURSO',
+              prioridad: 'CRITICA',
+              incidenteId: 'inc-888',
+              incidenteCodigo: 'INC-888',
+              incidenteTipoAfectacion: 'Inundación',
+              cuadrillaId: null,
+              cuadrillaNombre: null,
+              patrullaId: 'pat-001',
+              patrullaNombre: 'Patrulla 1',
+              delegacionId: 'del-001',
+              delegacionNombre: 'Norte',
+              fechaInicio: '2026-11-16T14:50:00Z',
+              fechaCierre: null,
+              creadoEn: '2026-11-16T14:40:00Z',
+              actualizadoEn: '2026-11-16T15:05:00Z',
+            },
+          ],
+          meta: { total: 1, page: 1, limit: 20, totalPages: 1, hasNext: false, hasPrev: false },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const listaSync = await sincronizarMisiones({ tipoMision: 'VERIFICACION' });
+      expect(listaSync[0]?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+      expect(listaSync[0]?.datosAdicionales?.prioridadEvaluada).toBe(true);
+
+      // 2. Si GET /api/misiones/{id} responde 403, fallback combina IndexedDB + caché de evaluaciones
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValueOnce({
+        id: 'mis-sync-patrulla',
+        incidenteId: 'inc-888',
+        codigoIncidente: 'INC-888',
+        tipologia: 'Inundación',
+        direccion: 'Sector Las Ánimas',
+        prioridad: 'CRITICA',
+        estado: 'EN_CURSO',
+        fechaDespacho: '2026-11-16T14:50:00Z',
+        actualizadoEn: '2026-11-16T15:05:00Z',
+      });
+
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: undefined,
+        error: { message: 'No cuenta con el permiso requerido: misiones:leer' },
+        response: new Response(null, { status: 403 }),
+      } as never);
+
+      const detalle403 = await obtenerDetalleMision('mis-sync-patrulla');
+      expect(detalle403?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+      expect(detalle403?.datosAdicionales?.evaluadorTipologia).toEqual({
+        id: 'usr-p1',
+        nombre: 'Patrullero 1',
+        email: 'patrulla@valdivia.cl',
+      });
+      expect(detalle403?.datosAdicionales?.prioridadEvaluada).toBe(true);
+
+      // 3. Cuando GET /api/misiones/{id} responde 200 OK, rescata registrador e esReclasificacion desde metadatos/hito
+      vi.mocked(offlineQueue.obtenerEvaluacionMisionCache).mockReturnValue(undefined);
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValueOnce(undefined);
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: {
+            id: 'mis-sync-patrulla',
+            codigo: 'MIS-2026-888',
+            titulo: 'Verificación: Inundación - INC-888',
+            descripcion: 'Sector Las Ánimas',
+            tipoMision: 'VERIFICACION',
+            estado: 'EN_CURSO',
+            prioridad: 'CRITICA',
+            justificacionRechazo: null,
+            fechaInicio: '2026-11-16T14:50:00Z',
+            fechaCierre: null,
+            creadoEn: '2026-11-16T14:40:00Z',
+            actualizadoEn: '2026-11-16T15:05:00Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: {
+              id: 'inc-888',
+              codigo: 'INC-888',
+              codigoSeguimiento: 'SEG-888',
+              tipoAfectacion: 'Inundación',
+              descripcion: 'Agua en calzada',
+              direccion: 'Sector Las Ánimas',
+              latitud: -39.81,
+              longitud: -73.24,
+              estado: 'VERIFICANDO',
+              prioridad: 'CRITICA',
+              requiereAsistenciaSocial: false,
+              delegacionNombre: 'Norte',
+            },
+            prevencion: null,
+            cuadrilla: null,
+            patrulla: null,
+            bitacoraTiempos: [
+              {
+                id: 'hito-tip-1',
+                hito: 'TIPOLOGIA_RECLASIFICADA',
+                fecha: '2026-11-16',
+                hora: '15:00:00',
+                timestamp: '2026-11-16T15:00:00Z',
+                descripcion: 'Tipología ratificada',
+                registradoPor: {
+                  id: 'usr-p1',
+                  nombre: 'Patrullero 1',
+                  email: 'patrulla@valdivia.cl',
+                },
+                metadatos: {
+                  tipoAnteriorId: 'tipo-1',
+                  tipoNuevoId: 'tipo-1',
+                  esReclasificacion: false,
+                  justificacion: 'Ratificada',
+                },
+              },
+            ],
+            reportesTerreno: [{ id: 'rep-srv-1', versionReporte: 1 }],
+            evaluaciones: {
+              tipologiaEvaluada: true,
+              tipologiaEvaluadaEn: '2026-11-16T15:00:00Z',
+              prioridadEvaluada: true,
+              prioridadEvaluadaEn: '2026-11-16T15:05:00Z',
+              versionReportePrioridad: 1,
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle200 = await obtenerDetalleMision('mis-sync-patrulla');
+      expect(detalle200?.datosAdicionales?.esReclasificacion).toBe(false);
+      expect(detalle200?.datosAdicionales?.evaluadorTipologia).toEqual({
+        id: 'usr-p1',
+        nombre: 'Patrullero 1',
+        email: 'patrulla@valdivia.cl',
+        rut: null,
+      });
+    });
+
     it('preserva prioridad optimista y estado RECHAZADA en sincronizarMisiones y obtenerDetalleMision cuando existen AJUSTAR_PRIORIDAD o RECHAZAR_MISION en outbox (BUG-INT-PWA-09)', async () => {
       const misionPrioridadLocal = {
         id: '60000000-0000-4000-8000-000000000808',
@@ -1066,6 +1333,7 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
       expect(detalle?.prioridad).toBe('CRITICA');
       expect(detalle?.sincronizacionPendiente).toBe(true);
     });
+
   });
 
   describe('rechazarMision (H41, H69)', () => {

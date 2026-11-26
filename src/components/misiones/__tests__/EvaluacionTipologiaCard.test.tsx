@@ -355,6 +355,47 @@ describe('EvaluacionTipologiaCard (H37)', () => {
     expect(screen.getByRole('button', { name: /Cancelar modificación/i })).toBeInTheDocument();
   });
 
+  it('muestra autoría ("Registrado por") una sola vez sin banner duplicado y permite modificar', async () => {
+    const misionPorOtro: MisionLocal = {
+      ...misionMock,
+      tipologia: 'Inundación',
+      datosAdicionales: {
+        tipologiaEvaluada: true,
+        esReclasificacion: true,
+        justificacionTipologia: 'Desborde de estero verificado por Patrullero 1.',
+        fechaEvaluacionTipologia: '2026-11-16T15:30:00Z',
+        evaluadorTipologia: {
+          id: 'usr-patrulla-1',
+          nombre: 'Patrullero Uno',
+          email: 'patrulla@valdivia.cl',
+        },
+      },
+    };
+
+    render(
+      <EvaluacionTipologiaCard
+        incidenteId={misionPorOtro.incidenteId}
+        misionActual={misionPorOtro}
+        usuarioActualId="usr-patrulla-2"
+      />
+    );
+
+    expect(screen.queryByTestId('aviso-autor-tipologia')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Tipo registrado$/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Reclasificada')).toBeInTheDocument();
+    expect(screen.getByText(/^Registrado por$/i)).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Patrullero Uno \(patrulla@valdivia\.cl\) ·/i)
+    ).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /Modificar categorización/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/^Tipo registrado$/i)).toBeInTheDocument();
+  });
+
   it('deshabilita los controles cuando la prop deshabilitado es true', async () => {
     render(
       <EvaluacionTipologiaCard

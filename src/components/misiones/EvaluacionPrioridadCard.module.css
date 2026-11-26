@@ -388,38 +388,6 @@
   line-height: 1.4;
 }
 
-.alertBox {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2, 8px);
-  padding: var(--space-3, 12px);
-  font-size: 0.875rem;
-  font-weight: 600;
-  line-height: 1.4;
-  border-radius: var(--radius-none, 0px);
-  border-left: 4px solid currentColor;
-}
-
-.alertIcon {
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.alertSuccess {
-  background-color: var(--color-success-bg, #e8f5e9);
-  color: var(--color-success, #2e7d32);
-}
-
-.alertOffline {
-  background-color: var(--color-warning-bg, #fff3e0);
-  color: var(--color-warning, #e65100);
-}
-
-.alertError {
-  background-color: var(--color-danger-bg, #ffebee);
-  color: var(--color-danger, #d32f2f);
-}
-
 .submitBtn {
   min-height: 52px;
   border-radius: var(--radius-none, 0px);
@@ -506,7 +474,6 @@
   align-self: flex-start;
   margin-top: var(--space-1, 4px);
 }
-
 /* Sección de Familias y Hogares Afectados */
 .familiaCard {
   background-color: var(--color-white, #ffffff);
