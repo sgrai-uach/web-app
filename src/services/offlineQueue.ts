@@ -424,7 +424,6 @@ export async function encolarAccionOutbox(
     const actualizada: AccionOutbox = {
       ...duplicada,
       payload: accion.payload,
-      timestamp: generarTimestampMonotonico(existentes),
     };
     await db.put('outbox', actualizada);
     return actualizada;

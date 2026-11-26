@@ -378,4 +378,41 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
     await eliminarAccionOutbox(a3.id);
   });
 
+  it('preserva timestamp causal original al deduplicar una acción previa para no desplazarla detrás de ENVIAR_REPORTE (BUG-INT-PWA-14)', async () => {
+    const misionId = 'mision-dedup-causal-01';
+    const tipificar = await encolarAccionOutbox({
+      tipo: 'ACTUALIZAR_TIPOLOGIA',
+      url: '/api/incidentes/inc-dedup-01/tipologia',
+      metodo: 'PATCH',
+      payload: { misionId, tipoIncidenteId: 'tipo-1' },
+    });
+    const cerrar = await encolarAccionOutbox({
+      tipo: 'ENVIAR_REPORTE',
+      url: `/api/misiones/${misionId}/reporte`,
+      metodo: 'POST',
+      payload: { dictamen: 'REQUIERE_CUADRILLA' },
+    });
+
+    const tipificarActualizada = await encolarAccionOutbox({
+      tipo: 'ACTUALIZAR_TIPOLOGIA',
+      url: '/api/incidentes/inc-dedup-01/tipologia',
+      metodo: 'PATCH',
+      payload: { misionId, tipoIncidenteId: 'tipo-2' },
+    });
+
+    expect(tipificarActualizada.id).toBe(tipificar.id);
+    expect(tipificarActualizada.timestamp).toBe(tipificar.timestamp);
+
+    const ordenadas = (await obtenerAccionesOutbox()).filter((a) =>
+      [tipificar.id, cerrar.id].includes(a.id)
+    );
+    expect(ordenadas.map((a) => a.tipo)).toEqual([
+      'ACTUALIZAR_TIPOLOGIA',
+      'ENVIAR_REPORTE',
+    ]);
+
+    await eliminarAccionOutbox(tipificar.id);
+    await eliminarAccionOutbox(cerrar.id);
+  });
+
 });
