@@ -340,6 +340,7 @@ describe('useConnectivity hook', () => {
       await result.current.sincronizar();
     });
 
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledTimes(1);
     expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
       expect.objectContaining({
         prioridad: 'CRITICA',
@@ -402,6 +403,7 @@ describe('useConnectivity hook', () => {
     });
 
     expect(ejecutorResultado).toBe(true);
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledTimes(1);
     expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
       expect.objectContaining({
         prioridad: 'MEDIA',
@@ -501,6 +503,71 @@ describe('useConnectivity hook', () => {
     expect(obtenerDetalleMision).toHaveBeenCalledWith('mis-rech-409');
     fetchSpy.mockRestore();
   });
+
+  it('reconcilia ENVIAR_REPORTE exitoso (201) marcando reporte sincronizado, limpiando outbox y emitiendo sgrai:mision-sincronizada (BUG-INT-PWA-13)', async () => {
+    const misionId = '60000000-0000-4000-8000-000000000040';
+    vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+      id: misionId,
+      incidenteId: 'inc-40',
+      codigoIncidente: 'INC-2026-0040',
+      tipologia: 'Inundación',
+      direccion: 'Valdivia',
+      prioridad: 'ALTA',
+      estado: 'COMPLETADA',
+      fechaDespacho: '2026-11-10T01:00:00Z',
+      sincronizacionPendiente: true,
+      datosAdicionales: {
+        trabajo: 'Verificar',
+        reporteVerificacionEnviado: true,
+        dictamenVerificacion: 'REQUIERE_CUADRILLA',
+        reporteVerificacion: { id: 'rep-local', sincronizado: false },
+      },
+      actualizadoEn: '2026-11-10T01:10:00Z',
+    });
+
+    vi.mocked(offlineQueue.sincronizarColaOutbox).mockImplementation(async (ejecutor) => {
+      const ok = await ejecutor({
+        id: 'act-rep-201',
+        tipo: 'ENVIAR_REPORTE',
+        url: `/api/misiones/${misionId}/reporte`,
+        metodo: 'POST',
+        payload: { dictamen: 'REQUIERE_CUADRILLA', resumen_tecnico: 'Cierre verificado.' },
+        timestamp: new Date().toISOString(),
+        intentos: 0,
+      });
+      return { total: 1, exitosas: ok ? 1 : 0, fallidas: ok ? 0 : 1 };
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ message: 'Creado' }), { status: 201 }));
+    const syncEventSpy = vi.fn();
+    window.addEventListener('sgrai:mision-sincronizada', syncEventSpy);
+
+    const { result } = renderHook(() => useConnectivity());
+    await act(async () => {
+      await result.current.sincronizar();
+    });
+
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledTimes(1);
+    expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: misionId,
+        estado: 'COMPLETADA',
+        sincronizacionPendiente: false,
+        datosAdicionales: expect.objectContaining({
+          reporteVerificacion: expect.objectContaining({ sincronizado: true }),
+        }),
+      })
+    );
+    expect(offlineQueue.eliminarAccionOutbox).toHaveBeenCalledWith('act-rep-201');
+    expect(obtenerDetalleMision).toHaveBeenCalledWith(misionId);
+    expect(syncEventSpy).toHaveBeenCalledTimes(1);
+
+    window.removeEventListener('sgrai:mision-sincronizada', syncEventSpy);
+    fetchSpy.mockRestore();
+  });
+
   it('sincroniza acción RECHAZAR_MISION y limpia sincronizacionPendiente en IndexedDB', async () => {
     vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
       id: 'mis-rech-1',

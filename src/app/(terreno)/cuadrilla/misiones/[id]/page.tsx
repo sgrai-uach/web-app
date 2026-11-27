@@ -75,12 +75,16 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
   }, [cargarDetalle]);
 
   useEffect(() => {
-    const handleOutboxSynced = () => {
+    const handleSincronizacion = () => {
       void cargarDetalle();
     };
-    window.addEventListener('sgrai:outbox-synced', handleOutboxSynced);
+    window.addEventListener('sgrai:outbox-synced', handleSincronizacion);
+    window.addEventListener('sgrai:mision-sincronizada', handleSincronizacion);
+    window.addEventListener('sgrai:mision-rechazada', handleSincronizacion);
     return () => {
-      window.removeEventListener('sgrai:outbox-synced', handleOutboxSynced);
+      window.removeEventListener('sgrai:outbox-synced', handleSincronizacion);
+      window.removeEventListener('sgrai:mision-sincronizada', handleSincronizacion);
+      window.removeEventListener('sgrai:mision-rechazada', handleSincronizacion);
     };
   }, [cargarDetalle]);
 
@@ -218,6 +222,10 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     setMensajeConfirmacion(res.mensaje);
     setModalRechazoAbierto(false);
     await actualizarPendientes();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
+      window.dispatchEvent(new CustomEvent('sgrai:mision-rechazada', { detail: { misionId: mision.id } }));
+    }
     const params = new URLSearchParams({
       rechazo: res.modoOffline ? 'offline' : 'ok',
       msg: res.mensaje,

@@ -1334,6 +1334,53 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
       expect(detalle?.sincronizacionPendiente).toBe(true);
     });
 
+    it('limpia sincronizacionPendiente en sincronizarMisiones cuando el servidor confirma estado terminal COMPLETADA sin pendientes en outbox (BUG-INT-PWA-15)', async () => {
+      const misionLocalPendiente = {
+        id: '60000000-0000-4000-8000-000000000915',
+        incidenteId: 'a0000000-0000-4000-8000-000000000915',
+        codigoIncidente: 'INC-2026-0915',
+        tipologia: 'Inundación',
+        direccion: 'Av. Picarte 915',
+        prioridad: 'ALTA',
+        estado: 'COMPLETADA',
+        fechaDespacho: '2026-11-26T10:00:00Z',
+        sincronizacionPendiente: true,
+        actualizadoEn: '2026-11-26T10:15:00Z',
+      };
+
+      vi.mocked(offlineQueue.obtenerMisionesLocales)
+        .mockResolvedValueOnce([misionLocalPendiente])
+        .mockResolvedValueOnce([]);
+      vi.mocked(offlineQueue.obtenerAccionesOutbox).mockResolvedValueOnce([]);
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: [
+            {
+              id: misionLocalPendiente.id,
+              codigo: 'MIS-2026-0915',
+              titulo: 'Verificación: Inundación',
+              descripcion: 'Av. Picarte 915',
+              tipoMision: 'VERIFICACION',
+              estado: 'COMPLETADA',
+              prioridad: 'ALTA',
+              incidenteId: misionLocalPendiente.incidenteId,
+              incidenteCodigo: 'INC-2026-0915',
+              fechaInicio: '2026-11-26T10:05:00Z',
+              creadoEn: '2026-11-26T10:00:00Z',
+              actualizadoEn: '2026-11-26T10:20:00Z',
+            },
+          ],
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const lista = await sincronizarMisiones({ tipoMision: 'VERIFICACION' });
+      expect(lista[0].estado).toBe('COMPLETADA');
+      expect(lista[0].sincronizacionPendiente).toBe(false);
+    });
+
   });
 
   describe('rechazarMision (H41, H69)', () => {

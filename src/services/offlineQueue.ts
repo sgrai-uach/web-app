@@ -422,7 +422,7 @@ export async function encolarAccionOutbox(
   const db = await getDB();
   const existentes = await obtenerAccionesOutbox();
 
-  // Cada evidencia multimedia representa un archivo independiente aunque comparta ruta/misión
+  // Cada evidencia multimedia representa un archivo independiente aunque comparta ruta/misión (H43)
   if (accion.tipo !== 'SUBIR_EVIDENCIA') {
     const duplicada = existentes.find(
       (item) => item.tipo === accion.tipo && item.url === accion.url
@@ -432,7 +432,7 @@ export async function encolarAccionOutbox(
       const actualizada: AccionOutbox = {
         ...duplicada,
         payload: accion.payload,
-        timestamp: generarTimestampMonotonico(existentes),
+        // Sin reasignar timestamp: se preserva el orden causal original (BUG-INT-PWA-14)
       };
       await db.put('outbox', actualizada);
       return actualizada;

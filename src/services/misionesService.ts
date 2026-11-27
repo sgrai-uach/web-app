@@ -336,9 +336,7 @@ export async function sincronizarMisiones(filtros?: FiltrosMisiones): Promise<Mi
             mantenerOptimista && previa
               ? (previa.fechaInicio ?? item.fechaInicio ?? null)
               : item.fechaInicio || null,
-          sincronizacionPendiente: mantenerOptimista
-            ? true
-            : Boolean(previa?.sincronizacionPendiente),
+          sincronizacionPendiente: mantenerOptimista,
           datosAdicionales: {
             ...datosPrevios,
             trabajo: item.descripcion || 'Sin instrucciones adicionales especificadas.',
