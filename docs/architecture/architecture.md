@@ -59,12 +59,13 @@ La aplicación utiliza IndexedDB como fuente local de la verdad mediante el wrap
 ## 3. Telemetría GPS en Tiempo Real (H70)
 
 Para mantener actualizado el mapa operacional del Centro de Mando:
-- El hook `useTelemetry` activa el sensor de geolocalización de alta precisión (`enableHighAccuracy: true`).
-- Transmite periódicamente mediante WebSocket el evento `telemetria:posicion` a la sala del servidor con:
+- El hook `useTelemetry` activa la captura de geolocalización de alta precisión mediante la Geolocation API (`enableHighAccuracy: true`, `timeout: 10000`, `maximumAge: 30000`) únicamente cuando la unidad cuenta con misión activa (`EN_CURSO`).
+- Reutiliza el cliente Socket.io compartido (`src/lib/socket/terrenoSocket.ts`) autenticado con JWT (`auth: { token }`) y transmite periódicamente cada **30 segundos** (rango operativo 30–60s) el evento `telemetria:posicion` con:
   - Identificador y tipo de unidad (`PATRULLA` o `CUADRILLA`).
-  - Coordenadas geográficas (`lat`, `lng`).
-  - Precisión en metros y velocidad instantánea.
-- Cuenta con limitador de frecuencia (*throttling*) de 15 segundos para conservar la batería del dispositivo móvil durante jornadas operativas extensas.
+  - Coordenadas geográficas WGS84 (`lat`, `lng`) y marca de tiempo ISO 8601 (`timestamp`).
+  - Metadatos saneados opcionales: orientación en grados (`rumbo`), precisión en metros (`precision`) y velocidad instantánea en m/s (`velocidad`).
+- Ante desconexión de red (zonas de sombra), opera sin alertas modales bloqueantes y retransmite silenciosamente la última posición conocida al reconectarse el socket.
+- Se detiene de inmediato al finalizar, rechazar o cancelar la misión, o cuando la unidad vuelve a estado `DISPONIBLE`.
 
 ---
 

@@ -44,6 +44,11 @@ import {
 import { obtenerReportesPrioridadMision } from '@/services/prioridadService';
 import { obtenerReporteVerificacionMision } from '@/services/reporteVerificacionService';
 import { formatearPrioridad, formatearFechaHora24h, formatearTipologia } from '@/lib/utils/formatters';
+import { useTelemetry } from '@/hooks/useTelemetry';
+import {
+  TelemetryStatusBadge,
+  TelemetryWarningBanner,
+} from '@/components/terreno/TelemetryStatusBadge';
 import type { MisionLocal } from '@/types/offline';
 import styles from './PatrullaDetailPage.module.css';
 
@@ -57,11 +62,11 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
   const toast = useToastOptional();
   const {
     usuario,
+    esPatrulla,
     unidadActiva,
     tieneUnidadAsignada,
     estadoAsignacion,
     tienePermiso,
-    esPatrulla,
   } = useAuth();
   const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
   const [mision, setMision] = useState<MisionLocal | null>(null);
@@ -178,6 +183,20 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
     }
   };
 
+  const estadoNormalizado = mision?.estado?.toUpperCase() || '';
+  const esDespachada = estadoNormalizado === 'DESPACHADA';
+  const esEnCurso =
+    estadoNormalizado === 'EN_CURSO' ||
+    estadoNormalizado === 'EN_RUTA' ||
+    estadoNormalizado === 'EN_TERRENO';
+
+  const misionActiva = Boolean(unidadActiva && esEnCurso && esPatrulla);
+  const { estado: estadoTelemetria, reintentar: reintentarTelemetria } = useTelemetry({
+    unidadId: usuario?.unidadId ?? null,
+    tipoUnidad: esPatrulla ? 'PATRULLA' : null,
+    activa: misionActiva,
+  });
+
   if (cargando) {
     return (
       <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
@@ -238,13 +257,6 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
       </div>
     );
   }
-
-  const estadoNormalizado = mision.estado?.toUpperCase() || '';
-  const esDespachada = estadoNormalizado === 'DESPACHADA';
-  const esEnCurso =
-    estadoNormalizado === 'EN_CURSO' ||
-    estadoNormalizado === 'EN_RUTA' ||
-    estadoNormalizado === 'EN_TERRENO';
 
   const tienePermisoVerificar =
     typeof tienePermiso === 'function'
@@ -523,12 +535,23 @@ export default function PatrullaMisionDetailPage({ params }: PageProps) {
                 En Trayecto / Evaluación
               </h2>
             </div>
-            <Chip variant="success" size="sm">
-              Misión activa
-            </Chip>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <TelemetryStatusBadge
+                estado={estadoTelemetria}
+                onRetry={reintentarTelemetria}
+              />
+              <Chip variant="success" size="sm">
+                Misión activa
+              </Chip>
+            </div>
           </div>
 
           <div className={styles.enTrayectoContent}>
+            <TelemetryWarningBanner
+              estado={estadoTelemetria}
+              onRetry={reintentarTelemetria}
+            />
+
             {mision.sincronizacionPendiente ? (
               <div className={styles.offlineQueueBanner} role="status">
                 <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />

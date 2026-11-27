@@ -27,7 +27,7 @@
 | **TC-14** | H43 | `CargaEvidenciaCard` | Online / Offline | Capturar foto de 4 MB con cámara. | Comprime en cliente a JPEG $\le 1280$px y $\approx 250$ KB, encola en `outbox`. | APROBADO |
 | **TC-15** | H44 | `SolicitudApoyoModal` | Online / Offline | Solicitar maquinaria pesada con motivo de 10 caracteres. | Modal valida $\ge 5$ caracteres, encola solicitud estructurada (`POST /misiones/{id}/apoyo`). | APROBADO |
 | **TC-16** | H68 | `CierreFaenaForm` | Online / Offline | Registrar observaciones y rendir 2 materiales consumidos (combustible, sacos). | Encola cierre en `outbox`, transiciona a `FINALIZADA` y libera cuadrilla. | APROBADO |
-| **TC-17** | H70 | `useTelemetry` | Online | Misión activa en curso. | Activa `watchPosition` de alta precisión, transmite coordenadas cada 15 segundos. | APROBADO |
+| **TC-17** | H70 | `useTelemetry` | Online / Offline | Misión activa `EN_CURSO` en patrulla o cuadrilla. | Activa sondeo controlado `getCurrentPosition` de alta precisión (`enableHighAccuracy: true`, `timeout: 10000`, `maximumAge: 30000`), emite `telemetria:posicion` cada 30 segundos y retransmite silenciosamente al reconectar. | APROBADO |
 | **TC-18** | Core | `offlineQueue` / `useConnectivity` | Transición Offline $\to$ Online | Desconectar red celular, ejecutar acciones, reconectar red. | Badge muestra pendientes en gris carbón; al volver señal, sincroniza cola y cambia a verde sage. | APROBADO |
 
 ---

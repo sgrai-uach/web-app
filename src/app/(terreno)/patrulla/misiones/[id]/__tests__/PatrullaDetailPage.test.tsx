@@ -356,6 +356,96 @@ describe('PatrullaMisionDetailPage — Confirmar y aceptar misión asignada (HU-
       screen.queryByRole('button', { name: /aceptar misi[oó]n/i })
     ).not.toBeInTheDocument();
   });
+
+  it('activa telemetría GPS ("GPS activo") en misión EN_CURSO y muestra aviso no bloqueante ante permiso denegado (HU-70)', async () => {
+    const originalGeolocation = navigator.geolocation;
+    const mockGetCurrentPosition = vi.fn<Geolocation['getCurrentPosition']>((success) => {
+      success({
+        coords: {
+          latitude: -39.8142,
+          longitude: -73.2459,
+          heading: 120,
+          accuracy: 8,
+          speed: 5,
+          altitude: null,
+          altitudeAccuracy: null,
+          toJSON: () => ({}),
+        },
+        timestamp: Date.now(),
+        toJSON: () => ({}),
+      });
+    });
+
+    Object.defineProperty(navigator, 'geolocation', {
+      value: {
+        getCurrentPosition: mockGetCurrentPosition,
+        watchPosition: vi.fn(),
+        clearWatch: vi.fn(),
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      configurarAuthMock({ unidadActiva: true, permisoVerificar: true });
+      vi.mocked(misionesService.obtenerDetalleMision).mockResolvedValue({
+        ...misionDespachadaMock,
+        estado: 'EN_CURSO',
+        fechaInicio: '2026-11-01T21:00:00.000Z',
+      });
+
+      const { unmount } = await act(async () =>
+        render(
+          <Suspense fallback={<div>Cargando...</div>}>
+            <PatrullaMisionDetailPage
+              params={Promise.resolve({ id: misionDespachadaMock.id })}
+            />
+          </Suspense>
+        )
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('GPS activo')).toBeInTheDocument();
+      });
+      unmount();
+
+      // Caso permiso denegado: banner no bloqueante y formularios siguen habilitados
+      mockGetCurrentPosition.mockImplementationOnce((_, error) => {
+        error?.({
+          code: 1,
+          message: 'User denied Geolocation',
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3,
+        });
+      });
+
+      await act(async () => {
+        render(
+          <Suspense fallback={<div>Cargando...</div>}>
+            <PatrullaMisionDetailPage
+              params={Promise.resolve({ id: misionDespachadaMock.id })}
+            />
+          </Suspense>
+        );
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Ubicación GPS no autorizada')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('formularios-reporte-tecnico')).toBeInTheDocument();
+    } finally {
+      if (originalGeolocation === undefined) {
+        delete (navigator as unknown as { geolocation?: Geolocation }).geolocation;
+      } else {
+        Object.defineProperty(navigator, 'geolocation', {
+          value: originalGeolocation,
+          writable: true,
+          configurable: true,
+        });
+      }
+    }
+  });
 });
 
 

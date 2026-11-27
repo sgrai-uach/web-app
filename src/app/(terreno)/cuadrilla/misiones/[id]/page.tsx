@@ -24,6 +24,11 @@ import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
+import { useTelemetry } from '@/hooks/useTelemetry';
+import {
+  TelemetryStatusBadge,
+  TelemetryWarningBanner,
+} from '@/components/terreno/TelemetryStatusBadge';
 import {
   RechazoMisionModal,
   type CoordenadasGPS,
@@ -44,10 +49,10 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
 
   const {
     usuario,
+    esCuadrilla,
     unidadActiva,
     tieneUnidadAsignada,
     estadoAsignacion,
-    esCuadrilla,
     tienePermiso,
   } = useAuth();
   const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
@@ -85,6 +90,19 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
       window.removeEventListener('sgrai:mision-rechazada', handleSincronizacion);
     };
   }, [cargarDetalle]);
+
+  const estadoNormalizado = mision?.estado?.toUpperCase() || '';
+  const esEnCurso =
+    estadoNormalizado === 'EN_CURSO' ||
+    estadoNormalizado === 'EN_RUTA' ||
+    estadoNormalizado === 'EN_TERRENO';
+  const misionActiva = Boolean(unidadActiva && esEnCurso && esCuadrilla);
+
+  const { estado: estadoTelemetria, reintentar: reintentarTelemetria } = useTelemetry({
+    unidadId: usuario?.unidadId ?? null,
+    tipoUnidad: esCuadrilla ? 'CUADRILLA' : null,
+    activa: misionActiva,
+  });
 
   if (cargando) {
     return (
@@ -141,7 +159,6 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     );
   }
 
-  const estadoNormalizado = mision.estado?.toUpperCase() || '';
   const tienePermisoEjecutar =
     typeof tienePermiso === 'function'
       ? tienePermiso('misiones:terreno:ejecutar')
@@ -255,8 +272,19 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
               {formatearPrioridad(mision.prioridad)}
             </Chip>
           </div>
-          <EstadoBadge estado={mision.estado} size="md" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <TelemetryStatusBadge
+              estado={estadoTelemetria}
+              onRetry={reintentarTelemetria}
+            />
+            <EstadoBadge estado={mision.estado} size="md" />
+          </div>
         </div>
+
+        <TelemetryWarningBanner
+          estado={estadoTelemetria}
+          onRetry={reintentarTelemetria}
+        />
 
         <div className={styles.detailGrid}>
           {/* Bloque Tipo */}

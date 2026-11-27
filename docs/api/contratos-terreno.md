@@ -331,12 +331,13 @@ Esto notifica de inmediato al Encargado del Centro de Mando en `sgrai-web` para 
    - **Evento emitido `telemetria:posicion` (H70):**
      ```json
      {
-       "unidadId": "unidad-01",
+       "unidadId": "f1000000-0000-4000-8000-000000000050",
        "tipoUnidad": "PATRULLA", // o "CUADRILLA"
        "lat": -39.81422,
        "lng": -73.24589,
-       "precisionMetros": 8.5,
-       "velocidad": 12.3,
-       "timestamp": "2026-10-27T16:05:00Z"
+       "timestamp": "2026-10-27T16:05:00.000Z",
+       "rumbo": 180,
+       "precision": 8.5,
+       "velocidad": 12.3
      }
      ```
