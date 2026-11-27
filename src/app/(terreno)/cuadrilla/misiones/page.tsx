@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw, CheckCircle2, WifiOff, X } from 'lucide-react';
 import { Heading } from '@/components/ui/Heading';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
@@ -30,14 +30,24 @@ function CuadrillaMisionesContenido() {
   const [misiones, setMisiones] = useState<MisionLocal[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
 
-  // Leer filtro desde URL ?estado= (default: 'todas')
+  // Leer filtro desde URL ?estado= (default: 'todas') y feedback persistente tras rechazo (BUG-H41-PWA-03)
   const estadoParam = searchParams.get('estado');
+  const rechazoParam = searchParams.get('rechazo');
+  const msgParam = searchParams.get('msg');
   const filtroActual: FiltroEstado =
     estadoParam === 'pendientes' ||
     estadoParam === 'en_curso' ||
     estadoParam === 'finalizadas'
       ? estadoParam
       : 'todas';
+
+  const descartarFeedbackRechazo = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('rechazo');
+    params.delete('msg');
+    const query = params.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
+  };
 
   const cargarMisiones = useCallback(async () => {
     setCargando(true);
@@ -60,6 +70,22 @@ function CuadrillaMisionesContenido() {
 
   useEffect(() => {
     cargarMisiones();
+  }, [cargarMisiones]);
+
+  useEffect(() => {
+    const refrescar = () => {
+      void cargarMisiones();
+    };
+    window.addEventListener('sgrai:outbox-synced', refrescar);
+    window.addEventListener('sgrai:mision-rechazada', refrescar);
+    window.addEventListener('sgrai:mision-sincronizada', refrescar);
+    window.addEventListener('sgrai:mision_actualizada', refrescar);
+    return () => {
+      window.removeEventListener('sgrai:outbox-synced', refrescar);
+      window.removeEventListener('sgrai:mision-rechazada', refrescar);
+      window.removeEventListener('sgrai:mision-sincronizada', refrescar);
+      window.removeEventListener('sgrai:mision_actualizada', refrescar);
+    };
   }, [cargarMisiones]);
 
   const { ultimaMisionAsignada, descartarUltimaMision } = useMisionesSocket({
@@ -138,9 +164,42 @@ function CuadrillaMisionesContenido() {
         <NuevaMisionBanner
           codigoMision={ultimaMisionAsignada.codigo}
           misionId={ultimaMisionAsignada.misionId}
-          urlDetalle={`/terreno/cuadrilla/misiones/${ultimaMisionAsignada.misionId}`}
+          urlDetalle={`/cuadrilla/misiones/${ultimaMisionAsignada.misionId}`}
           alCerrar={descartarUltimaMision}
         />
+      )}
+
+      {(rechazoParam === 'ok' || rechazoParam === 'offline') && (
+        <div
+          role="status"
+          className={
+            rechazoParam === 'offline'
+              ? styles.feedbackOfflineBanner
+              : styles.feedbackSuccessBanner
+          }
+        >
+          <div className={styles.feedbackContent}>
+            {rechazoParam === 'offline' ? (
+              <WifiOff size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+            ) : (
+              <CheckCircle2 size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+            )}
+            <span>
+              {msgParam ||
+                (rechazoParam === 'offline'
+                  ? 'Rechazo registrado localmente. Se sincronizará automáticamente al recuperar la conexión.'
+                  : 'Misión rechazada exitosamente.')}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={descartarFeedbackRechazo}
+            className={styles.feedbackCloseButton}
+            aria-label="Cerrar notificación de rechazo"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
       )}
 
       {!tieneUnidadAsignada ? (

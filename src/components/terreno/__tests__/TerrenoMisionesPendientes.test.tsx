@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { TerrenoMisionesPendientes } from '../TerrenoMisionesPendientes';
 import * as authContext from '@/context/AuthContext';
 import * as misionesService from '@/services/misionesService';
@@ -127,6 +127,57 @@ describe('TerrenoMisionesPendientes — Sección Destacada de Despachos Pendient
 
       // No debe incluir la misión que ya está en curso
       expect(screen.queryByText('INC-2026-00400')).not.toBeInTheDocument();
+    });
+  });
+
+  it('refresca despachos pendientes ante eventos sgrai:mision-sincronizada, sgrai:mision-rechazada y sgrai:outbox-synced (BUG-INT-PWA-16)', async () => {
+    vi.spyOn(authContext, 'useAuth').mockReturnValue({
+      usuario: {
+        id: 'usr-1',
+        rut: '12.345.678-9',
+        nombre: 'Patrullero Uno',
+        email: 'p1@valdivia.cl',
+        rolId: 'rol-1',
+        rolNombre: 'Patrulla Verificadora',
+        rolCodigo: 'PATRULLA_VERIFICADORA',
+        delegacionId: 'del-1',
+        delegacionNombre: 'Central',
+        permisos: [],
+        unidadId: 'pat-1',
+        unidadNombre: 'Móvil 01',
+        unidadActiva: true,
+      },
+      token: 'jwt',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: true,
+      esCuadrilla: false,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: vi.fn(),
+    });
+
+    const syncSpy = vi.spyOn(misionesService, 'sincronizarMisiones').mockResolvedValue([]);
+
+    render(<TerrenoMisionesPendientes />);
+
+    await waitFor(() => {
+      expect(syncSpy).toHaveBeenCalledTimes(1);
+    });
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('sgrai:mision-sincronizada'));
+      window.dispatchEvent(new CustomEvent('sgrai:mision-rechazada'));
+      window.dispatchEvent(new CustomEvent('sgrai:outbox-synced'));
+    });
+
+    await waitFor(() => {
+      expect(syncSpy).toHaveBeenCalledTimes(4);
     });
   });
 });

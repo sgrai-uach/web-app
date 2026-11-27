@@ -207,5 +207,112 @@ describe('useTerrenoSocket hook (H85)', () => {
     });
     expect(recargarSesionMock).toHaveBeenCalledTimes(2);
   });
+
+  it('suscribe a eventos de actualización de misión/incidente y dispara sgrai:mision-sincronizada', () => {
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: {
+        id: 'u-pat-2',
+        rut: '12.345.678-9',
+        nombre: 'Personal 2',
+        email: 'p2@valdivia.cl',
+        rolId: 'r-1',
+        rolNombre: 'Patrulla Verificadora',
+        rolCodigo: 'PATRULLA_VERIFICADORA',
+        delegacionId: 'del-1',
+        delegacionNombre: 'Centro',
+        permisos: [],
+        unidadId: 'pat-123',
+        unidadNombre: 'Patrulla 1',
+        unidadActiva: true,
+      },
+      token: 'jwt-patrulla',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: true,
+      esCuadrilla: false,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: recargarSesionMock,
+    });
+
+    const listener = vi.fn();
+    window.addEventListener('sgrai:mision-sincronizada', listener);
+
+    const { unmount } = renderHook(() => useTerrenoSocket());
+
+    act(() => {
+      mockSocket.trigger('mision:actualizada', { misionId: 'm-1' });
+    });
+    act(() => {
+      mockSocket.trigger('incidente:actualizado', { id: 'inc-1' });
+    });
+
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    unmount();
+    window.removeEventListener('sgrai:mision-sincronizada', listener);
+    expect(mockSocket.off).toHaveBeenCalledWith('mision:actualizada', expect.any(Function));
+    expect(mockSocket.off).toHaveBeenCalledWith('incidente:actualizado', expect.any(Function));
+  });
+
+  it('filtra mision:rechazada por cuadrillaId y despacha sgrai:mision-rechazada solo para la unidad activa (BUG-H41-PWA-04)', () => {
+    vi.mocked(AuthContextModule.useAuth).mockReturnValue({
+      usuario: {
+        id: 'u-cuad-1',
+        rut: '15.111.222-3',
+        nombre: 'Delegado Cuadrilla',
+        email: 'delegado@valdivia.cl',
+        rolId: 'r-2',
+        rolNombre: 'Delegado de Cuadrilla',
+        rolCodigo: 'DELEGADO_CUADRILLA',
+        delegacionId: 'del-2',
+        delegacionNombre: 'Las Ánimas',
+        permisos: ['misiones:terreno:ejecutar'],
+        unidadId: 'cuad-99',
+        unidadNombre: 'Cuadrilla Sur',
+        unidadActiva: true,
+      },
+      token: 'jwt-cuadrilla',
+      cargando: false,
+      autenticado: true,
+      esPatrulla: false,
+      esCuadrilla: true,
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      tienePermiso: vi.fn().mockReturnValue(true),
+      tieneAlgunPermiso: vi.fn().mockReturnValue(true),
+      login: vi.fn(),
+      logout: vi.fn(),
+      recargarSesion: recargarSesionMock,
+    });
+
+    const listenerSpy = vi.fn();
+    window.addEventListener('sgrai:mision-rechazada', listenerSpy);
+
+    renderHook(() => useTerrenoSocket());
+
+    act(() => {
+      mockSocket.trigger('mision:rechazada', { misionId: 'm-otra', cuadrillaId: 'cuad-otra' });
+    });
+    expect(listenerSpy).not.toHaveBeenCalled();
+
+    act(() => {
+      mockSocket.trigger('mision:rechazada', { misionId: 'm-mia', cuadrillaId: 'cuad-99' });
+    });
+    expect(listenerSpy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      mockSocket.trigger('mision:rechazada', { misionId: 'm-sin-unidad' });
+    });
+    expect(listenerSpy).toHaveBeenCalledTimes(2);
+
+    window.removeEventListener('sgrai:mision-rechazada', listenerSpy);
+  });
 });
 

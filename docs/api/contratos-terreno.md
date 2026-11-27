@@ -169,8 +169,6 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
   "riesgoQuimicoSanitario": false,
   "aislamientoVial": false,
   "requiereEvacuacion": false,
-  "requiereAsistenciaSocial": true,
-  "requiereApoyoAdicional": true,
   "detallesAdicionales": "Se requiere coordinación con empresa eléctrica y cuadrilla de despeje.",
   "factoresGatillantes": [
     "Peligro eléctrico activo en terreno",
@@ -183,12 +181,51 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 
 #### Reglas de Validación y Versionado
 - Si `prioridad !== prioridadSugerida`, el campo `justificacionPrioridad` es obligatorio y debe tener al menos **5 caracteres**.
-- Cada envío o rectificación incrementa `versionReporte` (`1`, `2`, `...`), registrando un reporte distinguible en el Centro de Mando y emitiendo el evento WebSocket `incidente:actualizado`.
-### 2.3 Rechazo Motivado de Misión por Patrulla Verificadora (H41, H69)
+- Cada envío o rectificación incrementa `versionReporte` (`1`, `2`, `...`), registrando un reporte distinguible en el Centro de Mando (con datos de `evaluador` visibles para toda la patrulla) y emitiendo los eventos WebSocket `incidente:actualizado` y `mision:actualizada`.
+
+---
+
+### 2.3 Enviar Informe Técnico de Verificación y Cerrar Misión (H39 / H86)
+- **Historia:** H39 (fusión H39 / H86)
+- **Método:** `POST`
+- **Ruta:** `/api/misiones/{id}/reporte`
+- **Permiso RBAC requerido:** `reportes:crear`
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+#### Request Body (`POST /api/misiones/{id}/reporte`)
+```json
+{
+  "dictamen": "REQUIERE_CUADRILLA",
+  "motivo_no_abordable": null,
+  "resumen_tecnico": "Se constata obstrucción completa de sumidero y socavón en berma norte; requiere cuadrilla vial con motobomba.",
+  "estado_terreno": "CRITICO",
+  "personas_afectadas": 4,
+  "danos_estimados": "Anegamiento de primer nivel en 2 viviendas y daño en cerco perimetral.",
+  "observaciones": "Acceso despejado para camión aljibe por calle paralela.",
+  "requiere_asistencia_social": true,
+  "adjuntoIds": [],
+  "adjuntos": [],
+  "latitud": -39.819588,
+  "longitud": -73.245209
+}
+```
+
+#### Reglas de Validación y Transacción Atómica
+- `dictamen`: obligatorio (`'REQUIERE_CUADRILLA'` o `'NO_ABORDABLE'`).
+- `resumen_tecnico`: obligatorio, mínimo **10 caracteres**.
+- `motivo_no_abordable`: obligatorio cuando `dictamen === 'NO_ABORDABLE'`, mínimo **15 caracteres**. Transiciona `incidente.estado = 'NO_ABORDABLE'` registrando `fecha_cierre` y motivo.
+- `personas_afectadas`: entero `>= 0`, precargado automáticamente desde el último reporte de prioridad (HU-38) mediante `evaluaciones.personasAfectadasPrevias` / `reportesTerreno` y editable por la patrulla.
+- `requiere_asistencia_social`: casilla Ficha FIBE (trasladada desde HU-38); si es `true`, marca `incidente.requiere_asistencia_social = true`.
+- `adjuntoIds` / `adjuntos`: sección preparada para integración con evidencia fotográfica (HU-43).
+- Al recibir `201 Created`, la misión pasa a `COMPLETADA` (`fecha_cierre`), la patrulla pasa a `DISPONIBLE` y se emiten los eventos WebSocket `mision:actualizada`, `incidente:actualizado` y `patrulla:actualizada` / `patrulla:liberada`, sincronizando el estado y autoría (`evaluador`) para todo el personal de la patrulla.
+
+---
+
+### 2.4 Rechazo Motivado de Misión en Terreno (H41, H69)
 - **Historia:** H41, H69
 - **Método:** `POST`
 - **Ruta:** `/api/misiones/{id}/rechazar`
-- **Permiso RBAC requerido:** `misiones:terreno:verificar` (Patrulla Verificadora) / `misiones:terreno:atender` (Delegado de Cuadrilla)
+- **Permiso RBAC requerido:** `misiones:terreno:verificar` (Patrulla Verificadora) / `misiones:terreno:ejecutar` (Delegado de Cuadrilla)
 - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
 
 #### Request Body
@@ -200,40 +237,61 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 }
 ```
 
-> **Regla de Negocio Crítica §3.3:** La justificación es obligatoria y debe contar con un mínimo de **5 caracteres** útiles (tras remover espacios en blanco circundantes). Las coordenadas GPS son opcionales y no bloqueantes.
+> **Regla de Negocio Crítica §3.3:** La justificación es obligatoria y debe contar con un mínimo de **5 caracteres** útiles (y máximo **1000** tras remover espacios en blanco circundantes). Las coordenadas GPS son opcionales y no bloqueantes, pero si se informan deben incluir paridad (`latitud` y `longitud`).
 
 #### Response Exitosa (200 OK)
 ```json
 {
-  "message": "Misión rechazada exitosamente.",
+  "message": "Misión rechazada exitosamente. La cuadrilla ha vuelto a estado DISPONIBLE y el incidente ha retornado a VERIFICANDO para su reasignación.",
   "data": {
     "mision": {
       "id": "60000000-0000-4000-8000-000000000001",
       "codigo": "MIS-2026-0001",
+      "tipoMision": "ATENCION_CUADRILLA",
       "estado": "RECHAZADA",
       "justificacionRechazo": "Desperfecto mecánico severo en vehículo de traslado.",
+      "fechaCierre": "2026-11-01T21:05:00.000Z",
       "actualizadoEn": "2026-11-01T21:05:00.000Z"
+    },
+    "cuadrilla": {
+      "id": "50000000-0000-4000-8000-000000000001",
+      "nombre": "Cuadrilla Vías y Canales 1",
+      "estado": "DISPONIBLE"
+    },
+    "incidente": {
+      "id": "30000000-0000-4000-8000-000000000001",
+      "codigo": "INC-2026-0001",
+      "estado": "VERIFICANDO",
+      "prioridad": "ALTA"
     }
   }
 }
 ```
 
 #### Códigos de Error HTTP
-- `400 Bad Request`: Formato de carga inválido o justificación menor a 5 caracteres (`VALIDATION_ERROR`).
+- `400 Bad Request`: Formato de carga inválido, body vacío, justificación menor a 5 caracteres o coordenadas GPS sin paridad (`VALIDATION_ERROR`).
 - `401 Unauthorized`: Token de sesión ausente, inválido o expirado.
-- `403 Forbidden`: Operador sin rol o sin permiso `misiones:terreno:verificar`, o unidad operativa en estado desactivada.
+- `403 Forbidden`: Operador sin rol o sin permiso (`misiones:terreno:verificar` para patrulla o `misiones:terreno:ejecutar` para cuadrilla), o sin pertenencia a la unidad asignada.
 - `404 Not Found`: Identificador de misión no registrado en el sistema.
-- `409 Conflict`: La misión ya no se encuentra en estado `DESPACHADA` o `ASIGNADA` (ej. ya aceptada previamente o cancelada por despacho).
+- `409 Conflict`: La misión ya no se encuentra en estado `DESPACHADA`, el incidente asociado ya está en estado terminal (`RESUELTO` / `NO_ABORDABLE`) o no posee unidad compatible.
 
 #### Efectos Colaterales en Tiempo Real (Socket.io)
-Al procesar exitosamente el rechazo, el backend emite el evento `mision:rechazada` hacia la sala `encargado`:
+Al procesar exitosamente el rechazo, el backend emite el evento `mision:rechazada` hacia `encargado`, `sala:encargados`, `supervisor` y la sala de la unidad (`cuadrilla:{id}` o `patrulla:{id}`):
 ```json
 {
   "misionId": "60000000-0000-4000-8000-000000000001",
   "codigo": "MIS-2026-0001",
-  "unidadId": "f1000000-0000-4000-8000-000000000001",
+  "tipoMision": "ATENCION_CUADRILLA",
   "motivo": "Desperfecto mecánico severo en vehículo de traslado.",
-  "timestamp": "2026-11-01T21:05:00.000Z"
+  "justificacionRechazo": "Desperfecto mecánico severo en vehículo de traslado.",
+  "cuadrillaId": "50000000-0000-4000-8000-000000000001",
+  "cuadrillaNombre": "Cuadrilla Vías y Canales 1",
+  "patrullaId": null,
+  "patrullaNombre": null,
+  "incidenteId": "30000000-0000-4000-8000-000000000001",
+  "incidenteCodigo": "INC-2026-0001",
+  "rechazadoPorId": "d0000000-0000-4000-8000-000000000001",
+  "rechazadoEn": "2026-11-01T21:05:00.000Z"
 }
 ```
 Esto notifica de inmediato al Encargado del Centro de Mando en `sgrai-web` para reasignar la misión a otra unidad disponible.
@@ -241,7 +299,6 @@ Esto notifica de inmediato al Encargado del Centro de Mando en `sgrai-web` para 
 #### Comportamiento Offline-First
 - En caso de pérdida de señal o error de red, la PWA valida localmente con Zod (`rechazoMisionSchema`), persiste el estado `RECHAZADA` con `sincronizacionPendiente: true` en IndexedDB y almacena la mutación `RECHAZAR_MISION` en `outbox`.
 - El badge de conectividad refleja de inmediato `1 pendiente` y el worker/hook `useConnectivity` reintenta la mutación al recuperar la conexión.
-
 
 ---
 

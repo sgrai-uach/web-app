@@ -253,7 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (listaPermisos.includes('*') || listaPermisos.includes(permiso)) {
         return true;
       }
-      // Fallback por rol canónico de terreno cuando el token o mock no desglosa permisos de ruta
+      // Fallback por rol canónico de terreno solo para prefijos de ruta propios
       if (esPatrulla && permiso.startsWith('patrulla:')) {
         return true;
       }

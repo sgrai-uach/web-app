@@ -3,8 +3,10 @@ import {
   guardarMisionesLocales,
   obtenerMisionesLocales,
   obtenerMisionLocalPorId,
+  guardarMisionLocal,
   limpiarMisionesLocales,
   limpiarAlmacenamientoOffline,
+  obtenerEvaluacionMisionCache,
   guardarCatalogoLocal,
   obtenerCatalogoLocal,
   encolarAccionOutbox,
@@ -85,6 +87,55 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
     expect(resultado.exitosas).toBeGreaterThanOrEqual(1);
     const listaActual = await obtenerAccionesOutbox();
     expect(listaActual.some((a) => a.id === accion1.id)).toBe(false);
+  });
+
+  it('preserva evaluaciones cacheadas de misión ante limpiarAlmacenamientoOffline y las refusiona al guardar misiones', async () => {
+    const misionConEvaluaciones: MisionLocal = {
+      ...misionEjemplo,
+      id: 'mision-cambio-usuario',
+      tipologia: 'Inundación',
+      estado: 'EN_CURSO',
+      datosAdicionales: {
+        tipologiaEvaluada: true,
+        esReclasificacion: true,
+        justificacionTipologia: 'Desborde verificado en terreno.',
+        evaluadorTipologia: {
+          id: 'usr-patrulla-1',
+          nombre: 'Patrulla Uno',
+          email: 'patrulla@valdivia.cl',
+        },
+        prioridadEvaluada: true,
+        versionReportePrioridad: 1,
+      },
+    };
+
+    await guardarMisionLocal(misionConEvaluaciones);
+    expect(obtenerEvaluacionMisionCache('mision-cambio-usuario')?.tipologiaEvaluada).toBe(true);
+
+    // Simula logout() del primer usuario
+    await limpiarAlmacenamientoOffline();
+    expect(await obtenerMisionLocalPorId('mision-cambio-usuario')).toBeUndefined();
+    expect(obtenerEvaluacionMisionCache('mision-cambio-usuario')?.prioridadEvaluada).toBe(true);
+
+    // Simula login de patrulla2@valdivia.cl y sincronización resumida desde GET /api/misiones
+    await guardarMisionesLocales([
+      {
+        ...misionEjemplo,
+        id: 'mision-cambio-usuario',
+        tipologia: 'Caída de árbol',
+        estado: 'EN_CURSO',
+      },
+    ]);
+
+    const restaurada = await obtenerMisionLocalPorId('mision-cambio-usuario');
+    expect(restaurada?.tipologia).toBe('Inundación');
+    expect(restaurada?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+    expect(restaurada?.datosAdicionales?.prioridadEvaluada).toBe(true);
+    expect(restaurada?.datosAdicionales?.evaluadorTipologia).toEqual({
+      id: 'usr-patrulla-1',
+      nombre: 'Patrulla Uno',
+      email: 'patrulla@valdivia.cl',
+    });
   });
 
   it('respeta el orden causal por misión en sincronizarColaOutbox si una acción previa falla', async () => {
@@ -245,6 +296,123 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
     await limpiarAlmacenamientoOffline();
     const pendientes = await contarAccionesPendientes();
     expect(pendientes).toBe(0);
+  });
+
+  it('preserva prioridad optimista y reportes locales en guardarMisionesLocales si existe AJUSTAR_PRIORIDAD en outbox (BUG-INT-PWA-09)', async () => {
+    const misionPrioridadPendiente: MisionLocal = {
+      ...misionEjemplo,
+      id: 'mision-prio-pendiente-01',
+      incidenteId: 'inc-prio-pendiente-01',
+      estado: 'EN_CURSO',
+      prioridad: 'CRITICA',
+      sincronizacionPendiente: true,
+      datosAdicionales: {
+        prioridadEvaluada: true,
+        versionReportePrioridad: 1,
+        reportesPrioridad: [{ versionReporte: 1, prioridadAsignada: 'CRITICA', sincronizado: false }],
+      },
+    };
+
+    await guardarMisionesLocales([misionPrioridadPendiente]);
+    const accion = await encolarAccionOutbox({
+      tipo: 'AJUSTAR_PRIORIDAD',
+      url: '/api/incidentes/inc-prio-pendiente-01/prioridad',
+      metodo: 'PATCH',
+      payload: {
+        misionId: 'mision-prio-pendiente-01',
+        prioridad: 'CRITICA',
+      },
+    });
+
+    await guardarMisionesLocales([
+      {
+        ...misionPrioridadPendiente,
+        prioridad: 'MEDIA',
+        sincronizacionPendiente: false,
+        datosAdicionales: { trabajo: 'Remoto desactualizado' },
+      },
+    ]);
+
+    const recuperada = await obtenerMisionLocalPorId('mision-prio-pendiente-01');
+    expect(recuperada?.prioridad).toBe('CRITICA');
+    expect(recuperada?.sincronizacionPendiente).toBe(true);
+    expect(recuperada?.datosAdicionales?.prioridadEvaluada).toBe(true);
+
+    await eliminarAccionOutbox(accion.id);
+  });
+
+  it('garantiza orden causal FIFO determinista en outbox aunque se encolen múltiples mutaciones en el mismo milisegundo (BUG-INT-PWA-12)', async () => {
+    const misionId = 'mision-fifo-01';
+    const a1 = await encolarAccionOutbox({
+      tipo: 'ACEPTAR_MISION',
+      url: `/api/misiones/${misionId}/aceptar`,
+      metodo: 'POST',
+      payload: { misionId },
+    });
+    const a2 = await encolarAccionOutbox({
+      tipo: 'ACTUALIZAR_TIPOLOGIA',
+      url: '/api/incidentes/inc-fifo-01/tipologia',
+      metodo: 'PATCH',
+      payload: { misionId },
+    });
+    const a3 = await encolarAccionOutbox({
+      tipo: 'AJUSTAR_PRIORIDAD',
+      url: '/api/incidentes/inc-fifo-01/prioridad',
+      metodo: 'PATCH',
+      payload: { misionId, prioridad: 'CRITICA' },
+    });
+
+    const ordenadas = (await obtenerAccionesOutbox()).filter((a) =>
+      [a1.id, a2.id, a3.id].includes(a.id)
+    );
+    expect(ordenadas.map((a) => a.tipo)).toEqual([
+      'ACEPTAR_MISION',
+      'ACTUALIZAR_TIPOLOGIA',
+      'AJUSTAR_PRIORIDAD',
+    ]);
+    expect(Date.parse(a1.timestamp)).toBeLessThan(Date.parse(a2.timestamp));
+    expect(Date.parse(a2.timestamp)).toBeLessThan(Date.parse(a3.timestamp));
+
+    await eliminarAccionOutbox(a1.id);
+    await eliminarAccionOutbox(a2.id);
+    await eliminarAccionOutbox(a3.id);
+  });
+
+  it('preserva timestamp causal original al deduplicar una acción previa para no desplazarla detrás de ENVIAR_REPORTE (BUG-INT-PWA-14)', async () => {
+    const misionId = 'mision-dedup-causal-01';
+    const tipificar = await encolarAccionOutbox({
+      tipo: 'ACTUALIZAR_TIPOLOGIA',
+      url: '/api/incidentes/inc-dedup-01/tipologia',
+      metodo: 'PATCH',
+      payload: { misionId, tipoIncidenteId: 'tipo-1' },
+    });
+    const cerrar = await encolarAccionOutbox({
+      tipo: 'ENVIAR_REPORTE',
+      url: `/api/misiones/${misionId}/reporte`,
+      metodo: 'POST',
+      payload: { dictamen: 'REQUIERE_CUADRILLA' },
+    });
+
+    const tipificarActualizada = await encolarAccionOutbox({
+      tipo: 'ACTUALIZAR_TIPOLOGIA',
+      url: '/api/incidentes/inc-dedup-01/tipologia',
+      metodo: 'PATCH',
+      payload: { misionId, tipoIncidenteId: 'tipo-2' },
+    });
+
+    expect(tipificarActualizada.id).toBe(tipificar.id);
+    expect(tipificarActualizada.timestamp).toBe(tipificar.timestamp);
+
+    const ordenadas = (await obtenerAccionesOutbox()).filter((a) =>
+      [tipificar.id, cerrar.id].includes(a.id)
+    );
+    expect(ordenadas.map((a) => a.tipo)).toEqual([
+      'ACTUALIZAR_TIPOLOGIA',
+      'ENVIAR_REPORTE',
+    ]);
+
+    await eliminarAccionOutbox(tipificar.id);
+    await eliminarAccionOutbox(cerrar.id);
   });
 
 });

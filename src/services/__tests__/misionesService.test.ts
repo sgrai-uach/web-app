@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   sincronizarMisiones,
   obtenerDetalleMision,
-  rechazarMision,
   aceptarMisionPatrulla,
   validarPayloadAceptarMision,
   obtenerCoordenadasOpcionales,
+  rechazarMision,
   MisionServiceError,
 } from '../misionesService';
 import apiClient from '@/lib/api/client';
@@ -26,6 +26,18 @@ vi.mock('@/services/offlineQueue', () => ({
   obtenerMisionLocalPorId: vi.fn(),
   obtenerAccionesOutbox: vi.fn(),
   encolarAccionOutbox: vi.fn(),
+  obtenerEvaluacionMisionCache: vi.fn(),
+  fusionarDatosAdicionalesMision: vi.fn((mision, previos) =>
+    previos
+      ? {
+          ...mision,
+          datosAdicionales: {
+            ...previos,
+            ...(mision.datosAdicionales || {}),
+          },
+        }
+      : mision
+  ),
 }));
 
 describe('misionesService — Sincronización remota y persistencia IndexedDB (Offline-First)', () => {
@@ -368,6 +380,84 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
           sincronizacionPendiente: true,
         })
       );
+    });
+
+    it('preserva estado optimista COMPLETADA mientras exista ENVIAR_REPORTE pendiente en outbox (BUG-H39-PWA-03)', async () => {
+      const misionId = '60000000-0000-4000-8000-000000000099';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: misionId,
+        incidenteId: 'a0000000-0000-4000-8000-000000000099',
+        codigoIncidente: 'INC-2026-0099',
+        tipologia: 'Inundación',
+        direccion: 'Costanera 420',
+        prioridad: 'ALTA',
+        estado: 'COMPLETADA',
+        fechaDespacho: '2026-10-30T04:00:00Z',
+        sincronizacionPendiente: true,
+        datosAdicionales: {
+          reporteVerificacionEnviado: true,
+          dictamenVerificacion: 'REQUIERE_CUADRILLA',
+        },
+        actualizadoEn: '2026-10-30T04:10:00Z',
+      });
+      vi.mocked(offlineQueue.obtenerAccionesOutbox).mockResolvedValue([
+        {
+          id: 'outbox-rep-99',
+          tipo: 'ENVIAR_REPORTE',
+          url: `/api/misiones/${misionId}/reporte`,
+          metodo: 'POST',
+          payload: {},
+          timestamp: '2026-10-30T04:10:00Z',
+          intentos: 0,
+        },
+      ]);
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: {
+            id: misionId,
+            codigo: 'MIS-2026-0099',
+            titulo: 'Inundación',
+            descripcion: 'Verificar',
+            tipoMision: 'VERIFICACION',
+            estado: 'EN_CURSO',
+            prioridad: 'ALTA',
+            justificacionRechazo: null,
+            fechaInicio: '2026-10-30T04:05:00Z',
+            fechaCierre: null,
+            creadoEn: '2026-10-30T04:00:00Z',
+            actualizadoEn: '2026-10-30T04:05:00Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: {
+              id: 'a0000000-0000-4000-8000-000000000099',
+              codigo: 'INC-2026-0099',
+              codigoSeguimiento: 'SEG-099',
+              tipoAfectacion: 'INUNDACION',
+              descripcion: 'Agua en calzada',
+              direccion: 'Costanera 420',
+              latitud: -39.8123,
+              longitud: -73.2467,
+              estado: 'VERIFICANDO',
+              prioridad: 'ALTA',
+              requiereAsistenciaSocial: false,
+              delegacionNombre: 'Norte',
+            },
+            prevencion: null,
+            cuadrilla: null,
+            patrulla: null,
+            bitacoraTiempos: [],
+            reportesTerreno: [],
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle = await obtenerDetalleMision(misionId);
+
+      expect(detalle?.estado).toBe('COMPLETADA');
+      expect(detalle?.sincronizacionPendiente).toBe(true);
     });
   });
 
@@ -894,6 +984,597 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
       expect(detalle?.datosAdicionales?.justificacionTipologia).toBe('Matriz rota');
       expect(detalle?.datosAdicionales?.prioridadEvaluada).toBe(true);
       expect(detalle?.datosAdicionales?.versionReportePrioridad).toBe(1);
+    });
+
+    it('extrae autoría de categorización (evaluadorTipologia) y preserva reportes cacheados tras cambio de usuario ante 403 en detalle', async () => {
+      vi.mocked(offlineQueue.obtenerEvaluacionMisionCache).mockReturnValue({
+        tipologiaEvaluada: true,
+        esReclasificacion: true,
+        justificacionTipologia: 'Cauce desbordado verificado.',
+        fechaEvaluacionTipologia: '2026-11-16T15:00:00Z',
+        evaluadorTipologia: {
+          id: 'usr-p1',
+          nombre: 'Patrullero 1',
+          email: 'patrulla@valdivia.cl',
+        },
+        prioridadEvaluada: true,
+        versionReportePrioridad: 1,
+        reportesPrioridad: [
+          {
+            id: 'rep-prio-1',
+            versionReporte: 1,
+            prioridadSugerida: 'ALTA',
+            prioridadAsignada: 'CRITICA',
+            evaluador: {
+              id: 'usr-p1',
+              nombre: 'Patrullero 1',
+              email: 'patrulla@valdivia.cl',
+            },
+          },
+        ],
+      });
+
+      // 1. sincronizarMisiones conserva caché tras logout -> login de patrulla2@valdivia.cl
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: [
+            {
+              id: 'mis-sync-patrulla',
+              codigo: 'MIS-2026-888',
+              titulo: 'Verificación: Inundación - INC-888',
+              descripcion: 'Sector Las Ánimas',
+              tipoMision: 'VERIFICACION',
+              estado: 'EN_CURSO',
+              prioridad: 'CRITICA',
+              incidenteId: 'inc-888',
+              incidenteCodigo: 'INC-888',
+              incidenteTipoAfectacion: 'Inundación',
+              cuadrillaId: null,
+              cuadrillaNombre: null,
+              patrullaId: 'pat-001',
+              patrullaNombre: 'Patrulla 1',
+              delegacionId: 'del-001',
+              delegacionNombre: 'Norte',
+              fechaInicio: '2026-11-16T14:50:00Z',
+              fechaCierre: null,
+              creadoEn: '2026-11-16T14:40:00Z',
+              actualizadoEn: '2026-11-16T15:05:00Z',
+            },
+          ],
+          meta: { total: 1, page: 1, limit: 20, totalPages: 1, hasNext: false, hasPrev: false },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const listaSync = await sincronizarMisiones({ tipoMision: 'VERIFICACION' });
+      expect(listaSync[0]?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+      expect(listaSync[0]?.datosAdicionales?.prioridadEvaluada).toBe(true);
+
+      // 2. Si GET /api/misiones/{id} responde 403, fallback combina IndexedDB + caché de evaluaciones
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValueOnce({
+        id: 'mis-sync-patrulla',
+        incidenteId: 'inc-888',
+        codigoIncidente: 'INC-888',
+        tipologia: 'Inundación',
+        direccion: 'Sector Las Ánimas',
+        prioridad: 'CRITICA',
+        estado: 'EN_CURSO',
+        fechaDespacho: '2026-11-16T14:50:00Z',
+        actualizadoEn: '2026-11-16T15:05:00Z',
+      });
+
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: undefined,
+        error: { message: 'No cuenta con el permiso requerido: misiones:leer' },
+        response: new Response(null, { status: 403 }),
+      } as never);
+
+      const detalle403 = await obtenerDetalleMision('mis-sync-patrulla');
+      expect(detalle403?.datosAdicionales?.tipologiaEvaluada).toBe(true);
+      expect(detalle403?.datosAdicionales?.evaluadorTipologia).toEqual({
+        id: 'usr-p1',
+        nombre: 'Patrullero 1',
+        email: 'patrulla@valdivia.cl',
+      });
+      expect(detalle403?.datosAdicionales?.prioridadEvaluada).toBe(true);
+
+      // 3. Cuando GET /api/misiones/{id} responde 200 OK, rescata registrador e esReclasificacion desde metadatos/hito
+      vi.mocked(offlineQueue.obtenerEvaluacionMisionCache).mockReturnValue(undefined);
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValueOnce(undefined);
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: {
+            id: 'mis-sync-patrulla',
+            codigo: 'MIS-2026-888',
+            titulo: 'Verificación: Inundación - INC-888',
+            descripcion: 'Sector Las Ánimas',
+            tipoMision: 'VERIFICACION',
+            estado: 'EN_CURSO',
+            prioridad: 'CRITICA',
+            justificacionRechazo: null,
+            fechaInicio: '2026-11-16T14:50:00Z',
+            fechaCierre: null,
+            creadoEn: '2026-11-16T14:40:00Z',
+            actualizadoEn: '2026-11-16T15:05:00Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: {
+              id: 'inc-888',
+              codigo: 'INC-888',
+              codigoSeguimiento: 'SEG-888',
+              tipoAfectacion: 'Inundación',
+              descripcion: 'Agua en calzada',
+              direccion: 'Sector Las Ánimas',
+              latitud: -39.81,
+              longitud: -73.24,
+              estado: 'VERIFICANDO',
+              prioridad: 'CRITICA',
+              requiereAsistenciaSocial: false,
+              delegacionNombre: 'Norte',
+            },
+            prevencion: null,
+            cuadrilla: null,
+            patrulla: null,
+            bitacoraTiempos: [
+              {
+                id: 'hito-tip-1',
+                hito: 'TIPOLOGIA_RECLASIFICADA',
+                fecha: '2026-11-16',
+                hora: '15:00:00',
+                timestamp: '2026-11-16T15:00:00Z',
+                descripcion: 'Tipología ratificada',
+                registradoPor: {
+                  id: 'usr-p1',
+                  nombre: 'Patrullero 1',
+                  email: 'patrulla@valdivia.cl',
+                },
+                metadatos: {
+                  tipoAnteriorId: 'tipo-1',
+                  tipoNuevoId: 'tipo-1',
+                  esReclasificacion: false,
+                  justificacion: 'Ratificada',
+                },
+              },
+            ],
+            reportesTerreno: [{ id: 'rep-srv-1', versionReporte: 1 }],
+            evaluaciones: {
+              tipologiaEvaluada: true,
+              tipologiaEvaluadaEn: '2026-11-16T15:00:00Z',
+              prioridadEvaluada: true,
+              prioridadEvaluadaEn: '2026-11-16T15:05:00Z',
+              versionReportePrioridad: 1,
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle200 = await obtenerDetalleMision('mis-sync-patrulla');
+      expect(detalle200?.datosAdicionales?.esReclasificacion).toBe(false);
+      expect(detalle200?.datosAdicionales?.evaluadorTipologia).toEqual({
+        id: 'usr-p1',
+        nombre: 'Patrullero 1',
+        email: 'patrulla@valdivia.cl',
+        rut: null,
+      });
+    });
+
+    it('preserva prioridad optimista y estado RECHAZADA en sincronizarMisiones y obtenerDetalleMision cuando existen AJUSTAR_PRIORIDAD o RECHAZAR_MISION en outbox (BUG-INT-PWA-09)', async () => {
+      const misionPrioridadLocal = {
+        id: '60000000-0000-4000-8000-000000000808',
+        incidenteId: 'a0000000-0000-4000-8000-000000000808',
+        codigoIncidente: 'INC-2026-0808',
+        tipologia: 'Inundación',
+        direccion: 'Av. Picarte 808',
+        prioridad: 'CRITICA',
+        estado: 'EN_CURSO',
+        fechaDespacho: '2026-11-24T10:00:00Z',
+        fechaInicio: '2026-11-24T10:05:00Z',
+        sincronizacionPendiente: false,
+        datosAdicionales: {
+          prioridadEvaluada: true,
+          versionReportePrioridad: 1,
+        },
+        actualizadoEn: '2026-11-24T10:15:00Z',
+      };
+
+      const misionRechazoLocal = {
+        id: '60000000-0000-4000-8000-000000000809',
+        incidenteId: 'a0000000-0000-4000-8000-000000000809',
+        codigoIncidente: 'INC-2026-0809',
+        tipologia: 'Caída de árbol',
+        direccion: 'Calle Bueras 100',
+        prioridad: 'ALTA',
+        estado: 'RECHAZADA',
+        fechaDespacho: '2026-11-24T10:00:00Z',
+        sincronizacionPendiente: false,
+        datosAdicionales: {
+          justificacionRechazo: 'Falla mecánica en móvil',
+        },
+        actualizadoEn: '2026-11-24T10:12:00Z',
+      };
+
+      vi.mocked(offlineQueue.obtenerMisionesLocales)
+        .mockResolvedValueOnce([misionPrioridadLocal, misionRechazoLocal])
+        .mockResolvedValueOnce([]);
+      vi.mocked(offlineQueue.obtenerAccionesOutbox).mockResolvedValueOnce([
+        {
+          id: 'outbox-prio-808',
+          tipo: 'AJUSTAR_PRIORIDAD',
+          url: '/api/incidentes/a0000000-0000-4000-8000-000000000808/prioridad',
+          metodo: 'PATCH',
+          payload: {
+            misionId: misionPrioridadLocal.id,
+            prioridad: 'CRITICA',
+          },
+          timestamp: '2026-11-24T10:15:00Z',
+          intentos: 0,
+        },
+        {
+          id: 'outbox-rech-809',
+          tipo: 'RECHAZAR_MISION',
+          url: `/api/misiones/${misionRechazoLocal.id}/rechazar`,
+          metodo: 'POST',
+          payload: {
+            justificacion_rechazo: 'Falla mecánica en móvil',
+          },
+          timestamp: '2026-11-24T10:12:00Z',
+          intentos: 0,
+        },
+      ]);
+
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: [
+            {
+              id: misionPrioridadLocal.id,
+              codigo: 'MIS-2026-0808',
+              titulo: 'Verificación: Inundación',
+              descripcion: 'Av. Picarte 808',
+              tipoMision: 'VERIFICACION',
+              estado: 'EN_CURSO',
+              prioridad: 'MEDIA',
+              incidenteId: misionPrioridadLocal.incidenteId,
+              incidenteCodigo: 'INC-2026-0808',
+              fechaInicio: '2026-11-24T10:05:00Z',
+              creadoEn: '2026-11-24T10:00:00Z',
+              actualizadoEn: '2026-11-24T10:05:00Z',
+            },
+            {
+              id: misionRechazoLocal.id,
+              codigo: 'MIS-2026-0809',
+              titulo: 'Verificación: Caída de árbol',
+              descripcion: 'Calle Bueras 100',
+              tipoMision: 'VERIFICACION',
+              estado: 'DESPACHADA',
+              prioridad: 'ALTA',
+              incidenteId: misionRechazoLocal.incidenteId,
+              incidenteCodigo: 'INC-2026-0809',
+              fechaInicio: null,
+              creadoEn: '2026-11-24T10:00:00Z',
+              actualizadoEn: '2026-11-24T10:00:00Z',
+            },
+          ],
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const lista = await sincronizarMisiones({ tipoMision: 'VERIFICACION' });
+      expect(lista[0].prioridad).toBe('CRITICA');
+      expect(lista[0].sincronizacionPendiente).toBe(true);
+      expect(lista[1].estado).toBe('RECHAZADA');
+      expect(lista[1].sincronizacionPendiente).toBe(true);
+
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValueOnce(misionPrioridadLocal);
+      vi.mocked(offlineQueue.obtenerAccionesOutbox).mockResolvedValueOnce([
+        {
+          id: 'outbox-prio-808',
+          tipo: 'AJUSTAR_PRIORIDAD',
+          url: '/api/incidentes/a0000000-0000-4000-8000-000000000808/prioridad',
+          metodo: 'PATCH',
+          payload: {
+            misionId: misionPrioridadLocal.id,
+            prioridad: 'CRITICA',
+          },
+          timestamp: '2026-11-24T10:15:00Z',
+          intentos: 0,
+        },
+      ]);
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: {
+            id: misionPrioridadLocal.id,
+            codigo: 'MIS-2026-0808',
+            titulo: 'Verificación: Inundación',
+            descripcion: 'Av. Picarte 808',
+            tipoMision: 'VERIFICACION',
+            estado: 'EN_CURSO',
+            prioridad: 'MEDIA',
+            justificacionRechazo: null,
+            fechaInicio: '2026-11-24T10:05:00Z',
+            fechaCierre: null,
+            creadoEn: '2026-11-24T10:00:00Z',
+            actualizadoEn: '2026-11-24T10:05:00Z',
+            creadoPor: null,
+            encargado: null,
+            incidente: {
+              id: misionPrioridadLocal.incidenteId,
+              codigo: 'INC-2026-0808',
+              codigoSeguimiento: 'SEG-808',
+              tipoAfectacion: 'Inundación',
+              descripcion: 'Agua en calzada',
+              direccion: 'Av. Picarte 808',
+              latitud: -39.81,
+              longitud: -73.24,
+              estado: 'VERIFICANDO',
+              prioridad: 'MEDIA',
+              requiereAsistenciaSocial: false,
+              delegacionNombre: 'Centro',
+            },
+            prevencion: null,
+            cuadrilla: null,
+            patrulla: null,
+            bitacoraTiempos: [],
+            reportesTerreno: [],
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const detalle = await obtenerDetalleMision(misionPrioridadLocal.id);
+      expect(detalle?.prioridad).toBe('CRITICA');
+      expect(detalle?.sincronizacionPendiente).toBe(true);
+    });
+
+    it('limpia sincronizacionPendiente en sincronizarMisiones cuando el servidor confirma estado terminal COMPLETADA sin pendientes en outbox (BUG-INT-PWA-15)', async () => {
+      const misionLocalPendiente = {
+        id: '60000000-0000-4000-8000-000000000915',
+        incidenteId: 'a0000000-0000-4000-8000-000000000915',
+        codigoIncidente: 'INC-2026-0915',
+        tipologia: 'Inundación',
+        direccion: 'Av. Picarte 915',
+        prioridad: 'ALTA',
+        estado: 'COMPLETADA',
+        fechaDespacho: '2026-11-26T10:00:00Z',
+        sincronizacionPendiente: true,
+        actualizadoEn: '2026-11-26T10:15:00Z',
+      };
+
+      vi.mocked(offlineQueue.obtenerMisionesLocales)
+        .mockResolvedValueOnce([misionLocalPendiente])
+        .mockResolvedValueOnce([]);
+      vi.mocked(offlineQueue.obtenerAccionesOutbox).mockResolvedValueOnce([]);
+      vi.mocked(apiClient.GET).mockResolvedValueOnce({
+        data: {
+          message: 'OK',
+          data: [
+            {
+              id: misionLocalPendiente.id,
+              codigo: 'MIS-2026-0915',
+              titulo: 'Verificación: Inundación',
+              descripcion: 'Av. Picarte 915',
+              tipoMision: 'VERIFICACION',
+              estado: 'COMPLETADA',
+              prioridad: 'ALTA',
+              incidenteId: misionLocalPendiente.incidenteId,
+              incidenteCodigo: 'INC-2026-0915',
+              fechaInicio: '2026-11-26T10:05:00Z',
+              creadoEn: '2026-11-26T10:00:00Z',
+              actualizadoEn: '2026-11-26T10:20:00Z',
+            },
+          ],
+        },
+        error: undefined,
+        response: new Response(),
+      } as never);
+
+      const lista = await sincronizarMisiones({ tipoMision: 'VERIFICACION' });
+      expect(lista[0].estado).toBe('COMPLETADA');
+      expect(lista[0].sincronizacionPendiente).toBe(false);
+    });
+
+  });
+
+  describe('rechazarMision (H41, H69)', () => {
+    it('rechaza localmente con Zod si la justificación tiene menos de 5 caracteres', async () => {
+      await expect(
+        rechazarMision('70000000-0000-4000-8000-000000000001', {
+          justificacion_rechazo: '  abc ',
+        })
+      ).rejects.toThrow();
+
+      expect(apiClient.POST).not.toHaveBeenCalled();
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('envía POST /api/misiones/{id}/rechazar y actualiza IndexedDB cuando responde 200 OK', async () => {
+      const misionId = '70000000-0000-4000-8000-000000000001';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: misionId,
+        incidenteId: '30000000-0000-4000-8000-000000000001',
+        codigoIncidente: 'INC-2026-0001',
+        tipologia: 'Árbol caído',
+        direccion: 'Av. Picarte 1100',
+        prioridad: 'ALTA',
+        estado: 'DESPACHADA',
+        fechaDespacho: '2026-11-16T22:00:00.000Z',
+        actualizadoEn: '2026-11-16T22:00:00.000Z',
+      });
+
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: {
+          message: 'Misión rechazada exitosamente.',
+          data: {
+            mision: {
+              id: misionId,
+              codigo: 'MIS-2026-0005',
+              tipoMision: 'ATENCION_CUADRILLA',
+              estado: 'RECHAZADA',
+              justificacionRechazo: 'Camión tolva presenta falla hidráulica.',
+              fechaCierre: '2026-11-16T23:15:00.000Z',
+              actualizadoEn: '2026-11-16T23:15:00.000Z',
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
+
+      const res = await rechazarMision(misionId, {
+        justificacion_rechazo: 'Camión tolva presenta falla hidráulica.',
+        latitud: -39.81422,
+        longitud: -73.24589,
+      });
+
+      expect(apiClient.POST).toHaveBeenCalledWith('/api/misiones/{id}/rechazar', {
+        params: { path: { id: misionId } },
+        body: {
+          justificacion_rechazo: 'Camión tolva presenta falla hidráulica.',
+          latitud: -39.81422,
+          longitud: -73.24589,
+        },
+      });
+      expect(res.exito).toBe(true);
+      expect(res.modoOffline).toBeUndefined();
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: misionId,
+          estado: 'RECHAZADA',
+          sincronizacionPendiente: false,
+        })
+      );
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('lanza MisionServiceError en 400/403/409 sin encolar en outbox', async () => {
+      vi.mocked(apiClient.POST).mockResolvedValue({
+        data: undefined,
+        error: { message: 'La misión no se encuentra en estado DESPACHADA.' },
+        response: new Response(null, { status: 409 }),
+      } as never);
+
+      await expect(
+        rechazarMision('70000000-0000-4000-8000-000000000001', {
+          justificacion_rechazo: 'Falla mecánica en ruta',
+        })
+      ).rejects.toThrow(MisionServiceError);
+
+      expect(offlineQueue.encolarAccionOutbox).not.toHaveBeenCalled();
+    });
+
+    it('encola RECHAZAR_MISION en outbox y actualiza caché local ante falla de red', async () => {
+      const misionId = '70000000-0000-4000-8000-000000000001';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: misionId,
+        incidenteId: '30000000-0000-4000-8000-000000000001',
+        codigoIncidente: 'INC-2026-0001',
+        tipologia: 'Árbol caído',
+        direccion: 'Av. Picarte 1100',
+        prioridad: 'ALTA',
+        estado: 'DESPACHADA',
+        fechaDespacho: '2026-11-16T22:00:00.000Z',
+        actualizadoEn: '2026-11-16T22:00:00.000Z',
+      });
+      vi.mocked(apiClient.POST).mockRejectedValue(new TypeError('Failed to fetch'));
+
+      const res = await rechazarMision(misionId, {
+        justificacion_rechazo: 'Desperfecto eléctrico en camión',
+      });
+
+      expect(res.exito).toBe(true);
+      expect(res.modoOffline).toBe(true);
+      expect(offlineQueue.encolarAccionOutbox).toHaveBeenCalledWith({
+        tipo: 'RECHAZAR_MISION',
+        url: `/api/misiones/${misionId}/rechazar`,
+        metodo: 'POST',
+        payload: {
+          justificacion_rechazo: 'Desperfecto eléctrico en camión',
+        },
+      });
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: misionId,
+          estado: 'RECHAZADA',
+          sincronizacionPendiente: true,
+        })
+      );
+    });
+
+    it('crea respaldo local en IndexedDB cuando no existía registro previo en persistirRechazoLocal (BUG-H41-PWA-03)', async () => {
+      const misionId = '70000000-0000-4000-8000-000000000099';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue(undefined);
+      vi.mocked(apiClient.POST).mockRejectedValue(new TypeError('Failed to fetch'));
+
+      const res = await rechazarMision(misionId, {
+        justificacion_rechazo: 'Sin caché previa en IndexedDB',
+      });
+
+      expect(res.exito).toBe(true);
+      expect(res.modoOffline).toBe(true);
+      expect(offlineQueue.guardarMisionLocal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: misionId,
+          estado: 'RECHAZADA',
+          sincronizacionPendiente: true,
+          datosAdicionales: expect.objectContaining({
+            justificacionRechazo: 'Sin caché previa en IndexedDB',
+          }),
+        })
+      );
+    });
+
+    it('obtenerDetalleMision mapea justificacionRechazo y omite estadoPatrulla si patrulla es null (BUG-H41-PWA-03)', async () => {
+      const misionId = '70000000-0000-4000-8000-000000000088';
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue(undefined);
+      vi.mocked(apiClient.GET).mockResolvedValue({
+        data: {
+          message: 'OK',
+          data: {
+            id: misionId,
+            codigo: 'MIS-2026-0088',
+            titulo: 'Atención cuadrilla',
+            descripcion: 'Despeje',
+            tipoMision: 'ATENCION_CUADRILLA',
+            estado: 'RECHAZADA',
+            prioridad: 'ALTA',
+            justificacionRechazo: 'Motivo persistido en servidor',
+            patrulla: null,
+            cuadrilla: { id: 'c1', nombre: 'Cuadrilla 1', estado: 'DISPONIBLE' },
+            incidente: {
+              id: 'inc-1',
+              codigo: 'INC-2026-0088',
+              tipoAfectacion: 'Árbol caído',
+              direccion: 'Valdivia',
+              estado: 'VERIFICANDO',
+              latitud: -39.81,
+              longitud: -73.24,
+            },
+            bitacoraTiempos: [],
+            reportesTerreno: [],
+            fechaInicio: null,
+            creadoEn: '2026-11-16T22:00:00Z',
+            actualizadoEn: '2026-11-16T23:00:00Z',
+          },
+        },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
+
+      const detalle = await obtenerDetalleMision(misionId);
+
+      expect(detalle?.datosAdicionales?.justificacionRechazo).toBe(
+        'Motivo persistido en servidor'
+      );
+      expect(detalle?.datosAdicionales?.estadoPatrulla).toBeUndefined();
+      expect(detalle?.datosAdicionales?.estadoCuadrilla).toBe('DISPONIBLE');
     });
   });
 });

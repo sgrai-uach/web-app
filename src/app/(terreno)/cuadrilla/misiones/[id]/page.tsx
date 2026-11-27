@@ -2,13 +2,25 @@
 
 import React, { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Calendar, Archive, Map } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import {
+  ArrowLeft,
+  MapPin,
+  Calendar,
+  Archive,
+  Map,
+  XCircle,
+  CheckCircle2,
+  AlertCircle,
+  WifiOff,
+} from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useConnectivity } from '@/hooks/useConnectivity';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { EstadoBadge } from '@/components/misiones/EstadoBadge';
+import { ConnectionStatusBadge } from '@/components/common/ConnectionStatusBadge';
 import { obtenerVarianteChipPrioridad } from '@/lib/utils/chipVariants';
-import { obtenerDetalleMision } from '@/services/misionesService';
 import { UnidadInactivaBanner } from '@/components/common/UnidadInactivaBanner';
 import { SinUnidadBanner } from '@/components/common/SinUnidadBanner';
 import { MapaModal } from '@/components/maps/MapaModal';
@@ -17,6 +29,11 @@ import {
   TelemetryStatusBadge,
   TelemetryWarningBanner,
 } from '@/components/terreno/TelemetryStatusBadge';
+import {
+  RechazoMisionModal,
+  type CoordenadasGPS,
+} from '@/components/misiones/RechazoMisionModal';
+import { obtenerDetalleMision, rechazarMision } from '@/services/misionesService';
 import { formatearPrioridad, formatearFechaHora24h } from '@/lib/utils/formatters';
 import type { MisionLocal } from '@/types/offline';
 import styles from './CuadrillaDetailPage.module.css';
@@ -26,35 +43,52 @@ interface PageProps {
 }
 
 export default function CuadrillaMisionDetailPage({ params }: PageProps) {
-  const { id: misionId } = use(params);
+  const resolvedParams = use(params);
+  const misionId = resolvedParams?.id;
+  const router = useRouter();
+
   const {
     usuario,
     esCuadrilla,
     unidadActiva,
     tieneUnidadAsignada,
     estadoAsignacion,
+    tienePermiso,
   } = useAuth();
+  const { status, pendientes, sincronizar, actualizarPendientes } = useConnectivity();
 
   const [mision, setMision] = useState<MisionLocal | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
   const [mapaAbierto, setMapaAbierto] = useState<boolean>(false);
+  const [modalRechazoAbierto, setModalRechazoAbierto] = useState<boolean>(false);
+  const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
 
   const cargarDetalle = useCallback(async () => {
     setCargando(true);
     try {
       const encontrada = await obtenerDetalleMision(misionId);
-      if (encontrada) {
-        setMision(encontrada);
-      } else {
-        setMision(null);
-      }
+      setMision(encontrada || null);
     } finally {
       setCargando(false);
     }
   }, [misionId]);
 
   useEffect(() => {
-    cargarDetalle();
+    void cargarDetalle();
+  }, [cargarDetalle]);
+
+  useEffect(() => {
+    const handleSincronizacion = () => {
+      void cargarDetalle();
+    };
+    window.addEventListener('sgrai:outbox-synced', handleSincronizacion);
+    window.addEventListener('sgrai:mision-sincronizada', handleSincronizacion);
+    window.addEventListener('sgrai:mision-rechazada', handleSincronizacion);
+    return () => {
+      window.removeEventListener('sgrai:outbox-synced', handleSincronizacion);
+      window.removeEventListener('sgrai:mision-sincronizada', handleSincronizacion);
+      window.removeEventListener('sgrai:mision-rechazada', handleSincronizacion);
+    };
   }, [cargarDetalle]);
 
   const estadoNormalizado = mision?.estado?.toUpperCase() || '';
@@ -70,23 +104,137 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
     activa: misionActiva,
   });
 
-  if (cargando || !mision) {
-    return <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>Cargando misión...</div>;
+  if (cargando) {
+    return (
+      <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
+        Cargando misión...
+      </div>
+    );
   }
 
-  const trabajoTexto = (mision.datosAdicionales?.trabajo as string) || mision.direccion;
+  if (!mision) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.topBar}>
+          <Link href="/cuadrilla/misiones" className={styles.backLink}>
+            <ArrowLeft size={16} aria-hidden="true" />
+            <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}</span>
+          </Link>
+          <ConnectionStatusBadge
+            status={status}
+            pendingCount={pendientes}
+            onRetry={sincronizar}
+          />
+        </div>
+        <div
+          className={styles.missionHeader}
+          style={{ textAlign: 'center', padding: 'var(--space-6)' }}
+          role="alert"
+        >
+          <AlertCircle
+            size={40}
+            color="var(--color-text-muted)"
+            aria-hidden="true"
+            style={{ margin: '0 auto var(--space-2)' }}
+          />
+          <p style={{ fontWeight: 700, margin: '0 0 var(--space-1) 0' }}>
+            Misión no encontrada
+          </p>
+          <p
+            style={{
+              fontSize: '0.875rem',
+              color: 'var(--color-text-muted)',
+              margin: '0 0 var(--space-3) 0',
+            }}
+          >
+            La misión solicitada no existe o no se encuentra disponible en caché local.
+          </p>
+          <div>
+            <Link href="/cuadrilla/misiones" className={styles.backLink}>
+              Volver a la bandeja
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const tienePermisoEjecutar =
+    typeof tienePermiso === 'function'
+      ? tienePermiso('misiones:terreno:ejecutar')
+      : false;
+
+  const esRechazable = Boolean(
+    unidadActiva &&
+    esCuadrilla &&
+    tienePermisoEjecutar &&
+    estadoNormalizado === 'DESPACHADA'
+  );
+
+  const trabajoTexto =
+    (mision.datosAdicionales?.trabajo as string) || mision.direccion;
+  const justificacionRegistrada =
+    typeof mision.datosAdicionales?.justificacionRechazo === 'string'
+      ? mision.datosAdicionales.justificacionRechazo
+      : null;
   const esSoloLectura =
     !unidadActiva ||
-    mision.estado === 'FINALIZADA' ||
-    mision.estado === 'COMPLETADA' ||
-    mision.estado === 'CERRADA';
+    estadoNormalizado === 'FINALIZADA' ||
+    estadoNormalizado === 'COMPLETADA' ||
+    estadoNormalizado === 'CERRADA' ||
+    estadoNormalizado === 'RECHAZADA';
+
+  const handleConfirmarRechazo = async (
+    motivo: string,
+    coordenadas?: CoordenadasGPS
+  ) => {
+    const res = await rechazarMision(mision.id, {
+      justificacion_rechazo: motivo,
+      latitud: coordenadas?.lat,
+      longitud: coordenadas?.lng,
+    });
+
+    setMision((prev) =>
+      prev
+        ? {
+          ...prev,
+          estado: 'RECHAZADA',
+          sincronizacionPendiente: Boolean(res.modoOffline),
+          actualizadoEn: new Date().toISOString(),
+          datosAdicionales: {
+            ...prev.datosAdicionales,
+            justificacionRechazo: motivo,
+          },
+        }
+        : null
+    );
+    setMensajeConfirmacion(res.mensaje);
+    setModalRechazoAbierto(false);
+    await actualizarPendientes();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sgrai:mision_actualizada'));
+      window.dispatchEvent(new CustomEvent('sgrai:mision-rechazada', { detail: { misionId: mision.id } }));
+    }
+    const params = new URLSearchParams({
+      rechazo: res.modoOffline ? 'offline' : 'ok',
+      msg: res.mensaje,
+    });
+    router.push(`/cuadrilla/misiones?${params.toString()}`);
+  };
 
   return (
     <div className={styles.container}>
-      <Link href="/cuadrilla/misiones" className={styles.backLink}>
-        <ArrowLeft size={16} aria-hidden="true" />
-        <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}</span>
-      </Link>
+      <div className={styles.topBar}>
+        <Link href="/cuadrilla/misiones" className={styles.backLink}>
+          <ArrowLeft size={16} aria-hidden="true" />
+          <span>{estadoAsignacion === 'DESACTIVADA' ? 'Historial' : 'Faenas'}</span>
+        </Link>
+        <ConnectionStatusBadge
+          status={status}
+          pendingCount={pendientes}
+          onRetry={sincronizar}
+        />
+      </div>
 
       {!tieneUnidadAsignada ? (
         <SinUnidadBanner
@@ -99,6 +247,22 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
           nombreUnidad={usuario?.unidadNombre}
         />
       ) : null}
+
+      {mision.sincronizacionPendiente && (
+        <div className={styles.offlineAlertBanner} role="status">
+          <WifiOff size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+          <span>
+            Acción registrada localmente. Pendiente de sincronizar con el Centro de Mando.
+          </span>
+        </div>
+      )}
+
+      {mensajeConfirmacion && !mision.sincronizacionPendiente && (
+        <div className={styles.successAlertBanner} role="status">
+          <CheckCircle2 size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+          <span>{mensajeConfirmacion}</span>
+        </div>
+      )}
 
       <div className={styles.missionHeader}>
         <div className={styles.headerRow}>
@@ -123,7 +287,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         />
 
         <div className={styles.detailGrid}>
-          {/* Bloque Tipo (único en negrita) */}
+          {/* Bloque Tipo */}
           <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Tipo</span>
             <span className={`${styles.itemValue} ${styles.itemValueBold}`}>
@@ -131,7 +295,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
             </span>
           </div>
 
-          {/* Bloque Ubicación separado */}
+          {/* Bloque Ubicación */}
           <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Ubicación</span>
             <div className={styles.locationActionRow}>
@@ -150,7 +314,7 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Bloque Trabajo separado */}
+          {/* Bloque Trabajo */}
           <div className={styles.sectionBlock}>
             <span className={styles.itemLabel}>Trabajo</span>
             <span className={styles.itemValue}>{trabajoTexto}</span>
@@ -169,6 +333,39 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         </div>
       </div>
 
+      {/* Acciones de Despacho (H41) */}
+      {esRechazable && (
+        <section
+          className={styles.dispatchCard}
+          aria-label="Acciones de despacho de cuadrilla"
+        >
+          <h2 className={styles.dispatchTitle}>Acciones de Despacho</h2>
+          <p className={styles.dispatchDesc}>
+            Si la cuadrilla presenta un impedimento técnico o de fuerza mayor para
+            atender la asignación, registre el rechazo motivado para reasignación
+            inmediata.
+          </p>
+          <div className={styles.actionsStack}>
+            <Button
+              variant="destructive"
+              size="md"
+              fullWidth
+              icon={<XCircle size={18} />}
+              onClick={() => setModalRechazoAbierto(true)}
+            >
+              Rechazar Misión
+            </Button>
+          </div>
+        </section>
+      )}
+
+      {estadoNormalizado === 'RECHAZADA' && justificacionRegistrada && (
+        <div className={styles.rejectedInfoBox}>
+          <span className={styles.rejectedInfoLabel}>Justificación de rechazo registrada</span>
+          <span>{justificacionRegistrada}</span>
+        </div>
+      )}
+
       {esSoloLectura && (
         <div className={styles.readOnlyNotice}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
@@ -185,6 +382,15 @@ export default function CuadrillaMisionDetailPage({ params }: PageProps) {
         longitud={mision.coordenadas?.lng}
         titulo={mision.tipologia || mision.codigoIncidente}
         direccion={mision.direccion}
+      />
+
+      <RechazoMisionModal
+        abierto={modalRechazoAbierto}
+        codigoMision={mision.codigoIncidente}
+        titulo="Rechazar Asignación de Cuadrilla"
+        unidadEtiqueta="cuadrilla"
+        alConfirmar={handleConfirmarRechazo}
+        alCancelar={() => setModalRechazoAbierto(false)}
       />
     </div>
   );
