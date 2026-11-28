@@ -1,5 +1,10 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { AccionOutbox, MisionLocal, CatalogoLocal } from '@/types/offline';
+import type {
+  AccionOutbox,
+  AdjuntoLocal,
+  MisionLocal,
+  CatalogoLocal,
+} from '@/types/offline';
 
 const DB_NAME = 'sgrai_terreno_offline_db';
 const DB_VERSION = 2;
@@ -416,17 +421,22 @@ export async function encolarAccionOutbox(
 ): Promise<AccionOutbox> {
   const db = await getDB();
   const existentes = await obtenerAccionesOutbox();
-  const duplicada = existentes.find(
-    (item) => item.tipo === accion.tipo && item.url === accion.url
-  );
 
-  if (duplicada) {
-    const actualizada: AccionOutbox = {
-      ...duplicada,
-      payload: accion.payload,
-    };
-    await db.put('outbox', actualizada);
-    return actualizada;
+  // Cada evidencia multimedia representa un archivo independiente aunque comparta ruta/misión (H43)
+  if (accion.tipo !== 'SUBIR_EVIDENCIA') {
+    const duplicada = existentes.find(
+      (item) => item.tipo === accion.tipo && item.url === accion.url
+    );
+
+    if (duplicada) {
+      const actualizada: AccionOutbox = {
+        ...duplicada,
+        payload: accion.payload,
+        // Sin reasignar timestamp: se preserva el orden causal original (BUG-INT-PWA-14)
+      };
+      await db.put('outbox', actualizada);
+      return actualizada;
+    }
   }
 
   const nuevaAccion: AccionOutbox = {
@@ -470,6 +480,12 @@ export async function contarAccionesPendientes(): Promise<number> {
 }
 
 function obtenerClaveCausalAccion(accion: AccionOutbox): string | null {
+  if (accion.tipo === 'SUBIR_EVIDENCIA') {
+    const misionIdEvidencia = accion.payload?.misionId;
+    if (typeof misionIdEvidencia === 'string' && misionIdEvidencia.trim()) {
+      return `mision:${misionIdEvidencia.trim()}`;
+    }
+  }
   const payloadMisionId = accion.payload?.misionId;
   if (typeof payloadMisionId === 'string' && payloadMisionId) {
     return `mision:${payloadMisionId}`;
@@ -545,5 +561,89 @@ export async function obtenerNotificacionLocal(
 export async function obtenerNotificacionesLocales(): Promise<NotificacionLocal[]> {
   const db = await getDB();
   return db.getAll('notificaciones');
+}
+
+// ==========================================
+// ADJUNTOS LOCALES EN MISIÓN (H43)
+// ==========================================
+
+export function extraerAdjuntosDeMision(mision: MisionLocal): AdjuntoLocal[] {
+  const raw = mision.datosAdicionales?.adjuntos;
+  if (!Array.isArray(raw)) return [];
+  return raw as AdjuntoLocal[];
+}
+
+export async function agregarAdjuntoLocalAMision(
+  misionId: string,
+  adjunto: AdjuntoLocal
+): Promise<void> {
+  try {
+    const local = await obtenerMisionLocalPorId(misionId);
+    if (!local) return;
+    const actuales = extraerAdjuntosDeMision(local);
+    const filtrados = actuales.filter((item) => item.id !== adjunto.id);
+    await guardarMisionLocal({
+      ...local,
+      datosAdicionales: {
+        ...local.datosAdicionales,
+        adjuntos: [adjunto, ...filtrados],
+      },
+      actualizadoEn: new Date().toISOString(),
+    });
+  } catch {
+    // Ignorar fallos secundarios de caché local
+  }
+}
+
+export async function reemplazarAdjuntoLocalEnMision(
+  misionId: string,
+  adjuntoLocalId: string,
+  adjuntoServidor: AdjuntoLocal
+): Promise<void> {
+  try {
+    const local = await obtenerMisionLocalPorId(misionId);
+    if (!local) return;
+    const actuales = extraerAdjuntosDeMision(local);
+    const sinTemporal = actuales.filter(
+      (item) => item.id !== adjuntoLocalId && item.id !== adjuntoServidor.id
+    );
+    await guardarMisionLocal({
+      ...local,
+      datosAdicionales: {
+        ...local.datosAdicionales,
+        adjuntos: [{ ...adjuntoServidor, sincronizacionPendiente: false }, ...sinTemporal],
+      },
+      actualizadoEn: new Date().toISOString(),
+    });
+  } catch {
+    // Ignorar fallos secundarios de caché local
+  }
+}
+
+export async function marcarErrorAdjuntoLocalEnMision(
+  misionId: string,
+  adjuntoLocalId: string,
+  errorMensaje: string
+): Promise<void> {
+  try {
+    const local = await obtenerMisionLocalPorId(misionId);
+    if (!local) return;
+    const actuales = extraerAdjuntosDeMision(local);
+    const actualizados = actuales.map((item) =>
+      item.id === adjuntoLocalId
+        ? { ...item, sincronizacionPendiente: false, errorSincronizacion: errorMensaje }
+        : item
+    );
+    await guardarMisionLocal({
+      ...local,
+      datosAdicionales: {
+        ...local.datosAdicionales,
+        adjuntos: actualizados,
+      },
+      actualizadoEn: new Date().toISOString(),
+    });
+  } catch {
+    // Ignorar fallos secundarios de caché local
+  }
 }
 

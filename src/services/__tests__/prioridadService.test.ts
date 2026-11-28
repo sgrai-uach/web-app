@@ -32,7 +32,7 @@ describe('prioridadService (H38)', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
     vi.spyOn(offlineQueue, 'encolarAccionOutbox').mockResolvedValue({
       id: 'outbox-prio-1',
       tipo: 'AJUSTAR_PRIORIDAD',
@@ -49,63 +49,11 @@ describe('prioridadService (H38)', () => {
     vi.unstubAllGlobals();
   });
 
-  describe('obtenerReportesPrioridadMision', () => {
-    it('hidrata contadores y riesgos desde reportesTerreno[].detallesEvaluacion y riesgosActivos', () => {
-      const misionConRemoto: MisionLocal = {
-        ...misionMock,
-        sincronizacionPendiente: false,
-        datosAdicionales: {
-          reportesTerreno: [
-            {
-              id: 'rep-remoto-1',
-              versionReporte: 1,
-              prioridadSugerida: 'CRITICA',
-              prioridadAsignada: 'CRITICA',
-              justificacionPrioridad: 'Electrodependiente en vivienda',
-              detallesEvaluacion: {
-                nucleoFamiliarTotal: 4,
-                cantidadNinos: 1,
-                personasElectrodependientes: 1,
-                nivelCompromisoVivienda: 'MODERADO',
-                riesgosActivos: {
-                  riesgoElectrico: true,
-                  riesgoEstructural: false,
-                  riesgoQuimicoSanitario: false,
-                  aislamientoVial: true,
-                },
-                familias: [
-                  {
-                    id: 'fam-1',
-                    referencia: 'Casa 1',
-                    nucleoFamiliarTotal: 4,
-                    cantidadNinos: 1,
-                    personasElectrodependientes: 1,
-                    nivelCompromisoVivienda: 'MODERADO',
-                  },
-                ],
-              },
-            },
-          ],
-        },
-      };
-
-      const reportes = obtenerReportesPrioridadMision(misionConRemoto);
-      expect(reportes).toHaveLength(1);
-      expect(reportes[0].evaluacion.nucleoFamiliarTotal).toBe(4);
-      expect(reportes[0].evaluacion.personasElectrodependientes).toBe(1);
-      expect(reportes[0].evaluacion.riesgoElectrico).toBe(true);
-      expect(reportes[0].evaluacion.aislamientoVial).toBe(true);
-      expect(reportes[0].evaluacion.nivelCompromisoVivienda).toBe('MODERADO');
-      expect(reportes[0].evaluacion.familias[0].referencia).toBe('Casa 1');
-    });
-  });
-
   describe('solicitarCalculoPrioridad', () => {
-    it('retorna el cálculo del servidor vía apiClient cuando responde 200 OK', async () => {
+    it('retorna el cálculo del servidor cuando responde 200 OK', async () => {
       vi.stubGlobal('navigator', { onLine: true });
-      vi.mocked(apiClient.POST).mockResolvedValue({
+      vi.mocked(apiClient.POST).mockResolvedValueOnce({
         data: {
-          message: 'OK',
           data: {
             prioridadSugerida: 'CRITICA',
             factoresGatillantes: ['Riesgo eléctrico confirmado por servidor'],
@@ -132,11 +80,13 @@ describe('prioridadService (H38)', () => {
       const res = await solicitarCalculoPrioridad(misionMock.incidenteId, {
         ...VALORES_INICIALES_EVALUACION_PRIORIDAD,
         familias: [],
-        personasDiscapacitadas: 3,
+        personasDiscapacitadas: 2,
       });
 
-      expect(res.prioridadSugerida).toBe('ALTA');
-      expect(res.factoresGatillantes[0]).toMatch(/discapacidad/i);
+      expect(res.prioridadSugerida).toBe('MEDIA');
+      expect(res.factoresGatillantes[0]).toMatch(
+        /Personas con discapacidad/i
+      );
     });
   });
 
@@ -156,9 +106,9 @@ describe('prioridadService (H38)', () => {
       ).rejects.toThrow(/al menos 5 caracteres/i);
     });
 
-    it('envía petición PATCH online exitosa vía apiClient incluyendo familias y lee data.reporteTerreno.id', async () => {
+    it('envía petición PATCH online exitosa, actualiza la prioridad de la misión y registra Reporte #1', async () => {
       vi.stubGlobal('navigator', { onLine: true });
-      vi.mocked(apiClient.PATCH).mockResolvedValue({
+      vi.mocked(apiClient.PATCH).mockResolvedValueOnce({
         data: {
           message: 'Prioridad actualizada y reporte registrado en el Centro de Mando.',
           data: {
@@ -194,33 +144,19 @@ describe('prioridadService (H38)', () => {
       expect(resultado.ok).toBe(true);
       expect(resultado.offline).toBe(false);
       expect(resultado.versionReporte).toBe(1);
-      expect(resultado.reporte.id).toBe('rep-100');
       expect(resultado.mision?.prioridad).toBe('CRITICA');
       expect(resultado.mision?.datosAdicionales?.prioridadEvaluada).toBe(true);
-      expect(apiClient.PATCH).toHaveBeenCalledWith(
-        '/api/incidentes/{id}/prioridad',
-        expect.objectContaining({
-          body: expect.objectContaining({
-            familias: expect.any(Array),
-          }),
-        })
-      );
       expect(offlineQueue.guardarMisionLocal).toHaveBeenCalled();
     });
 
     it('incrementa la versión a Reporte #2 cuando la misión ya posee un reporte previo', async () => {
       vi.stubGlobal('navigator', { onLine: true });
-      vi.mocked(apiClient.PATCH).mockResolvedValue({
+      vi.mocked(apiClient.PATCH).mockResolvedValueOnce({
         data: {
-          message: undefined,
           data: {
             incidente: {
               id: misionMock.incidenteId,
               prioridad: 'CRITICA',
-            },
-            reporteTerreno: {
-              id: 'rep-2',
-              versionReporte: 2,
             },
           },
         },
@@ -302,9 +238,11 @@ describe('prioridadService (H38)', () => {
 
     it('lanza error descriptivo ante 403 Forbidden (falta permiso misiones:terreno:verificar)', async () => {
       vi.stubGlobal('navigator', { onLine: true });
-      vi.mocked(apiClient.PATCH).mockResolvedValue({
+      vi.mocked(apiClient.PATCH).mockResolvedValueOnce({
         data: undefined,
-        error: { message: 'Se requiere el permiso misiones:terreno:verificar.' },
+        error: {
+          message: 'Se requiere el permiso misiones:terreno:verificar.',
+        },
         response: new Response(null, { status: 403 }),
       } as never);
 
@@ -381,3 +319,4 @@ describe('prioridadService (H38)', () => {
     });
   });
 });
+

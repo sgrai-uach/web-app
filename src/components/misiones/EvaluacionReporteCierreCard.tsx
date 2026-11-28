@@ -11,13 +11,13 @@ import {
   Minus,
   Info,
   HeartHandshake,
-  Camera,
   FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
+import { CargaEvidenciaCard } from './CargaEvidenciaCard';
 import { ModalConfirmacionReporteCierre } from './ModalConfirmacionReporteCierre';
 import {
   AlertaFeedbackReporte,
@@ -43,7 +43,9 @@ import {
   formatearDictamenAtencion,
   formatearEstadoTerreno,
 } from '@/lib/utils/formatters';
+import { extraerAdjuntosDeMision } from '@/services/offlineQueue';
 import type {
+  AdjuntoLocal,
   DictamenAtencion,
   EstadoTerrenoVerificacion,
   MisionLocal,
@@ -52,6 +54,12 @@ import type {
 import styles from './EvaluacionReporteCierreCard.module.css';
 
 const TEXTAREA_MAX = 2000;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function esUuidValido(val?: string | null): val is string {
+  return typeof val === 'string' && UUID_REGEX.test(val.trim());
+}
 
 export interface EvaluacionReporteCierreCardProps {
   misionActual: MisionLocal;
@@ -98,7 +106,24 @@ export function EvaluacionReporteCierreCard({
   const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
   const [modalConfirmacionAbierto, setModalConfirmacionAbierto] =
     useState<boolean>(false);
+  const [adjuntosEvidencia, setAdjuntosEvidencia] = useState<AdjuntoLocal[]>(() =>
+    extraerAdjuntosDeMision(misionActual)
+  );
+  const reporteTerrenoIdActual =
+    typeof misionActual.datosAdicionales?.reporteTerrenoId === 'string' &&
+    misionActual.datosAdicionales.reporteTerrenoId.trim().length > 0
+      ? misionActual.datosAdicionales.reporteTerrenoId.trim()
+      : undefined;
+  const incidenteIdActual =
+    typeof misionActual.incidenteId === 'string' &&
+    misionActual.incidenteId.trim().length > 0
+      ? misionActual.incidenteId.trim()
+      : undefined;
   const [feedback, setFeedback] = useState<FeedbackReporteState | null>(null);
+
+  useEffect(() => {
+    setAdjuntosEvidencia(extraerAdjuntosDeMision(misionActual));
+  }, [misionActual]);
 
   // Sincronizar personas_afectadas desde HU-38 si el usuario no ha modificado el campo manualmente
   useEffect(() => {
@@ -128,6 +153,44 @@ export function EvaluacionReporteCierreCard({
     String(
       misionActual?.datosAdicionales?.dictamenVerificacion || 'REQUIERE_CUADRILLA'
     );
+
+  const adjuntosResumenCierre = useMemo<AdjuntoLocal[]>(() => {
+    const mapa = new Map<string, AdjuntoLocal>();
+    const existentesReporte = Array.isArray(reporteExistente?.adjuntos)
+      ? reporteExistente.adjuntos
+      : [];
+
+    existentesReporte.forEach((a, idx) => {
+      const id = a.id || `rep-adj-${idx}`;
+      if (!mapa.has(id)) {
+        mapa.set(id, {
+          id,
+          nombreArchivo: a.nombreArchivo || `Adjunto #${idx + 1}`,
+          url: typeof a.url === 'string' ? a.url : '',
+          tipoMime:
+            typeof a.tipoMime === 'string'
+              ? a.tipoMime
+              : 'application/octet-stream',
+          tamanoBytes: typeof a.tamanoBytes === 'number' ? a.tamanoBytes : 0,
+          creadoEn: fechaReporteCierre || misionActual.actualizadoEn,
+          sincronizacionPendiente: false,
+        });
+      }
+    });
+
+    for (const adj of adjuntosEvidencia) {
+      if (adj.id && !mapa.has(adj.id)) {
+        mapa.set(adj.id, adj);
+      }
+    }
+
+    return Array.from(mapa.values());
+  }, [
+    adjuntosEvidencia,
+    fechaReporteCierre,
+    misionActual.actualizadoEn,
+    reporteExistente,
+  ]);
 
   const esNoAbordable = form.dictamen === 'NO_ABORDABLE';
   const resumenLimpio = form.resumen_tecnico.trim();
@@ -169,15 +232,29 @@ export function EvaluacionReporteCierreCard({
 
     if (!resumenValido) {
       setErrorValidacion(
-        `El resumen técnico del siniestro es obligatorio y debe contener al menos ${RESUMEN_TECNICO_MIN} caracteres.`
+        `El resumen técnico del siniestro es obligatorio y debe contener al menos ${RESUMEN_TECNICO_MIN} caracteres (actual: ${resumenLimpio.length}).`
       );
+      if (typeof document !== 'undefined') {
+        const el = document.getElementById(resumenId);
+        if (el) {
+          el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+          el.focus?.();
+        }
+      }
       return;
     }
 
     if (esNoAbordable && !motivoValido) {
       setErrorValidacion(
-        `Cuando el dictamen es No abordable, el motivo es obligatorio y debe contener al menos ${MOTIVO_NO_ABORDABLE_MIN} caracteres.`
+        `Cuando el dictamen es No abordable, el motivo es obligatorio y debe contener al menos ${MOTIVO_NO_ABORDABLE_MIN} caracteres (actual: ${motivoLimpio.length}).`
       );
+      if (typeof document !== 'undefined') {
+        const el = document.getElementById(motivoId);
+        if (el) {
+          el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+          el.focus?.();
+        }
+      }
       return;
     }
 
@@ -324,15 +401,17 @@ export function EvaluacionReporteCierreCard({
                 />
               )}
 
-              {Array.isArray(reporteExistente.adjuntos) &&
-                reporteExistente.adjuntos.length > 0 && (
-                  <CampoResumenReporte
-                    label="Evidencia Adjunta"
-                    valor={reporteExistente.adjuntos
-                      .map((a, idx) => a.nombreArchivo || `Adjunto #${idx + 1}`)
-                      .join(', ')}
+              {adjuntosResumenCierre.length > 0 && (
+                <div style={{ marginTop: 'var(--space-2, 8px)' }}>
+                  <CargaEvidenciaCard
+                    misionId={misionActual.id}
+                    incidenteId={incidenteIdActual}
+                    reporteTerrenoId={reporteExistente?.id || reporteTerrenoIdActual}
+                    adjuntos={adjuntosResumenCierre}
+                    soloLectura
                   />
-                )}
+                </div>
+              )}
             </>
           )}
         </ResumenReporteTerreno>
@@ -594,7 +673,7 @@ export function EvaluacionReporteCierreCard({
             />
           </div>
 
-          {/* 4. Asistencia Social (Ficha FIBE) y Evidencia Fotográfica (HU-43) */}
+          {/* 4. Asistencia Social (Ficha FIBE) y Evidencia Multimedia */}
           <div className={styles.blockSection}>
             <h4 className={styles.blockTitle}>
               <HeartHandshake size={16} aria-hidden="true" />
@@ -625,25 +704,77 @@ export function EvaluacionReporteCierreCard({
               </span>
             </button>
 
-            <div className={styles.evidenciaBox} data-testid="seccion-evidencia-h43">
-              <div className={styles.evidenciaHeader}>
-                <span className={styles.evidenciaTitle}>
-                  <Camera size={16} aria-hidden="true" />
-                  <span>Evidencia Fotográfica</span>
-                </span>
-                <Chip variant="neutral" size="sm">
-                  Próximamente (HU-43)
-                </Chip>
-              </div>
-              <div className={styles.evidenciaEmpty}>
-                <Info size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
-                <span>
-                  Sección preparada para adjuntar fotografías técnicas en terreno. Se
-                  integrará automáticamente con el módulo de evidencia multimedia (HU-43).
-                </span>
-              </div>
-            </div>
+            <CargaEvidenciaCard
+              misionId={misionActual.id}
+              incidenteId={incidenteIdActual}
+              reporteTerrenoId={reporteTerrenoIdActual}
+              adjuntos={adjuntosEvidencia}
+              soloLectura={deshabilitado || guardando}
+              alAdjuntarEvidencia={(adjunto) => {
+                setAdjuntosEvidencia((prev) => [
+                  adjunto,
+                  ...prev.filter((item) => item.id !== adjunto.id),
+                ]);
+                if (
+                  !adjunto.sincronizacionPendiente &&
+                  esUuidValido(adjunto.id) &&
+                  !adjunto.url.startsWith('data:') &&
+                  !adjunto.url.startsWith('blob:')
+                ) {
+                  setForm((prev) => ({
+                    ...prev,
+                    adjuntoIds: prev.adjuntoIds?.includes(adjunto.id)
+                      ? prev.adjuntoIds
+                      : [...(prev.adjuntoIds ?? []), adjunto.id],
+                    adjuntos: [
+                      ...(prev.adjuntos ?? []).filter((item) => item.id !== adjunto.id),
+                      {
+                        id: adjunto.id,
+                        nombreArchivo: adjunto.nombreArchivo,
+                        url: adjunto.url,
+                        tipoMime: adjunto.tipoMime,
+                        tamanoBytes: adjunto.tamanoBytes,
+                      },
+                    ],
+                  }));
+                }
+              }}
+            />
           </div>
+
+          {!formularioValido && !errorValidacion && (
+            <p
+              role="note"
+              style={{
+                margin: 0,
+                fontSize: '0.8rem',
+                color: 'var(--color-text-muted, #5F676E)',
+                textAlign: 'center',
+              }}
+            >
+              Para enviar el reporte falta completar:{' '}
+              {!resumenValido
+                ? `resumen técnico (${resumenLimpio.length}/${RESUMEN_TECNICO_MIN} caracteres mínimos)`
+                : `motivo de no abordabilidad (${motivoLimpio.length}/${MOTIVO_NO_ABORDABLE_MIN} caracteres mínimos)`}
+              .
+            </p>
+          )}
+
+          {errorValidacion && (
+            <div
+              role="alert"
+              style={{
+                padding: '10px 12px',
+                backgroundColor: 'var(--color-danger-bg, #FFEBEE)',
+                border: '1px solid var(--color-danger, #D32F2F)',
+                color: 'var(--color-danger, #D32F2F)',
+                fontSize: '0.8125rem',
+                fontWeight: 500,
+              }}
+            >
+              {errorValidacion}
+            </div>
+          )}
 
           <Button
             type="submit"
@@ -651,7 +782,7 @@ export function EvaluacionReporteCierreCard({
             size="lg"
             fullWidth
             loading={guardando}
-            disabled={deshabilitado || !formularioValido}
+            disabled={deshabilitado || guardando}
             icon={<CheckCircle size={18} />}
             className={styles.submitBtn}
           >

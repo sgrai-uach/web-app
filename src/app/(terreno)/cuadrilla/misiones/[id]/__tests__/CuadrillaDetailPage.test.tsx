@@ -178,6 +178,59 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
     });
   });
 
+  it('muestra el módulo Evidencia Multimedia (H43) cuando la misión está EN_CURSO y el usuario tiene permiso reportes:crear', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      usuario: {
+        id: 'd0000000-0000-4000-8000-000000000001',
+        nombre: 'Juan Delegado',
+        unidadId: '50000000-0000-4000-8000-000000000001',
+        unidadNombre: 'Cuadrilla Vías y Canales 1',
+      },
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      esCuadrilla: true,
+      esPatrulla: false,
+      tienePermiso: (p: string) =>
+        p === 'misiones:terreno:ejecutar' || p === 'reportes:crear',
+    } as never);
+
+    vi.mocked(obtenerDetalleMision).mockResolvedValueOnce({
+      ...misionDespachada,
+      estado: 'EN_CURSO',
+    });
+
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Evidencia Multimedia')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /Tomar Foto/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Grabar Video/i })).toBeInTheDocument();
+  });
+
+  it('oculta los controles de carga de evidencia si la misión está DESPACHADA o falta permiso reportes:crear', async () => {
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('INC-2026-0001')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Evidencia Multimedia')).not.toBeInTheDocument();
+  });
+
   it('oculta acciones si el estado no es DESPACHADA, si unidadActiva es false, esCuadrilla es false o SIN_ASIGNACION, y muestra justificación en RECHAZADA (BUG-H41-PWA-04)', async () => {
     // 1. Estado EN_CURSO
     vi.mocked(obtenerDetalleMision).mockResolvedValueOnce({
@@ -285,5 +338,35 @@ describe('CuadrillaMisionDetailPage — Rechazo Motivado (H41)', () => {
       );
     });
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('BUG-H43-PWA-03: deshabilita carga de evidencia cuando la misión no tiene incidenteId ni reporteTerrenoId válidos', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      usuario: { id: 'u-1', nombre: 'Juan' },
+      unidadActiva: true,
+      tieneUnidadAsignada: true,
+      estadoAsignacion: 'ACTIVA',
+      esCuadrilla: true,
+      esPatrulla: false,
+      tienePermiso: () => true,
+    } as never);
+
+    vi.mocked(obtenerDetalleMision).mockResolvedValueOnce({
+      ...misionDespachada,
+      incidenteId: '   ',
+      estado: 'EN_CURSO',
+      datosAdicionales: { reporteTerrenoId: '' },
+    });
+
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <CuadrillaMisionDetailPage params={Promise.resolve({ id: misionDespachada.id })} />
+        </Suspense>
+      );
+    });
+
+    await waitFor(() => expect(screen.getByText('INC-2026-0001')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /Tomar Foto/i })).not.toBeInTheDocument();
   });
 });

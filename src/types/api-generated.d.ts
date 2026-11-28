@@ -2031,6 +2031,16 @@ export interface paths {
                                     };
                                     creadoEn: string;
                                 }[];
+                                /** @description Evidencias multimedia asociadas al incidente (directas por incidente_id y vinculadas a reportes de terreno) */
+                                adjuntos?: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    nombreArchivo: string;
+                                    url: string;
+                                    tipoMime: string;
+                                    tamanoBytes: number;
+                                    creadoEn: string;
+                                }[];
                                 /**
                                  * @description Indica si la verificación presencial fue completada
                                  * @default false
@@ -4074,6 +4084,36 @@ export interface paths {
                                     creadoEn: string;
                                     /** @description Fecha y hora de última modificación en formato ISO 8601 */
                                     actualizadoEn: string;
+                                }[];
+                                /** @description Evidencias multimedia consolidadas de la misión y su incidente asociado (HU-43) */
+                                adjuntos?: {
+                                    /**
+                                     * Format: uuid
+                                     * @description Identificador único UUID del archivo adjunto
+                                     */
+                                    id: string;
+                                    /**
+                                     * @description Nombre original del archivo
+                                     * @example foto_evaluacion_1.jpg
+                                     */
+                                    nombreArchivo: string;
+                                    /**
+                                     * @description Ruta de acceso pública o relativa del recurso estático bajo Caddy
+                                     * @example /uploads/evidencia/foto_evaluacion_1.jpg
+                                     */
+                                    url: string;
+                                    /**
+                                     * @description MIME type del archivo
+                                     * @example image/jpeg
+                                     */
+                                    tipoMime: string;
+                                    /**
+                                     * @description Tamaño en bytes del archivo
+                                     * @example 1048576
+                                     */
+                                    tamanoBytes: number;
+                                    /** @description Fecha y hora de carga del archivo en formato ISO 8601 */
+                                    creadoEn: string;
                                 }[];
                                 /** @description Estado consolidado de evaluaciones en terreno realizadas en la misión (HU-37 / HU-38 / HU-39) */
                                 evaluaciones?: {
@@ -9481,6 +9521,175 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/evidencia/adjuntos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar evidencia multimedia por incidente o reporte de terreno (HU-43)
+         * @description Retorna la lista cronológica de evidencias multimedia asociadas a un incidente o reporte de terreno.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    incidente_id?: string;
+                    reporte_terreno_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Listado de archivos adjuntos asociados */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ListarAdjuntosResponse"];
+                    };
+                };
+                /** @description Parámetros inválidos o falta incidente_id y reporte_terreno_id */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado o token JWT inválido */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Sin permisos suficientes para consultar evidencias */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor al consultar evidencias */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Subir evidencia multimedia (HU-43)
+         * @description Permite adjuntar fotografías (JPEG, PNG, WebP), videos (MP4, WebM, MOV) o documentos técnicos (PDF) de hasta 10 MB asociados a un incidente o reporte de terreno. Requiere permiso RBAC 'reportes:crear'.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /**
+                         * Format: binary
+                         * @description Archivo multimedia o PDF (máx. 10 MB)
+                         */
+                        file: string;
+                        /**
+                         * Format: uuid
+                         * @description UUID del incidente asociado (requerido si no se envía reporte_terreno_id)
+                         */
+                        incidente_id?: string;
+                        /**
+                         * Format: uuid
+                         * @description UUID del reporte de terreno asociado (requerido si no se envía incidente_id)
+                         */
+                        reporte_terreno_id?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Evidencia optimizada, almacenada y registrada exitosamente en la tabla adjunto */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdjuntoCreadoResponse"];
+                    };
+                };
+                /** @description Solicitud inválida: falta el archivo, archivo vacío o no se envió incidente_id ni reporte_terreno_id */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No autenticado, token ausente o usuario inactivo */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Acceso denegado. Se requiere el permiso 'reportes:crear' */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description El incidente_id o reporte_terreno_id especificado no existe */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflicto relacional (reporte_terreno_id e incidente_id no coinciden) o incidente en estado cerrado (RESUELTO / NO_ABORDABLE) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description El archivo supera el límite máximo permitido de 10 MB */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Tipo MIME o firma binaria (magic bytes) no permitida */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error interno del servidor al almacenar la evidencia */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/eventos-atp": {
         parameters: {
             query?: never;
@@ -9880,7 +10089,7 @@ export interface paths {
         put?: never;
         /**
          * Enviar informe técnico de verificación en terreno y cerrar misión inicial de patrullaje (HU-39 / HU-86)
-         * @description Permite a la patrulla verificadora enviar el informe técnico consolidado de terreno con dictamen operativo ('REQUIERE_CUADRILLA' o 'NO_ABORDABLE'), resumen técnico (>= 10 caracteres), estado del terreno, estimación de personas damnificadas (rescatable desde el reporte previo de prioridad HU-38 y modificable), daños estimados, observaciones, indicador de Ficha FIBE (requiere_asistencia_social) y sección preparada para evidencia fotográfica (HU-43). Ejecuta una transacción atómica que: (1) persiste el reporte en reporte_terreno con evaluador_id = usuario.id, (2) cierra la misión (COMPLETADA con fecha_cierre), (3) libera la patrulla a DISPONIBLE, (4) si es NO_ABORDABLE (exige motivo_no_abordable >= 15 caracteres), transiciona el incidente a NO_ABORDABLE con fecha_cierre y motivo, o si solicita Ficha FIBE marca incidente.requiere_asistencia_social = true, y (5) registra el hito VERIFICACION_COMPLETADA en mision_hito. Emite eventos WebSocket 'mision:actualizada', 'incidente:actualizado' y 'patrulla:actualizada' / 'patrulla:liberada'. Requiere permiso RBAC 'reportes:crear'.
+         * @description Permite a la patrulla verificadora enviar el informe técnico consolidado de terreno con dictamen operativo ('REQUIERE_CUADRILLA' o 'NO_ABORDABLE'), resumen técnico (>= 10 caracteres), estado del terreno, estimación de personas damnificadas (rescatable desde el reporte previo de prioridad HU-38 y modificable), daños estimados, observaciones, indicador de Ficha FIBE (requiere_asistencia_social) y sección de evidencia multimedia (HU-43). Ejecuta una transacción atómica que: (1) persiste el reporte en reporte_terreno con evaluador_id = usuario.id, (2) cierra la misión (COMPLETADA con fecha_cierre), (3) libera la patrulla a DISPONIBLE, (4) si es NO_ABORDABLE (exige motivo_no_abordable >= 15 caracteres), transiciona el incidente a NO_ABORDABLE con fecha_cierre y motivo, o si solicita Ficha FIBE marca incidente.requiere_asistencia_social = true, y (5) registra el hito VERIFICACION_COMPLETADA en mision_hito. Emite eventos WebSocket 'mision:actualizada', 'incidente:actualizado' y 'patrulla:actualizada' / 'patrulla:liberada'. Requiere permiso RBAC 'reportes:crear'.
          */
         post: {
             parameters: {
@@ -12516,6 +12725,16 @@ export interface components {
                         email?: string | null;
                         rut?: string | null;
                     };
+                    creadoEn: string;
+                }[];
+                /** @description Evidencias multimedia asociadas al incidente (directas por incidente_id y vinculadas a reportes de terreno) */
+                adjuntos?: {
+                    /** Format: uuid */
+                    id: string;
+                    nombreArchivo: string;
+                    url: string;
+                    tipoMime: string;
+                    tamanoBytes: number;
                     creadoEn: string;
                 }[];
                 /**
@@ -16527,6 +16746,32 @@ export interface components {
              * @example Valdivia2026!
              */
             confirmacionPassword: string;
+        };
+        AdjuntoCreadoResponse: {
+            /**
+             * Format: uuid
+             * @description UUID del registro en tabla adjunto
+             */
+            id: string;
+            /** @example evidencia_terreno.jpg */
+            nombreArchivo: string;
+            /** @example /uploads/evidencia/a1b2c3d4.webp */
+            url: string;
+            /** @example image/webp */
+            tipoMime: string;
+            /** @example 145820 */
+            tamanoBytes: number;
+            /** Format: uuid */
+            incidenteId: string | null;
+            /** Format: uuid */
+            reporteTerrenoId: string | null;
+            /** Format: uuid */
+            misionId?: string | null;
+            /** Format: date-time */
+            creadoEn: string;
+        };
+        ListarAdjuntosResponse: {
+            data: components["schemas"]["AdjuntoCreadoResponse"][];
         };
     };
     responses: never;

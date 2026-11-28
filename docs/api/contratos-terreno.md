@@ -143,7 +143,45 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 
 ---
 
-### 2.2 Evaluar Terreno y Asignar/Modificar Prioridad del Incidente (H38)
+### 2.2 Adjuntar Evidencia Multimedia en Terreno (H43)
+- **Historia:** H43
+- **Método:** `POST`
+- **Ruta:** `/api/evidencia/adjuntos`
+- **Permiso RBAC requerido:** `reportes:crear`
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: multipart/form-data`
+
+#### Request Body (`multipart/form-data`)
+- `file` *(binary, obligatorio)*: Archivo de imagen (`image/jpeg`, `image/png`, `image/webp`), video (`video/mp4`, `video/webm`, `video/quicktime`) o documento (`application/pdf`), con peso máximo de `10 MB`.
+- `incidente_id` *(string UUID, opcional)*: Identificador del incidente asociado.
+- `reporte_terreno_id` *(string UUID, opcional)*: Identificador del reporte de terreno asociado.
+> Al menos uno de `incidente_id` o `reporte_terreno_id` debe enviarse.
+
+#### Response Exitosa (`201 Created`)
+```json
+{
+  "id": "33333333-3333-4333-8333-333333333333",
+  "nombreArchivo": "foto_terreno.webp",
+  "url": "/uploads/evidencia/9f86d081884c7d659a2feaa0c55ad015.webp",
+  "tipoMime": "image/webp",
+  "tamanoBytes": 148200,
+  "incidenteId": "22222222-2222-4222-8222-222222222222",
+  "reporteTerrenoId": null,
+  "creadoEn": "2026-11-17T19:00:00.000Z"
+}
+```
+> El servidor optimiza imágenes a WebP y transcodifica videos a MP4 (720p, `faststart`), devolviendo `url`, `tipoMime` y `tamanoBytes` definitivos. El cliente actualiza el adjunto local con estos valores y consume `/uploads/evidencia/[filename]` con soporte `Accept-Ranges: bytes` (`206 Partial Content`).
+
+#### Códigos de Error y Manejo Offline
+- `400`: Faltan `incidente_id` / `reporte_terreno_id` o formato UUID inválido.
+- `403`: Usuario sin permiso `reportes:crear`.
+- `404`: Incidente o reporte de terreno no encontrado.
+- `413`: Archivo supera los `10 MB`.
+- `415`: Tipo MIME o firma binaria (*magic bytes*) no autorizada.
+- Sin conexión o falla de red (`5xx`): La PWA valida con Zod, comprime imágenes en cliente ($\le 1280\text{px}$), encola `SUBIR_EVIDENCIA` en IndexedDB y sincroniza automáticamente vía `FormData` al recuperar conectividad.
+
+---
+
+### 2.3 Evaluar Terreno y Asignar/Modificar Prioridad del Incidente (H38)
 - **Historia:** H38
 - **Método:** `PATCH`
 - **Ruta:** `/api/incidentes/{id}/prioridad` (y cálculo auxiliar en `POST /api/incidentes/{id}/prioridad/calcular`)
@@ -185,7 +223,7 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 
 ---
 
-### 2.3 Enviar Informe Técnico de Verificación y Cerrar Misión (H39 / H86)
+### 2.4 Enviar Informe Técnico de Verificación y Cerrar Misión (H39 / H86)
 - **Historia:** H39 (fusión H39 / H86)
 - **Método:** `POST`
 - **Ruta:** `/api/misiones/{id}/reporte`
@@ -221,7 +259,7 @@ Retorna la entidad `UsuarioSesion` descrita en el login.
 
 ---
 
-### 2.4 Rechazo Motivado de Misión en Terreno (H41, H69)
+### 2.5 Rechazo Motivado de Misión en Terreno (H41, H69)
 - **Historia:** H41, H69
 - **Método:** `POST`
 - **Ruta:** `/api/misiones/{id}/rechazar`

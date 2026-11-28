@@ -378,6 +378,45 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
     await eliminarAccionOutbox(a3.id);
   });
 
+  it('bloquea acciones posteriores de la misma misión si falla SUBIR_EVIDENCIA por orden causal (BUG-H43-PWA-04)', async () => {
+    const misionId = 'mision-causal-ev-01';
+    const aEv = await encolarAccionOutbox({
+      tipo: 'SUBIR_EVIDENCIA',
+      url: '/api/evidencia/adjuntos',
+      metodo: 'POST',
+      payload: {
+        adjuntoLocalId: 'local-ev-1',
+        misionId,
+        nombreArchivo: 'foto.jpg',
+        tipoMime: 'image/jpeg',
+        tamanoBytes: 1200,
+        dataUrl: 'data:image/jpeg;base64,abcd',
+      },
+    });
+    const aRep = await encolarAccionOutbox({
+      tipo: 'ENVIAR_REPORTE',
+      url: `/api/misiones/${misionId}/reporte`,
+      metodo: 'POST',
+      payload: {
+        misionId,
+        dictamen: 'REQUIERE_CUADRILLA',
+        resumen_tecnico: 'Evaluación técnica completa en terreno',
+      },
+    });
+
+    const ejecutadas: string[] = [];
+    const res = await sincronizarColaOutbox(async (accion) => {
+      ejecutadas.push(accion.tipo);
+      return accion.tipo !== 'SUBIR_EVIDENCIA';
+    });
+
+    expect(ejecutadas).toEqual(['SUBIR_EVIDENCIA']);
+    expect(res.fallidas).toBeGreaterThanOrEqual(2);
+
+    await eliminarAccionOutbox(aEv.id);
+    await eliminarAccionOutbox(aRep.id);
+  });
+
   it('preserva timestamp causal original al deduplicar una acción previa para no desplazarla detrás de ENVIAR_REPORTE (BUG-INT-PWA-14)', async () => {
     const misionId = 'mision-dedup-causal-01';
     const tipificar = await encolarAccionOutbox({
@@ -414,5 +453,4 @@ describe('offlineQueue (IndexedDB Offline Store)', () => {
     await eliminarAccionOutbox(tipificar.id);
     await eliminarAccionOutbox(cerrar.id);
   });
-
 });

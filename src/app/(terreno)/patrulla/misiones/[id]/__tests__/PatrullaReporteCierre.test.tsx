@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import PatrullaMisionDetailPage from '../page';
 import { useAuth } from '@/context/AuthContext';
 import { useConnectivity } from '@/hooks/useConnectivity';
@@ -300,10 +300,11 @@ describe('PatrullaMisionDetailPage — Informe Técnico de Verificación y Cierr
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('resumen-reporte-cierre')).toBeInTheDocument();
+      const resumen = screen.getByTestId('resumen-reporte-cierre');
+      expect(resumen).toBeInTheDocument();
       expect(screen.queryByTestId('aviso-autor-cierre')).not.toBeInTheDocument();
-      expect(screen.getByText(/^Registrado por$/i)).toBeInTheDocument();
-      expect(screen.getAllByText(/Personal 1 \(p1@valdivia\.cl\) ·/i)).toHaveLength(1);
+      expect(within(resumen).getByText(/^Registrado por$/i)).toBeInTheDocument();
+      expect(within(resumen).getAllByText(/Personal 1 \(p1@valdivia\.cl\) ·/i)).toHaveLength(1);
     });
   });
 
@@ -360,13 +361,17 @@ describe('PatrullaMisionDetailPage — Informe Técnico de Verificación y Cierr
       target: { value: 'Inspección perimetral desde calle sin ingreso posible.' },
     });
 
-    // Motivo corto (< 15 chars): botón debe seguir deshabilitado
+    // Motivo corto (< 15 chars): al intentar enviar muestra alerta de validación y no abre modal
     fireEvent.change(screen.getByLabelText(/Motivo de No Abordabilidad/i), {
       target: { value: 'Muy corto' },
     });
-    expect(
-      screen.getByRole('button', { name: /Enviar Reporte y Cerrar Tarea/i })
-    ).toBeDisabled();
+    const btnEnviarCorto = screen.getByRole('button', {
+      name: /Enviar Reporte y Cerrar Tarea/i,
+    });
+    expect(btnEnviarCorto).not.toBeDisabled();
+    fireEvent.click(btnEnviarCorto);
+    expect(screen.getAllByRole('alert')[0]).toHaveTextContent(/al menos 15 caracteres/i);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     // Motivo válido (>= 15 chars): abre modal de confirmación danger
     fireEvent.change(screen.getByLabelText(/Motivo de No Abordabilidad/i), {

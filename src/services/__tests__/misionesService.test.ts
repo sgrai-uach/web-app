@@ -1576,5 +1576,115 @@ describe('misionesService — Sincronización remota y persistencia IndexedDB (O
       expect(detalle?.datosAdicionales?.estadoPatrulla).toBeUndefined();
       expect(detalle?.datosAdicionales?.estadoCuadrilla).toBe('DISPONIBLE');
     });
+
+    it('obtenerDetalleMision consolida d.adjuntos y reportesTerreno[].adjuntos sin duplicados y conserva errores/locales previos (BUG-H43-PWA-01)', async () => {
+      const misionId = '70000000-0000-4000-8000-000000000099';
+      const adjDirecto = {
+        id: 'adj-directo-1',
+        nombreArchivo: 'incidente-directo.jpg',
+        url: '/uploads/evidencia/incidente-directo.jpg',
+        tipoMime: 'image/jpeg',
+        tamanoBytes: 1400,
+        creadoEn: '2026-11-16T22:10:00Z',
+      };
+      const adjReporte = {
+        id: 'adj-rep-1',
+        nombreArchivo: 'reporte.pdf',
+        url: '/uploads/evidencia/reporte.pdf',
+        tipoMime: 'application/pdf',
+        tamanoBytes: 2200,
+        creadoEn: '2026-11-16T22:20:00Z',
+      };
+      const adjConError = {
+        id: 'local-err-1',
+        nombreArchivo: 'fallido.png',
+        url: 'data:image/png;base64,abc',
+        tipoMime: 'image/png',
+        tamanoBytes: 500,
+        creadoEn: '2026-11-16T22:05:00Z',
+        sincronizacionPendiente: false,
+        errorSincronizacion: 'Archivo inválido en servidor.',
+      };
+      const adjPendiente = {
+        id: 'local-pend-1',
+        nombreArchivo: 'cola.jpg',
+        url: 'data:image/jpeg;base64,def',
+        tipoMime: 'image/jpeg',
+        tamanoBytes: 800,
+        creadoEn: '2026-11-16T22:06:00Z',
+        sincronizacionPendiente: true,
+      };
+
+      vi.mocked(offlineQueue.obtenerMisionLocalPorId).mockResolvedValue({
+        id: misionId,
+        incidenteId: 'inc-99',
+        codigoIncidente: 'INC-2026-0099',
+        tipologia: 'Inundación',
+        direccion: 'Valdivia',
+        prioridad: 'ALTA',
+        estado: 'EN_CURSO',
+        fechaDespacho: '2026-11-16T22:00:00Z',
+        actualizadoEn: '2026-11-16T22:06:00Z',
+        datosAdicionales: {
+          adjuntos: [adjConError, adjPendiente],
+        },
+      });
+
+      vi.mocked(apiClient.GET).mockResolvedValue({
+        data: {
+          message: 'OK',
+          data: {
+            id: misionId,
+            codigo: 'MIS-2026-0099',
+            titulo: 'Bombeo preventivo',
+            descripcion: 'Sector bajo',
+            tipoMision: 'ATENCION_CUADRILLA',
+            estado: 'EN_CURSO',
+            prioridad: 'ALTA',
+            patrulla: null,
+            cuadrilla: { id: 'c1', nombre: 'Cuadrilla 1', estado: 'EN_MISION' },
+            incidente: {
+              id: 'inc-99',
+              codigo: 'INC-2026-0099',
+              tipoAfectacion: 'Inundación',
+              direccion: 'Valdivia',
+              estado: 'EN_ATENCION',
+              latitud: -39.81,
+              longitud: -73.24,
+            },
+            adjuntos: [adjDirecto, adjReporte],
+            bitacoraTiempos: [],
+            reportesTerreno: [
+              {
+                id: 'rep-99',
+                tipoReporte: 'EVALUACION_PRIORIDAD',
+                adjuntos: [adjReporte],
+              },
+            ],
+            fechaInicio: '2026-11-16T22:01:00Z',
+            creadoEn: '2026-11-16T22:00:00Z',
+            actualizadoEn: '2026-11-16T22:30:00Z',
+          },
+        },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      } as never);
+
+      const detalle = await obtenerDetalleMision(misionId);
+      const adjuntos = (detalle?.datosAdicionales?.adjuntos ?? []) as Array<{
+        id: string;
+        errorSincronizacion?: string;
+      }>;
+
+      expect(adjuntos.map((a) => a.id)).toEqual([
+        'local-err-1',
+        'local-pend-1',
+        'adj-directo-1',
+        'adj-rep-1',
+      ]);
+      expect(adjuntos.find((a) => a.id === 'local-err-1')?.errorSincronizacion).toBe(
+        'Archivo inválido en servidor.'
+      );
+    });
   });
 });
